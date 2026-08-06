@@ -18,9 +18,11 @@ import org.robolectric.annotation.Config
 
 class FakeReminderScheduler(context: Context) : ReminderScheduler(context) {
     val scheduled = mutableListOf<Triple<String, Long, Int>>()
+
     override fun schedule(sessionId: String, remindAtUtc: Long, requestCode: Int) {
         scheduled.add(Triple(sessionId, remindAtUtc, requestCode))
     }
+
     override fun cancelAll(requestCodes: List<Int>) {}
 }
 
@@ -34,8 +36,10 @@ class RescheduleAlarmsUseCaseTest {
     private lateinit var useCase: RescheduleAlarmsUseCase
     private lateinit var resolveReminderUseCase: ResolveReminderUseCase
 
+    private var testNow: Long = 0
+
     @Before
-    fun setup() {
+    fun setup() = kotlinx.coroutines.runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
@@ -51,6 +55,28 @@ class RescheduleAlarmsUseCaseTest {
             resolveReminderUseCase,
             scheduler
         )
+
+        testNow = System.currentTimeMillis()
+        val day = 24L * 60 * 60 * 1000
+        
+        val sPast = fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity(
+            id = "s-past", planId = "p1", originalSessionId = null, scheduledDate = "2026-01-01", scheduledTime = null,
+            durationMin = 1, type = fi.merilainen.treenivalmentaja.domain.WorkoutType.RUNNING, timeIsFixed = false,
+            intensity = null, weekNumber = 1, distanceKm = null, description = null, reminderOverride = null, status = fi.merilainen.treenivalmentaja.domain.SessionStatus.PLANNED,
+            remindAtUtc = testNow - day, updatedAt = testNow
+        )
+        val s3Days = sPast.copy(id = "s-3", remindAtUtc = testNow + 3 * day, scheduledDate = java.time.LocalDate.now().plusDays(3).toString())
+        val s5Days = sPast.copy(id = "s-5", remindAtUtc = testNow + 5 * day, scheduledDate = java.time.LocalDate.now().plusDays(5).toString())
+        val s10Days = sPast.copy(id = "s-10", remindAtUtc = testNow + 10 * day, scheduledDate = java.time.LocalDate.now().plusDays(10).toString())
+        val sNotPlanned = sPast.copy(id = "s-not-planned", remindAtUtc = testNow + 4 * day, scheduledDate = java.time.LocalDate.now().plusDays(4).toString(), status = fi.merilainen.treenivalmentaja.domain.SessionStatus.COMPLETED)
+        
+        val p1 = fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity(id = "p1", name = "Plan", description = null, timeZone = "Europe/Helsinki", isActive = true, schemaVersion = 1, startDate = "2026-01-01", contentHash = "hash", createdAt = testNow)
+        db.trainingPlanDao().insert(p1)
+        db.workoutSessionDao().insert(sPast)
+        db.workoutSessionDao().insert(s3Days)
+        db.workoutSessionDao().insert(s5Days)
+        db.workoutSessionDao().insert(s10Days)
+        db.workoutSessionDao().insert(sNotPlanned)
     }
 
     @After
@@ -59,51 +85,45 @@ class RescheduleAlarmsUseCaseTest {
     }
 
     @Test
-    fun testScheduling() = runTest {
-        val now = System.currentTimeMillis()
-        val day = 24L * 60 * 60 * 1000
-        
-        val sPast = fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity(
-            id = "s-past", planId = "p1", originalSessionId = null, scheduledDate = "2026-01-01", scheduledTime = null,
-            durationMin = 1, type = fi.merilainen.treenivalmentaja.domain.WorkoutType.RUNNING, timeIsFixed = false,
-            intensity = null, weekNumber = 1, distanceKm = null, description = null, reminderOverride = null, status = fi.merilainen.treenivalmentaja.domain.SessionStatus.PLANNED,
-            remindAtUtc = now - day, updatedAt = now
-        )
-        val s3Days = sPast.copy(id = "s-3", remindAtUtc = now + 3 * day, scheduledDate = java.time.LocalDate.now().plusDays(3).toString())
-        val s5Days = sPast.copy(id = "s-5", remindAtUtc = now + 5 * day, scheduledDate = java.time.LocalDate.now().plusDays(5).toString())
-        val s10Days = sPast.copy(id = "s-10", remindAtUtc = now + 10 * day, scheduledDate = java.time.LocalDate.now().plusDays(10).toString())
-        val sNotPlanned = sPast.copy(id = "s-not-planned", remindAtUtc = now + 4 * day, scheduledDate = java.time.LocalDate.now().plusDays(4).toString(), status = fi.merilainen.treenivalmentaja.domain.SessionStatus.COMPLETED)
-        
-        val p1 = fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity(id = "p1", name = "Plan", description = null, timeZone = "Europe/Helsinki", isActive = true, schemaVersion = 1, startDate = "2026-01-01", contentHash = "hash", createdAt = now)
-        db.trainingPlanDao().insert(p1)
-        db.workoutSessionDao().insert(sPast)
-        db.workoutSessionDao().insert(s3Days)
-        db.workoutSessionDao().insert(s5Days)
-        db.workoutSessionDao().insert(s10Days)
-        db.workoutSessionDao().insert(sNotPlanned)
-
+    fun schedulesSessionWithin7Days() = runTest {
         useCase.execute()
-
         val scheduledIds = scheduler.scheduled.map { it.first }
-        
-        // Assert 1: 3 days is scheduled
         assertTrue(scheduledIds.contains("s-3"))
-        
-        // Assert 2: 10 days is skipped (outside 7 day window)
+        assertTrue(scheduledIds.contains("s-5"))
+    }
+
+    @Test
+    fun skipsSessionOutside7Days() = runTest {
+        useCase.execute()
+        val scheduledIds = scheduler.scheduled.map { it.first }
         assertTrue(!scheduledIds.contains("s-10"))
-        
-        // Assert 3: Past is skipped
+    }
+
+    @Test
+    fun skipsPastSession() = runTest {
+        useCase.execute()
+        val scheduledIds = scheduler.scheduled.map { it.first }
         assertTrue(!scheduledIds.contains("s-past"))
-        
-        // Assert: not planned is skipped
+    }
+
+    @Test
+    fun skipsNotPlannedSession() = runTest {
+        useCase.execute()
+        val scheduledIds = scheduler.scheduled.map { it.first }
         assertTrue(!scheduledIds.contains("s-not-planned"))
-        
-        // Assert 4: Different sessions get different request codes
+    }
+
+    @Test
+    fun assignsDifferentRequestCodesToDifferentSessions() = runTest {
+        useCase.execute()
         val s3Code = scheduler.scheduled.first { it.first == "s-3" }.third
         val s5Code = scheduler.scheduled.first { it.first == "s-5" }.third
         assertTrue(s3Code != s5Code)
-        
-        // Assert 5: REARM is scheduled with highest request code
+    }
+
+    @Test
+    fun schedulesRearmWithHighestRequestCode() = runTest {
+        useCase.execute()
         val rearm = scheduler.scheduled.first { it.first == "REARM" }
         assertEquals(scheduler.scheduled.maxOf { it.third }, rearm.third)
     }

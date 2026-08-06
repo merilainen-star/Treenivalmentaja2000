@@ -61,11 +61,11 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
                 .alpha(alphaAnim)
                 .scale(scaleAnim)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.splash_logo),
+            Icon(
+                imageVector = Icons.Filled.DirectionsRun,
                 contentDescription = "App Background and Logo",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                modifier = Modifier.size(120.dp), tint = Color.White
+                
             )
         }
         

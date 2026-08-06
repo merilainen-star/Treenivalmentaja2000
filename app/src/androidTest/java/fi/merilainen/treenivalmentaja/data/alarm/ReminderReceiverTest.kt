@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.rule.GrantPermissionRule
+import org.junit.Rule
 import fi.merilainen.treenivalmentaja.TreenivalmentajaApplication
 import fi.merilainen.treenivalmentaja.domain.EventSource
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -17,6 +19,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ReminderReceiverTest {
+    @get:Rule
+    val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
     private lateinit var app: TreenivalmentajaApplication
     private lateinit var receiver: ReminderReceiver
 
