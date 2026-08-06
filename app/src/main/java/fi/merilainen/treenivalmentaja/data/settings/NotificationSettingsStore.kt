@@ -32,6 +32,9 @@ class NotificationSettingsStore(private val context: Context) {
   private val STRENGTH_TIME = stringPreferencesKey("strength_time")
   private val SKIING_TIME = stringPreferencesKey("skiing_time")
   private val REMINDER_OFFSET_MIN = intPreferencesKey("reminder_offset_min")
+  private val ALARM_COUNT = intPreferencesKey("alarm_count")
+
+  val alarmCountFlow: Flow<Int> = context.dataStore.data.map { it[ALARM_COUNT] ?: 0 }
 
   val settingsFlow: Flow<NotificationSettings> = context.dataStore.data.map { preferences ->
     NotificationSettings(
@@ -50,6 +53,10 @@ class NotificationSettingsStore(private val context: Context) {
         WorkoutType.SKIING -> preferences[SKIING_TIME] = time
       }
     }
+  }
+
+  suspend fun updateAlarmCount(count: Int) {
+    context.dataStore.edit { it[ALARM_COUNT] = count }
   }
 
   suspend fun updateReminderOffset(offsetMin: Int) {

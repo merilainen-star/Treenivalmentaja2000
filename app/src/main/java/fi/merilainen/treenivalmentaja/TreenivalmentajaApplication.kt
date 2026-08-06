@@ -8,6 +8,10 @@ import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 
+
+import fi.merilainen.treenivalmentaja.data.notification.NotificationChannels
+import fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler
+
 class TreenivalmentajaApplication : Application() {
 
   val db: AppDatabase by lazy { AppDatabase.getInstance(this) }
@@ -28,13 +32,24 @@ class TreenivalmentajaApplication : Application() {
     ResolveReminderUseCase()
   }
 
+
+  val reminderScheduler: ReminderScheduler by lazy {
+    ReminderScheduler(this)
+  }
+
   val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase by lazy {
     RescheduleAlarmsUseCase(
       database = db,
       planDao = db.trainingPlanDao(),
       sessionDao = db.workoutSessionDao(),
       settingsStore = settingsStore,
-      resolveReminderUseCase = resolveReminderUseCase
+      resolveReminderUseCase = resolveReminderUseCase,
+      reminderScheduler = reminderScheduler
     )
+  }
+
+  override fun onCreate() {
+    super.onCreate()
+    NotificationChannels.createChannels(this)
   }
 }

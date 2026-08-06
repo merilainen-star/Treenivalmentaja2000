@@ -179,7 +179,7 @@ class TrainingRepository(
       }
       val now = clock.millis()
       val zone = activePlanTimeZone()
-      val time = newTime ?: LocalTime.parse(entity.scheduledTime, timeFormat)
+      val time = newTime ?: entity.scheduledTime?.let { LocalTime.parse(it, timeFormat) }
       val newId = "${entity.id}@${idGenerator().take(8)}"
 
       sessionDao.update(entity.copy(status = target, updatedAt = now))
@@ -187,8 +187,8 @@ class TrainingRepository(
         entity.copy(
           id = newId,
           scheduledDate = newDate.toString(),
-          scheduledTime = time.format(timeFormat),
-          remindAtUtc = ZonedDateTime.of(newDate, time, zone).toInstant().toEpochMilli(),
+          scheduledTime = time?.format(timeFormat),
+          remindAtUtc = time?.let { ZonedDateTime.of(newDate, it, zone).toInstant().toEpochMilli() } ?: entity.remindAtUtc,
           status = SessionStatus.PLANNED,
           originalSessionId = entity.id,
           updatedAt = now,

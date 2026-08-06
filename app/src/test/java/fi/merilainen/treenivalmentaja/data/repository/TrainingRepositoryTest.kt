@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.domain.EventSource
+import fi.merilainen.treenivalmentaja.data.repository.TransitionResult
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import java.time.Clock
 import java.time.Instant
@@ -353,4 +354,16 @@ class TrainingRepositoryTest {
       }
       """
   }
-}
+
+@Test
+  fun `rescheduling a session without time preserves null time without crashing`() = runTest {
+    val importRes = repository.importPlan(PLAN.replace("\"07:00\"", "null")) // make s-1 time null
+    assertTrue("Import failed: $importRes", importRes is fi.merilainen.treenivalmentaja.data.importer.ImportResult.Success)
+    val result = repository.reschedule("s-1", LocalDate.parse("2026-08-11"), null, EventSource.USER, null)
+    assertTrue("Reschedule should return Applied but got " + result.javaClass.simpleName, result is TransitionResult.Applied)
+    
+    val allSessions = db.workoutSessionDao().getByStatus(SessionStatus.PLANNED)
+    val newSession = allSessions.find { it.originalSessionId == "s-1" }!!
+    assertNull("Scheduled time should remain null", newSession.scheduledTime)
+    assertEquals("2026-08-11", newSession.scheduledDate)
+  }}
