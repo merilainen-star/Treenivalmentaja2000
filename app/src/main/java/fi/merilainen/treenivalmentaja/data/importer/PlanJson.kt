@@ -14,9 +14,9 @@ import java.security.MessageDigest
 /** Parsing and serialisation for the plan import format and the JSON columns in Room. */
 object PlanJson {
 
-  // The import DTOs carry use KotlinJsonAdapterFactory.
-  // KotlinJsonAdapterFactory is the fallback for the domain classes stored in the JSON columns —
-  // it defers to a generated adapter whenever one exists, so the two do not conflict.
+  // The KotlinJsonAdapterFactory uses reflection to serialize and deserialize the import DTOs
+  // and domain classes stored in the JSON columns without requiring KSP code generation.
+  
   private val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
   private val documentAdapter: JsonAdapter<PlanDocumentDto> =

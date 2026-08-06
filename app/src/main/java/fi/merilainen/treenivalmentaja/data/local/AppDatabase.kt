@@ -120,7 +120,7 @@ abstract class AppDatabase : RoomDatabase() {
     private fun build(context: Context): AppDatabase =
       Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
         .addMigrations(MIGRATION_3_4)
-        .fallbackToDestructiveMigration()
+        .fallbackToDestructiveMigration(dropAllTables = true)
         .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
         .build()
   }

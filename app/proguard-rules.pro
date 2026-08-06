@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Moshi reflection requires Kotlin metadata and keeping the DTO/domain classes intact
+-keep class kotlin.Metadata { *; }
+-keep class fi.merilainen.treenivalmentaja.data.importer.** { *; }
+-keep class fi.merilainen.treenivalmentaja.domain.** { *; }

@@ -19,7 +19,8 @@ class MigrationTest {
   val helper: MigrationTestHelper =
     MigrationTestHelper(
       InstrumentationRegistry.getInstrumentation(),
-      AppDatabase::class.java.canonicalName,
+      AppDatabase::class.java,
+      emptyList(),
       FrameworkSQLiteOpenHelperFactory()
     )
 
