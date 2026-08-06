@@ -255,13 +255,9 @@ object PlanValidator {
       return null
     }
     
-    // We set remindAtUtc based on time only if provided for now, but RescheduleAlarmsUseCase handles it fully.
-    // For import, we just map it out.
-    // Wait, the domain model now requires remindAtUtc. We should resolve it properly or use a placeholder.
-    // No, wait, if time is null, what is the placeholder for remindAtUtc in PlanValidator? 
-    // PlanValidator doesn't have access to settings. Let's just default to 18:00 for the initial mapping, 
-    // or RescheduleAlarmsUseCase will overwrite it immediately after import anyway.
-    val resolvedTime = time ?: java.time.LocalTime.of(18, 0)
+    // PlanValidator ei näe käyttäjän asetuksia, joten ajaton sessio saa väliaikaisen
+    // 18:00-arvon. RescheduleAlarmsUseCase laskee oikean muistutusajan heti tuonnin jälkeen.
+    val resolvedTime = time ?: LocalTime.of(18, 0)
 
     return TrainingSession(
       id = id,

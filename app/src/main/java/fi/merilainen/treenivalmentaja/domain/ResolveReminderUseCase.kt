@@ -19,21 +19,26 @@ class ResolveReminderUseCase {
     val date = LocalDate.parse(sessionScheduledDate)
     val zone = ZoneId.of(timeZone)
 
-    val resolvedTime: LocalTime = when {
-      sessionReminderOverride != null -> LocalTime.parse(sessionReminderOverride)
+    val resolvedZonedDateTime: ZonedDateTime = when {
+      sessionReminderOverride != null -> {
+        val overrideTime = LocalTime.parse(sessionReminderOverride)
+        ZonedDateTime.of(date, overrideTime, zone)
+      }
       sessionTimeIsFixed && sessionScheduledTime != null -> {
-        LocalTime.parse(sessionScheduledTime).minusMinutes(settings.reminderOffsetMin.toLong())
+        val scheduledTime = LocalTime.parse(sessionScheduledTime)
+        ZonedDateTime.of(date, scheduledTime, zone).minusMinutes(settings.reminderOffsetMin.toLong())
       }
       else -> {
         val defaultStr = settings.getTimeForType(sessionType)
-        try {
+        val defaultTime = try {
           LocalTime.parse(defaultStr)
         } catch (e: Exception) {
           LocalTime.of(18, 0)
         }
+        ZonedDateTime.of(date, defaultTime, zone)
       }
     }
     
-    return ZonedDateTime.of(date, resolvedTime, zone).toInstant().toEpochMilli()
+    return resolvedZonedDateTime.toInstant().toEpochMilli()
   }
 }

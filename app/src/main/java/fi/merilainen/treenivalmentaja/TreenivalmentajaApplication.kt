@@ -30,6 +30,7 @@ class TreenivalmentajaApplication : Application() {
 
   val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase by lazy {
     RescheduleAlarmsUseCase(
+      database = db,
       planDao = db.trainingPlanDao(),
       sessionDao = db.workoutSessionDao(),
       settingsStore = settingsStore,

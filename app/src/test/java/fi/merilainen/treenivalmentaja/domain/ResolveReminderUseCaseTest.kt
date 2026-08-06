@@ -64,4 +64,20 @@ class ResolveReminderUseCaseTest {
     val expected = ZonedDateTime.of(LocalDate.parse("2026-08-10"), LocalTime.parse("07:00"), ZoneId.of("Europe/Helsinki")).toInstant().toEpochMilli()
     assertEquals(expected, result)
   }
+
+  @Test
+  fun `fixed time uses offset across midnight`() {
+    val result = useCase.resolveRemindAtUtc(
+      sessionScheduledDate = "2026-08-10",
+      sessionScheduledTime = "00:10",
+      sessionTimeIsFixed = true,
+      sessionReminderOverride = null,
+      sessionType = WorkoutType.RUNNING,
+      timeZone = "Europe/Helsinki",
+      settings = settings
+    )
+    // 00:10 on 10th minus 15 min = 23:55 on the 9th
+    val expected = ZonedDateTime.of(LocalDate.parse("2026-08-09"), LocalTime.parse("23:55"), ZoneId.of("Europe/Helsinki")).toInstant().toEpochMilli()
+    assertEquals(expected, result)
+  }
 }

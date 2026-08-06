@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "database": {
-    "version": 2,
-    "identityHash": "7cc42f9b69ac0aabc5b53e7552e2dc54",
+    "version": 3,
+    "identityHash": "e38bc5b054d66dfbed0ebe43620d32b9",
     "entities": [
       {
         "tableName": "training_plans",
@@ -71,7 +71,7 @@
       },
       {
         "tableName": "workout_sessions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `planId` TEXT NOT NULL, `type` TEXT NOT NULL, `weekNumber` INTEGER NOT NULL, `scheduledDate` TEXT NOT NULL, `scheduledTime` TEXT, `remindAtUtc` INTEGER NOT NULL, `timeIsFixed` INTEGER NOT NULL, `reminderOverride` TEXT, `durationMin` INTEGER, `distanceKm` REAL, `intensity` TEXT, `rounds` INTEGER, `roundsMin` INTEGER, `roundsMax` INTEGER, `targetPace` TEXT, `warmupSec` INTEGER, `exercisesJson` TEXT, `lighterAlternativeJson` TEXT, `description` TEXT, `status` TEXT NOT NULL, `appliedLighterVariant` INTEGER NOT NULL, `originalSessionId` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`planId`) REFERENCES `training_plans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `planId` TEXT NOT NULL, `type` TEXT NOT NULL, `weekNumber` INTEGER NOT NULL, `scheduledDate` TEXT NOT NULL, `scheduledTime` TEXT NOT NULL, `scheduledAtUtc` INTEGER NOT NULL, `durationMin` INTEGER, `distanceKm` REAL, `intensity` TEXT, `rounds` INTEGER, `roundsMin` INTEGER, `roundsMax` INTEGER, `targetPace` TEXT, `warmupSec` INTEGER, `exercisesJson` TEXT, `lighterAlternativeJson` TEXT, `description` TEXT, `status` TEXT NOT NULL, `appliedLighterVariant` INTEGER NOT NULL, `originalSessionId` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`planId`) REFERENCES `training_plans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -106,24 +106,14 @@
           {
             "fieldPath": "scheduledTime",
             "columnName": "scheduledTime",
-            "affinity": "TEXT"
-          },
-          {
-            "fieldPath": "remindAtUtc",
-            "columnName": "remindAtUtc",
-            "affinity": "INTEGER",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "timeIsFixed",
-            "columnName": "timeIsFixed",
+            "fieldPath": "scheduledAtUtc",
+            "columnName": "scheduledAtUtc",
             "affinity": "INTEGER",
             "notNull": true
-          },
-          {
-            "fieldPath": "reminderOverride",
-            "columnName": "reminderOverride",
-            "affinity": "TEXT"
           },
           {
             "fieldPath": "durationMin",
@@ -239,13 +229,13 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_sessions_scheduledDate` ON `${TABLE_NAME}` (`scheduledDate`)"
           },
           {
-            "name": "index_workout_sessions_remindAtUtc",
+            "name": "index_workout_sessions_scheduledAtUtc",
             "unique": false,
             "columnNames": [
-              "remindAtUtc"
+              "scheduledAtUtc"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_sessions_remindAtUtc` ON `${TABLE_NAME}` (`remindAtUtc`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_workout_sessions_scheduledAtUtc` ON `${TABLE_NAME}` (`scheduledAtUtc`)"
           }
         ],
         "foreignKeys": [
@@ -460,7 +450,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7cc42f9b69ac0aabc5b53e7552e2dc54')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e38bc5b054d66dfbed0ebe43620d32b9')"
     ]
   }
 }

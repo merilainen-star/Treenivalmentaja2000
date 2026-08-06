@@ -40,18 +40,6 @@ abstract class AppDatabase : RoomDatabase() {
     private const val DB_NAME = "treenivalmentaja.db"
 
     
-    val MIGRATION_1_2 = object : Migration(1, 2) {
-      override fun migrate(db: SupportSQLiteDatabase) {
-          // Assuming 1->2 did something in original codebase
-      }
-    }
-    
-    val MIGRATION_2_3 = object : Migration(2, 3) {
-      override fun migrate(db: SupportSQLiteDatabase) {
-          // Assuming 2->3 did something in original codebase
-      }
-    }
-
     val MIGRATION_3_4 = object : Migration(3, 4) {
       override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("PRAGMA foreign_keys=OFF;")
@@ -131,7 +119,7 @@ abstract class AppDatabase : RoomDatabase() {
 
     private fun build(context: Context): AppDatabase =
       Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        .addMigrations(MIGRATION_3_4)
         .fallbackToDestructiveMigration()
         .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
         .build()

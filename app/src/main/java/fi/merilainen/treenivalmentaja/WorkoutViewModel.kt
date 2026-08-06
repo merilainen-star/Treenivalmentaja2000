@@ -7,6 +7,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
+import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
+import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
+import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
@@ -62,8 +65,8 @@ data class ImportFeedback(val title: String, val detail: String, val isError: Bo
 class WorkoutViewModel(
   private val repository: TrainingRepository,
   private val engine: TrainingEngine,
-  private val settingsStore: fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore,
-  private val rescheduleAlarmsUseCase: fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
+  private val settingsStore: NotificationSettingsStore,
+  private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -75,11 +78,11 @@ class WorkoutViewModel(
   private val _recoveryState = MutableStateFlow(RecoveryState.OKAY)
   val recoveryState: StateFlow<RecoveryState> = _recoveryState.asStateFlow()
 
-  val notificationSettings: StateFlow<fi.merilainen.treenivalmentaja.data.settings.NotificationSettings> =
+  val notificationSettings: StateFlow<NotificationSettings> =
     settingsStore.settingsFlow.stateIn(
       viewModelScope,
       SharingStarted.WhileSubscribed(5_000),
-      fi.merilainen.treenivalmentaja.data.settings.NotificationSettings()
+      NotificationSettings()
     )
 
   private val _importFeedback = MutableStateFlow<ImportFeedback?>(null)
