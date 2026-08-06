@@ -99,6 +99,7 @@ clipboard. It is also the format the future AI advisor must produce for a propos
 | `type` | string enum | **yes** | One of `RUNNING`, `STRENGTH`, `SKIING`. |
 | `date` | string | **yes** | `YYYY-MM-DD`. Must be on or after `plan.startDate`. |
 | `time` | string | **yes** | `HH:mm`, 24-hour, local time in `plan.timeZone`. |
+| `timeIsFixed` | `boolean` | **Valinnainen** (oletus: `false`). Jos `true`, `time` on oltava oikea aloitusaika ja on pakollinen. |
 | `durationMin` | integer | no | > 0 if present. |
 | `distanceKm` | number | no | > 0 if present. |
 | `intensity` | string enum | no | One of `EASY`, `MODERATE`, `HARD`, `MAX`. |
@@ -201,3 +202,7 @@ If the error list is non-empty, **nothing** is written to Room.
   ]
 }
 ```
+
+## Versiointi
+
+- **v1**: Ensimmäinen versio. `timeIsFixed` ja valinnainen `time` lisättiin taaksepäin yhteensopivasti. Huom. vanhat buildit hylkäävät ajattoman dokumentin.

@@ -40,6 +40,7 @@ data class SessionDto(
   val type: String? = null,
   val date: String? = null,
   val time: String? = null,
+  val timeIsFixed: Boolean? = null,
   val durationMin: Int? = null,
   val distanceKm: Double? = null,
   val intensity: String? = null,

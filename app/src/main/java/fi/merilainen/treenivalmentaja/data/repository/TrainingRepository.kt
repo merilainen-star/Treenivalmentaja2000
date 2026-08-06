@@ -188,7 +188,7 @@ class TrainingRepository(
           id = newId,
           scheduledDate = newDate.toString(),
           scheduledTime = time.format(timeFormat),
-          scheduledAtUtc = ZonedDateTime.of(newDate, time, zone).toInstant().toEpochMilli(),
+          remindAtUtc = ZonedDateTime.of(newDate, time, zone).toInstant().toEpochMilli(),
           status = SessionStatus.PLANNED,
           originalSessionId = entity.id,
           updatedAt = now,

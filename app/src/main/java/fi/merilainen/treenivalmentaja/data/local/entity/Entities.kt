@@ -39,7 +39,7 @@ data class TrainingPlanEntity(
       )
     ],
   indices =
-    [Index("planId"), Index("originalSessionId"), Index("scheduledDate"), Index("scheduledAtUtc")],
+    [Index("planId"), Index("originalSessionId"), Index("scheduledDate"), Index("remindAtUtc")],
 )
 data class WorkoutSessionEntity(
   @PrimaryKey val id: String,
@@ -49,9 +49,11 @@ data class WorkoutSessionEntity(
   /** `YYYY-MM-DD`, local date. */
   val scheduledDate: String,
   /** `HH:mm`, local time. */
-  val scheduledTime: String,
+  val scheduledTime: String?,
   /** Epoch millis UTC, resolved from date + time + the plan's time zone. */
-  val scheduledAtUtc: Long,
+  val remindAtUtc: Long,
+  val timeIsFixed: Boolean = false,
+  val reminderOverride: String? = null,
   val durationMin: Int? = null,
   val distanceKm: Double? = null,
   /** [fi.merilainen.treenivalmentaja.domain.Intensity] name, or `null`. */

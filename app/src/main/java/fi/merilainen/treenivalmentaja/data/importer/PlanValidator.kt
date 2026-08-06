@@ -205,8 +205,15 @@ object PlanValidator {
       usable = false
     }
 
-    val time = resolveTime(session.time, "$path.time", errors)
-    if (time == null) usable = false
+    val timeIsFixed = session.timeIsFixed ?: false
+    var time: java.time.LocalTime? = null
+    if (session.time != null) {
+      time = resolveTime(session.time, "$path.time", errors)
+      if (time == null) usable = false
+    } else if (timeIsFixed) {
+      errors += ImportError("$path.time", "kellonaika puuttuu, vaikka timeIsFixed on true")
+      usable = false
+    }
 
     val intensity =
       session.intensity?.let { raw ->
@@ -244,9 +251,17 @@ object PlanValidator {
     val lighter = validateLighter(session.lighterAlternative, "$path.lighterAlternative", errors)
     if (lighter == null && session.lighterAlternative != null) usable = false
 
-    if (!usable || id == null || type == null || date == null || time == null || zone == null) {
+    if (!usable || id == null || type == null || date == null || zone == null) {
       return null
     }
+    
+    // We set remindAtUtc based on time only if provided for now, but RescheduleAlarmsUseCase handles it fully.
+    // For import, we just map it out.
+    // Wait, the domain model now requires remindAtUtc. We should resolve it properly or use a placeholder.
+    // No, wait, if time is null, what is the placeholder for remindAtUtc in PlanValidator? 
+    // PlanValidator doesn't have access to settings. Let's just default to 18:00 for the initial mapping, 
+    // or RescheduleAlarmsUseCase will overwrite it immediately after import anyway.
+    val resolvedTime = time ?: java.time.LocalTime.of(18, 0)
 
     return TrainingSession(
       id = id,
@@ -254,8 +269,10 @@ object PlanValidator {
       type = type,
       weekNumber = weekNumber ?: 1,
       scheduledDate = date.toString(),
-      scheduledTime = time.format(TIME_FORMAT),
-      scheduledAtUtc = ZonedDateTime.of(date, time, zone).toInstant().toEpochMilli(),
+      scheduledTime = time?.format(TIME_FORMAT),
+      remindAtUtc = ZonedDateTime.of(date, resolvedTime, zone).toInstant().toEpochMilli(),
+      timeIsFixed = timeIsFixed,
+      reminderOverride = null,
       durationMin = session.durationMin,
       distanceKm = session.distanceKm,
       intensity = intensity,

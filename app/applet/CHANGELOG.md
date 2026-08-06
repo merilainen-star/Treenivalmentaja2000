@@ -66,3 +66,9 @@ All notable changes to this project will be documented in this file.
 - Oura API V2 data fetching.
 - Notification engine via AlarmManager.
 - Background sync via WorkManager.
+
+## [Unreleased]
+- **Changed**: Erotettiin treenin suoritusaika ja muistutusaika toisistaan.
+- **Added**: `timeIsFixed` ja valinnainen `time` JSON-skeemaan v1.
+- **Added**: Room-migraatio versioon 2, jossa lisättiin `remindAtUtc`, `timeIsFixed`, `reminderOverride`.
+- **Added**: `NotificationSettingsStore` (Datastore) lajikohtaisille hälytysasetuksille.

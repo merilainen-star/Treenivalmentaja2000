@@ -55,18 +55,15 @@ enum class RecoveryState(val title: String, val message: String) {
   POOR("Palautuminen: Heikko", "Harkitse lepoa"),
 }
 
-data class NotificationSettings(
-  val runningTime: String = "16:00",
-  val strengthTime: String = "07:00",
-  val skiingTime: String = "10:00",
-)
 
 /** Result of the last plan import, shown once and then dismissed. */
 data class ImportFeedback(val title: String, val detail: String, val isError: Boolean)
 
 class WorkoutViewModel(
   private val repository: TrainingRepository,
-  private val engine: TrainingEngine
+  private val engine: TrainingEngine,
+  private val settingsStore: fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore,
+  private val rescheduleAlarmsUseCase: fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -78,8 +75,12 @@ class WorkoutViewModel(
   private val _recoveryState = MutableStateFlow(RecoveryState.OKAY)
   val recoveryState: StateFlow<RecoveryState> = _recoveryState.asStateFlow()
 
-  private val _notificationSettings = MutableStateFlow(NotificationSettings())
-  val notificationSettings: StateFlow<NotificationSettings> = _notificationSettings.asStateFlow()
+  val notificationSettings: StateFlow<fi.merilainen.treenivalmentaja.data.settings.NotificationSettings> =
+    settingsStore.settingsFlow.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(5_000),
+      fi.merilainen.treenivalmentaja.data.settings.NotificationSettings()
+    )
 
   private val _importFeedback = MutableStateFlow<ImportFeedback?>(null)
   val importFeedback: StateFlow<ImportFeedback?> = _importFeedback.asStateFlow()
@@ -103,6 +104,7 @@ class WorkoutViewModel(
       val session = repository.getSession(workoutId) ?: return@launch
       val newDate = LocalDate.parse(session.scheduledDate).plusDays(1)
       repository.reschedule(workoutId, newDate)
+      rescheduleAlarmsUseCase.execute()
     }
   }
 
@@ -119,12 +121,9 @@ class WorkoutViewModel(
   }
 
   fun updateNotificationTime(type: WorkoutType, newTime: String) {
-    _notificationSettings.update { current ->
-      when (type) {
-        WorkoutType.RUNNING -> current.copy(runningTime = newTime)
-        WorkoutType.STRENGTH -> current.copy(strengthTime = newTime)
-        WorkoutType.SKIING -> current.copy(skiingTime = newTime)
-      }
+    viewModelScope.launch {
+      settingsStore.updateTime(type, newTime)
+      rescheduleAlarmsUseCase.execute()
     }
   }
 
@@ -135,13 +134,20 @@ class WorkoutViewModel(
         ImportFeedback("Ei tuotavaa", "Tiedosto tai leikepöytä oli tyhjä.", isError = true)
       return
     }
-    viewModelScope.launch { _importFeedback.value = repository.importPlan(rawJson).toFeedback() }
+    viewModelScope.launch {
+      val result = repository.importPlan(rawJson)
+      if (result is ImportResult.Success) {
+        rescheduleAlarmsUseCase.execute()
+      }
+      _importFeedback.value = result.toFeedback()
+    }
   }
 
   fun resetSampleData() {
     viewModelScope.launch {
       val success = repository.resetSampleData()
       if (success) {
+        rescheduleAlarmsUseCase.execute()
         _importFeedback.value = ImportFeedback("Onnistui", "Esimerkkidata palautettu (aloitus tänään).", isError = false)
         _recoveryState.value = RecoveryState.OKAY
       } else {
@@ -200,7 +206,12 @@ class WorkoutViewModel(
         val application =
           this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]
             as TreenivalmentajaApplication
-        WorkoutViewModel(application.repository, application.engine)
+        WorkoutViewModel(
+          application.repository,
+          application.engine,
+          application.settingsStore,
+          application.rescheduleAlarmsUseCase
+        )
       }
     }
 
@@ -212,7 +223,7 @@ class WorkoutViewModel(
             dayOffset =
               ChronoUnit.DAYS.between(today, LocalDate.parse(session.scheduledDate)).toInt(),
             type = session.type,
-            time = session.scheduledTime,
+            time = session.scheduledTime ?: "Ei aikaa",
             durationMin = session.durationMin ?: 0,
             description = session.description.orEmpty(),
             status = session.status,

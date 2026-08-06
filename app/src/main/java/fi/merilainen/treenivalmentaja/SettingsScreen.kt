@@ -1,4 +1,5 @@
 package fi.merilainen.treenivalmentaja
+import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult

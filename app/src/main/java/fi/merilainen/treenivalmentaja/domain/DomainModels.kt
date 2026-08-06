@@ -73,9 +73,11 @@ data class TrainingSession(
   /** Local date, `YYYY-MM-DD`. */
   val scheduledDate: String,
   /** Local time, `HH:mm`. */
-  val scheduledTime: String,
+  val scheduledTime: String?,
   /** Absolute instant of the session start, epoch millis UTC. What AlarmManager uses. */
-  val scheduledAtUtc: Long,
+  val remindAtUtc: Long,
+  val timeIsFixed: Boolean = false,
+  val reminderOverride: String? = null,
   val durationMin: Int? = null,
   val distanceKm: Double? = null,
   val intensity: Intensity? = null,

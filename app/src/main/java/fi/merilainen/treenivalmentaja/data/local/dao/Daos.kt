@@ -51,7 +51,7 @@ interface WorkoutSessionDao {
     SELECT s.* FROM workout_sessions s
     INNER JOIN training_plans p ON p.id = s.planId
     WHERE p.isActive = 1
-    ORDER BY s.scheduledAtUtc ASC, s.id ASC
+    ORDER BY s.remindAtUtc ASC, s.id ASC
     """
   )
   fun observeActivePlanSessions(): Flow<List<WorkoutSessionEntity>>
@@ -59,13 +59,16 @@ interface WorkoutSessionDao {
   @Query("SELECT * FROM workout_sessions WHERE id = :id")
   suspend fun getById(id: String): WorkoutSessionEntity?
 
-  @Query("SELECT * FROM workout_sessions WHERE planId = :planId ORDER BY scheduledAtUtc ASC")
+  @Query("SELECT * FROM workout_sessions WHERE status = :status")
+  suspend fun getByStatus(status: SessionStatus): List<WorkoutSessionEntity>
+
+  @Query("SELECT * FROM workout_sessions WHERE planId = :planId ORDER BY remindAtUtc ASC")
   suspend fun getByPlan(planId: String): List<WorkoutSessionEntity>
 
-  @Query("SELECT * FROM workout_sessions WHERE planId = :planId AND scheduledDate >= :date ORDER BY scheduledAtUtc ASC")
+  @Query("SELECT * FROM workout_sessions WHERE planId = :planId AND scheduledDate >= :date ORDER BY remindAtUtc ASC")
   suspend fun getByPlanFromDate(planId: String, date: String): List<WorkoutSessionEntity>
 
-  @Query("SELECT * FROM workout_sessions WHERE planId = :planId AND status = :status ORDER BY scheduledAtUtc ASC")
+  @Query("SELECT * FROM workout_sessions WHERE planId = :planId AND status = :status ORDER BY remindAtUtc ASC")
   suspend fun getByPlanAndStatus(planId: String, status: SessionStatus): List<WorkoutSessionEntity>
 
   /** Which of [ids] already exist. Used by the importer to report duplicates before writing. */

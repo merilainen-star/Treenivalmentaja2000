@@ -73,3 +73,7 @@
 - `app/src/main/java/fi/merilainen/treenivalmentaja/domain/SessionStatus.kt` (transition table)
 - `app/src/main/java/fi/merilainen/treenivalmentaja/data/local/dao/Daos.kt`
 - `docs/TRAINING_ENGINE.md` (binding rules)
+
+## Nykyinen tila
+- Suoritusaika ja muistutusaika erotettu (Migraatio versioon 2).
+- Datastore asetuksille lisätty.

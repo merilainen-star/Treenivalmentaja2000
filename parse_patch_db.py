@@ -1,45 +1,13 @@
-package fi.merilainen.treenivalmentaja.data.local
+import re
 
-import android.content.Context
-import androidx.room.Database
-import androidx.room.Room
-import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
-import fi.merilainen.treenivalmentaja.data.local.dao.OuraDao
-import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
-import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
-import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
-import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
-import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
-import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
-import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
-import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
+with open("app/src/main/java/fi/merilainen/treenivalmentaja/data/local/AppDatabase.kt", "r") as f:
+    content = f.read()
 
-@Database(
-  entities =
-    [
-      TrainingPlanEntity::class,
-      WorkoutSessionEntity::class,
-      SessionEventEntity::class,
-      OuraDailySummaryEntity::class,
-      OuraWorkoutEntity::class,
-    ],
-  version = 4,
-  exportSchema = true,
-)
-@TypeConverters(Converters::class)
-abstract class AppDatabase : RoomDatabase() {
-  abstract fun trainingPlanDao(): TrainingPlanDao
-  abstract fun workoutSessionDao(): WorkoutSessionDao
-  abstract fun sessionEventDao(): SessionEventDao
-  abstract fun ouraDao(): OuraDao
+# Update version to 4
+content = re.sub(r'version = 2', 'version = 4', content)
 
-  companion object {
-    private const val DB_NAME = "treenivalmentaja.db"
-
-    
+# Replace the MIGRATION_1_2 and MIGRATION_2_4 with MIGRATION_3_4 and others
+migrations_code = """
     val MIGRATION_1_2 = object : Migration(1, 2) {
       override fun migrate(db: SupportSQLiteDatabase) {
           // Assuming 1->2 did something in original codebase
@@ -57,7 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
         db.execSQL("PRAGMA foreign_keys=OFF;")
         
         // 1. Create new table
-        db.execSQL("""
+        db.execSQL(\"\"\"
           CREATE TABLE IF NOT EXISTS `workout_sessions_new` (
             `id` TEXT NOT NULL, 
             `planId` TEXT NOT NULL, 
@@ -86,10 +54,10 @@ abstract class AppDatabase : RoomDatabase() {
             PRIMARY KEY(`id`), 
             FOREIGN KEY(`planId`) REFERENCES `training_plans`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
           )
-        """)
+        \"\"\")
 
         // 2. Copy data
-        db.execSQL("""
+        db.execSQL(\"\"\"
           INSERT INTO `workout_sessions_new` (
             `id`, `planId`, `type`, `weekNumber`, `scheduledDate`, `scheduledTime`, 
             `remindAtUtc`, `timeIsFixed`, `reminderOverride`, `durationMin`, `distanceKm`, 
@@ -104,7 +72,7 @@ abstract class AppDatabase : RoomDatabase() {
             `exercisesJson`, `lighterAlternativeJson`, `description`, `status`, 
             `appliedLighterVariant`, `originalSessionId`, `updatedAt`
           FROM `workout_sessions`
-        """)
+        \"\"\")
 
         // 3. Drop old and rename
         db.execSQL("DROP TABLE `workout_sessions`")
@@ -119,21 +87,18 @@ abstract class AppDatabase : RoomDatabase() {
         db.execSQL("PRAGMA foreign_keys=ON;")
       }
     }
+"""
 
+content = re.sub(r'val MIGRATION_1_2 = object : Migration\(1, 2\) \{[\s\S]*?val MIGRATION_2_4 = object : Migration\(2, 4\) \{[\s\S]*?    \}', migrations_code, content)
 
-    @Volatile private var instance: AppDatabase? = null
-
-    fun getInstance(context: Context): AppDatabase =
-      instance
-        ?: synchronized(this) {
-          instance ?: build(context.applicationContext).also { instance = it }
-        }
-
-    private fun build(context: Context): AppDatabase =
-      Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
+# update database builder
+builder_code = """Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
         .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
         .fallbackToDestructiveMigration()
         .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-        .build()
-  }
-}
+        .build()"""
+
+content = re.sub(r'Room\.databaseBuilder\(context, AppDatabase::class\.java, DB_NAME\).*?\.build\(\)', builder_code, content, flags=re.DOTALL)
+
+with open("app/src/main/java/fi/merilainen/treenivalmentaja/data/local/AppDatabase.kt", "w") as f:
+    f.write(content)

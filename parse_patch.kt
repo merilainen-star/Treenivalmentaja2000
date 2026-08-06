@@ -1,1 +1,1 @@
-// This will be just for drafting the code.
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }

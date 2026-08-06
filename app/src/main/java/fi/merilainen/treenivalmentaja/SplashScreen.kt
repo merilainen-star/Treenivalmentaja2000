@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import fi.merilainen.treenivalmentaja.R
 
 @Composable
 fun SplashScreen(onSplashFinished: () -> Unit) {
@@ -51,23 +52,24 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.secondary
-                    )
-                )
-            ),
+            .background(Color(0xFF1A1A1A)),
         contentAlignment = Alignment.Center
     ) {
+        Image(
+            painter = painterResource(id = R.drawable.splash_notext),
+            contentDescription = "Splash Background",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .alpha(alphaAnim)
                 .scale(scaleAnim)
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 120.dp)
         ) {
-            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Treenivalmentaja",
                 style = MaterialTheme.typography.headlineLarge,
@@ -77,11 +79,10 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Tavoitteellista harjoittelua",
+                text = "Treenaa silloin kun kannattaa.",
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color.White.copy(alpha = 0.8f)
+                color = Color.White.copy(alpha = 0.9f)
             )
-            Spacer(modifier = Modifier.height(64.dp))
         }
     }
 }

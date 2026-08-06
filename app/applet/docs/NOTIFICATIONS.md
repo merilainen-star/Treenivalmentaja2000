@@ -29,3 +29,22 @@ Notifications feature actionable buttons via PendingIntents:
 
 ## Deep Links
 Notifications use deep links (e.g., `treenivalmentaja://session/{id}`) to route the user directly to the correct screen via Jetpack Navigation Compose.
+
+## Ratkaisujärjestys ja Ajastus
+
+1. `session.reminderOverride` — käyttäjän per-sessio-säätö
+2. `session.scheduledTime`, **jos** `session.timeIsFixed` → miinus `settings.reminderOffsetMin`
+3. lajikohtainen oletus asetuksista (`RUNNING`/`STRENGTH`/`SKIING`)
+4. globaali fallback (18:00)
+
+Uudelleenlaskennan liipaisimet (`RescheduleAlarmsUseCase`):
+- Suunnitelma tuodaan
+- Ilmoitusasetus muuttuu
+- Käyttäjä säätää yhden session muistutusta
+- Sessio siirretään toiselle päivälle
+- ACTION_BOOT_COMPLETED / ACTION_TIMEZONE_CHANGED
+
+Kolme reunatapausta:
+a) Viikkonäkymän järjestys seuraa muistutusaikaa (remindAtUtc ASC).
+b) `NOTIFIED`-sessiota (tai pitemmälle edenneitä) ei ajasteta uudelleen.
+c) Muistutusajan muutos ei ole tilasiirtymä, eikä se kirjoita `session_events`-rivimäärään.

@@ -46,7 +46,7 @@ erDiagram
   - `weekNumber` (Int) — 1-based week within the plan
   - `scheduledDate` (String — `YYYY-MM-DD`, local date)
   - `scheduledTime` (String — `HH:mm`, local time)
-  - `scheduledAtUtc` (Long — epoch millis, resolved from date+time+plan timezone; what AlarmManager uses)
+  - `remindAtUtc` (Long — epoch millis, resolved from date+time+plan timezone; what AlarmManager uses)
   - `durationMin` (Int?)
   - `distanceKm` (Double?)
   - `intensity` (Enum?: `EASY`, `MODERATE`, `HARD`, `MAX`)
@@ -77,6 +77,19 @@ promoted to their own table with a migration.
 ```json
 [{ "name": "Kyykky", "sets": 3, "reps": 10, "weightKg": 60.0, "restSec": 90, "notes": null }]
 ```
+
+
+#### Reminder Resolution (`remindAtUtc`)
+`remindAtUtc` is a derived value, not a frozen snapshot from import. It dictates when the AlarmManager fires and controls the display order in the UI. It is recalculated automatically when:
+- A plan is imported.
+- Notification defaults are changed.
+- A user overrides a specific session's time.
+
+The order of priority is:
+1. `reminderOverride` (user's manual adjustment for a session)
+2. `scheduledTime` minus offset (if `timeIsFixed` is true)
+3. Default notification setting for the `WorkoutType`
+4. Fallback (18:00)
 
 ### 3. Session Event (`SessionEvent`) — immutable, append-only
 - **Table:** `session_events`

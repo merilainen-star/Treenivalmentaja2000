@@ -97,3 +97,6 @@ The app is fully functional offline. The local deterministic engine reschedules 
 - Network errors during sync log silently and retry using WorkManager backoff policies.
 - UI displays cached data during outages.
 - Oura API rate limits will be respected using HTTP 429 backoff handling.
+
+### Notification Scheduling Flow
+`RescheduleAlarmsUseCase` computes the correct `remindAtUtc` for `PLANNED` sessions based on `ResolveReminderUseCase` and updates the database, ensuring AlarmManager fires at the exact desired times.

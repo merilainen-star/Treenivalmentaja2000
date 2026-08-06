@@ -1,4 +1,6 @@
 package fi.merilainen.treenivalmentaja.data.importer
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -51,7 +53,7 @@ class PlanValidatorTest {
     assertEquals(60.0, strength.exercises?.first()?.weightKg!!, 0.0001)
 
     // 2026-08-10 07:00 in Europe/Helsinki is 04:00 UTC (EEST, UTC+3).
-    assertEquals(1786334400000L, strength.scheduledAtUtc)
+    assertEquals(1786334400000L, strength.remindAtUtc)
 
     val run = plan.sessions[1]
     assertEquals(WorkoutType.RUNNING, run.type)
@@ -130,6 +132,44 @@ class PlanValidatorTest {
     assertTrue(byPath.containsKey("weeks[0].sessions[2].date"))
     assertTrue(byPath.containsKey("plan.timeZone"))
     assertTrue(byPath["plan.timeZone"]!!.contains("Europe/Helsinky"))
+  }
+
+
+  @Test
+  fun `session with timeIsFixed true but missing time is rejected`() {
+    val errors =
+      errorsOf(
+        """
+        {
+          "schemaVersion": 1,
+          "plan": { "id": "p", "name": "n", "timeZone": "Europe/Helsinki", "startDate": "2026-08-10" },
+          "weeks": [ { "weekNumber": 1, "sessions": [
+            { "id": "s-1", "type": "RUNNING", "date": "2026-08-10", "timeIsFixed": true, "durationMin": 30 }
+          ] } ]
+        }
+        """
+      )
+    val message = errors.single { it.path == "weeks[0].sessions[0].time" }.message
+    assertTrue(message.contains("kellonaika puuttuu, vaikka timeIsFixed on true"))
+  }
+
+  @Test
+  fun `session without time is accepted if timeIsFixed is false`() {
+    val plan = 
+        """
+        {
+          "schemaVersion": 1,
+          "plan": { "id": "p", "name": "n", "timeZone": "Europe/Helsinki", "startDate": "2026-08-10" },
+          "weeks": [ { "weekNumber": 1, "sessions": [
+            { "id": "s-1", "type": "RUNNING", "date": "2026-08-10", "durationMin": 30 }
+          ] } ]
+        }
+        """
+    val document = PlanJson.parse(plan).getOrThrow()
+    val validated = PlanValidator.validate(document) as ValidationOutcome.Valid
+    assertEquals(1, validated.plan.sessions.size)
+    assertNull(validated.plan.sessions[0].scheduledTime)
+    assertFalse(validated.plan.sessions[0].timeIsFixed)
   }
 
   @Test
