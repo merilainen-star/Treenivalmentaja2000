@@ -1,0 +1,124 @@
+package fi.merilainen.treenivalmentaja.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
+import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface TrainingPlanDao {
+  @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(plan: TrainingPlanEntity)
+
+  @Query("SELECT * FROM training_plans WHERE isActive = 1 LIMIT 1")
+  fun observeActivePlan(): Flow<TrainingPlanEntity?>
+
+  @Query("SELECT * FROM training_plans WHERE isActive = 1 LIMIT 1")
+  suspend fun getActivePlan(): TrainingPlanEntity?
+
+  @Query("SELECT id FROM training_plans WHERE isActive = 1 LIMIT 1")
+  suspend fun getActivePlanId(): String?
+
+  @Query("SELECT * FROM training_plans WHERE id = :id")
+  suspend fun getById(id: String): TrainingPlanEntity?
+
+  @Query("SELECT COUNT(*) FROM training_plans") suspend fun count(): Int
+
+  @Query("UPDATE training_plans SET isActive = 0") suspend fun deactivateAll()
+
+  @Query("DELETE FROM training_plans WHERE id = :id") suspend fun deleteById(id: String)
+  @Query("DELETE FROM training_plans") suspend fun deleteAll()
+}
+
+@Dao
+interface WorkoutSessionDao {
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  suspend fun insertAll(sessions: List<WorkoutSessionEntity>)
+
+  @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(session: WorkoutSessionEntity)
+
+  @Update suspend fun update(session: WorkoutSessionEntity)
+
+  @Query(
+    """
+    SELECT s.* FROM workout_sessions s
+    INNER JOIN training_plans p ON p.id = s.planId
+    WHERE p.isActive = 1
+    ORDER BY s.scheduledAtUtc ASC, s.id ASC
+    """
+  )
+  fun observeActivePlanSessions(): Flow<List<WorkoutSessionEntity>>
+
+  @Query("SELECT * FROM workout_sessions WHERE id = :id")
+  suspend fun getById(id: String): WorkoutSessionEntity?
+
+  @Query("SELECT * FROM workout_sessions WHERE planId = :planId ORDER BY scheduledAtUtc ASC")
+  suspend fun getByPlan(planId: String): List<WorkoutSessionEntity>
+
+  @Query("SELECT * FROM workout_sessions WHERE planId = :planId AND scheduledDate >= :date ORDER BY scheduledAtUtc ASC")
+  suspend fun getByPlanFromDate(planId: String, date: String): List<WorkoutSessionEntity>
+
+  @Query("SELECT * FROM workout_sessions WHERE planId = :planId AND status = :status ORDER BY scheduledAtUtc ASC")
+  suspend fun getByPlanAndStatus(planId: String, status: SessionStatus): List<WorkoutSessionEntity>
+
+  /** Which of [ids] already exist. Used by the importer to report duplicates before writing. */
+  @Query("SELECT id FROM workout_sessions WHERE id IN (:ids)")
+  suspend fun existingIds(ids: List<String>): List<String>
+
+  @Query("SELECT COUNT(*) FROM workout_sessions") suspend fun count(): Int
+  @Query("DELETE FROM workout_sessions") suspend fun deleteAll()
+}
+
+/**
+ * Append-only. There is deliberately no `@Update` and no `@Delete` here — the event log is the
+ * audit trail and must never be rewritten. See `docs/DATA_MODEL.md` § 3.
+ */
+@Dao
+interface SessionEventDao {
+  @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(event: SessionEventEntity)
+
+  @Insert(onConflict = OnConflictStrategy.ABORT)
+  suspend fun insertAll(events: List<SessionEventEntity>)
+
+  @Query(
+    "SELECT * FROM session_events WHERE sessionId = :sessionId ORDER BY timestampUtc ASC, id ASC"
+  )
+  fun observeForSession(sessionId: String): Flow<List<SessionEventEntity>>
+
+  @Query(
+    "SELECT * FROM session_events WHERE sessionId = :sessionId ORDER BY timestampUtc ASC, id ASC"
+  )
+  suspend fun getForSession(sessionId: String): List<SessionEventEntity>
+
+  @Query("SELECT COUNT(*) FROM session_events WHERE sessionId = :sessionId")
+  suspend fun countForSession(sessionId: String): Int
+
+  @Query("DELETE FROM session_events")
+  suspend fun deleteAll()
+}
+
+@Dao
+interface OuraDao {
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertDailySummary(summary: OuraDailySummaryEntity)
+
+  @Query("SELECT * FROM oura_daily_summaries WHERE date = :date")
+  fun observeDailySummary(date: String): Flow<OuraDailySummaryEntity?>
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertWorkouts(workouts: List<OuraWorkoutEntity>)
+
+  @Query("SELECT * FROM oura_workouts WHERE startTimeUtc BETWEEN :fromUtc AND :toUtc")
+  suspend fun getWorkoutsBetween(fromUtc: Long, toUtc: Long): List<OuraWorkoutEntity>
+
+  @Query("DELETE FROM oura_daily_summaries") suspend fun clearDailySummaries()
+
+  @Query("DELETE FROM oura_workouts") suspend fun clearWorkouts()
+}

@@ -1,0 +1,9 @@
+# The Gradle wrapper script is executed by /bin/sh; CRLF would break it.
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+*.jar binary
+*.keystore binary
+*.jks binary
+*.png binary
+*.webp binary

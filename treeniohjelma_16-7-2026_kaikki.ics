@@ -1,0 +1,1084 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//OpenAI//Mikon voimaharjoittelu//FI
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Mikon voimaharjoittelu
+X-WR-TIMEZONE:Europe/Helsinki
+BEGIN:VTIMEZONE
+TZID:Europe/Helsinki
+X-LIC-LOCATION:Europe/Helsinki
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0300
+TZNAME:EEST
+DTSTART:19700329T030000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0300
+TZOFFSETTO:+0200
+TZNAME:EET
+DTSTART:19701025T040000
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:1ab99a24-6c93-43a8-b450-fadef4d785d9@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260716T090000
+DTEND;TZID=Europe/Helsinki:20260716T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka\, kahvakuulaheilautus 15\, vinot vatsarutistukset 10/puoli\, timanttipunnerrus 6–8\, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e525f7d6-32aa-47a4-a93f-8aafd7ac7e91@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260717T090000
+DTEND;TZID=Europe/Helsinki:20260717T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10\, goblet-kyykky 12\, vatsarutistus penkillä 12\, käsipainosoutu 10/puoli\, lankku 30 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:a4e8ef60-f679-41e1-b4a2-1b2b328e4bf8@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260718T090000
+DTEND;TZID=Europe/Helsinki:20260718T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 1–2 kierrosta. Kevyt punnerrus 8\, kyykky 10\, vatsarutistus 10\, lankku 20 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:5e0aa567-c10a-4934-aa83-d6052958e612@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260719T090000
+DTEND;TZID=Europe/Helsinki:20260719T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 1 kierros. Kissanlehmä 8\, lonkankoukistajan venytys 30 s/puoli\, bird dog 8/puoli\, lankku 20 s\, sivulankku 15 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:09f164e9-25ff-4f03-8a9a-f37d8ae5639e@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260720T090000
+DTEND;TZID=Europe/Helsinki:20260720T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10\, goblet-kyykky 12\, vatsarutistus penkillä 12\, käsipainosoutu 10/puoli\, lankku 30 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:6e137146-7e1d-4fad-a68c-2972bc4b00e8@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260721T090000
+DTEND;TZID=Europe/Helsinki:20260721T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka\, kahvakuulaheilautus 15\, vinot vatsarutistukset 10/puoli\, timanttipunnerrus 6–8\, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:06708173-515d-442c-b6cd-c3f5d6a15eec@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260722T090000
+DTEND;TZID=Europe/Helsinki:20260722T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10\, goblet-kyykky 12\, vatsarutistus penkillä 12\, käsipainosoutu 10/puoli\, lankku 30 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:c7392205-6093-43db-8f7e-327bfcdcf2ed@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260723T090000
+DTEND;TZID=Europe/Helsinki:20260723T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka\, kahvakuulaheilautus 15\, vinot vatsarutistukset 10/puoli\, timanttipunnerrus 6–8\, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:de178417-7a17-4964-a3e0-a6064c49c09b@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260724T090000
+DTEND;TZID=Europe/Helsinki:20260724T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10\, goblet-kyykky 12\, vatsarutistus penkillä 12\, käsipainosoutu 10/puoli\, lankku 30 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:6f48fc14-c62a-45cb-916c-1f75e999d194@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260725T090000
+DTEND;TZID=Europe/Helsinki:20260725T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 1–2 kierrosta. Kevyt punnerrus 8\, kyykky 10\, vatsarutistus 10\, lankku 20 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:6739c726-9eef-49c7-a407-3740401fb2bb@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260726T090000
+DTEND;TZID=Europe/Helsinki:20260726T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 1 kierros. Kissanlehmä 8\, lonkankoukistajan venytys 30 s/puoli\, bird dog 8/puoli\, lankku 20 s\, sivulankku 15 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:a6ea180f-b456-4d36-b9d1-b475d23f10ee@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260727T090000
+DTEND;TZID=Europe/Helsinki:20260727T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10\, goblet-kyykky 12\, vatsarutistus penkillä 12\, käsipainosoutu 10/puoli\, lankku 30 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:8e539a27-6a0d-4c88-85ca-6f37d8459465@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260728T090000
+DTEND;TZID=Europe/Helsinki:20260728T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka\, kahvakuulaheilautus 15\, vinot vatsarutistukset 10/puoli\, timanttipunnerrus 6–8\, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:0777c07d-0c72-41a1-acee-43d39d481ff7@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260729T090000
+DTEND;TZID=Europe/Helsinki:20260729T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10\, goblet-kyykky 12\, vatsarutistus penkillä 12\, käsipainosoutu 10/puoli\, lankku 30 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:04aee0c5-b833-4c80-9247-2cf2defd3ca0@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260730T090000
+DTEND;TZID=Europe/Helsinki:20260730T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka\, kahvakuulaheilautus 18\, vinot vatsarutistukset 12/puoli\, timanttipunnerrus 8–10\, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:58c856c2-8b82-447c-9fb2-71734d32251d@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260731T090000
+DTEND;TZID=Europe/Helsinki:20260731T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12\, goblet-kyykky 15\, vatsarutistus penkillä 15\, käsipainosoutu 12/puoli\, lankku 40 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:4484e629-2e94-48d2-af72-29326aad286c@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260801T090000
+DTEND;TZID=Europe/Helsinki:20260801T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10\, kyykky 12\, vatsarutistus 12\, lankku 25 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e77663f5-f0c4-41f8-bfcf-5f0817d9d752@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260802T090000
+DTEND;TZID=Europe/Helsinki:20260802T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 1–2 kierrosta. Kissanlehmä 10\, lonkankoukistajan venytys 30 s/puoli\, bird dog 10/puoli\, lankku 25 s\, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:97840ee3-a8b0-49a2-8e59-0c971289c7c0@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260803T090000
+DTEND;TZID=Europe/Helsinki:20260803T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12\, goblet-kyykky 15\, vatsarutistus penkillä 15\, käsipainosoutu 12/puoli\, lankku 40 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:fdce7f1e-5300-43de-beeb-9b07452c3381@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260804T090000
+DTEND;TZID=Europe/Helsinki:20260804T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka\, kahvakuulaheilautus 18\, vinot vatsarutistukset 12/puoli\, timanttipunnerrus 8–10\, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:b6cde525-6640-4d96-aac1-20f2f699e7eb@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260805T090000
+DTEND;TZID=Europe/Helsinki:20260805T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12\, goblet-kyykky 15\, vatsarutistus penkillä 15\, käsipainosoutu 12/puoli\, lankku 40 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:206eb3cf-cdfa-4299-8970-a3365059ed54@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260806T090000
+DTEND;TZID=Europe/Helsinki:20260806T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka\, kahvakuulaheilautus 18\, vinot vatsarutistukset 12/puoli\, timanttipunnerrus 8–10\, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:f40fe889-3d76-4e1b-becc-afbebacc8786@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260807T090000
+DTEND;TZID=Europe/Helsinki:20260807T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12\, goblet-kyykky 15\, vatsarutistus penkillä 15\, käsipainosoutu 12/puoli\, lankku 40 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:0e9b6a16-8376-476f-96b7-1782aa68ad9d@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260808T090000
+DTEND;TZID=Europe/Helsinki:20260808T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10\, kyykky 12\, vatsarutistus 12\, lankku 25 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:4f9b7720-f962-4b2c-b483-695b35a771d2@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260809T090000
+DTEND;TZID=Europe/Helsinki:20260809T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 1–2 kierrosta. Kissanlehmä 10\, lonkankoukistajan venytys 30 s/puoli\, bird dog 10/puoli\, lankku 25 s\, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:bbc81b2a-ec72-4d85-bf6f-723485819ff1@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260810T090000
+DTEND;TZID=Europe/Helsinki:20260810T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12\, goblet-kyykky 15\, vatsarutistus penkillä 15\, käsipainosoutu 12/puoli\, lankku 40 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:cf0f5b78-66af-4818-b0b5-cc3439cb7ed4@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260811T090000
+DTEND;TZID=Europe/Helsinki:20260811T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka\, kahvakuulaheilautus 18\, vinot vatsarutistukset 12/puoli\, timanttipunnerrus 8–10\, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d2459601-1e66-4f9d-bf40-803324635dcf@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260812T090000
+DTEND;TZID=Europe/Helsinki:20260812T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12\, goblet-kyykky 15\, vatsarutistus penkillä 15\, käsipainosoutu 12/puoli\, lankku 40 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:dcc8c851-5aad-49a8-b570-607ac6d6ed80@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260813T090000
+DTEND;TZID=Europe/Helsinki:20260813T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 20\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 10–12\, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ef4d2380-f996-4cbe-87dd-4b7c6f231c78@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260814T090000
+DTEND;TZID=Europe/Helsinki:20260814T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15\, goblet-kyykky 15\, vatsarutistus penkillä 18\, käsipainosoutu 14/puoli\, lankku 50 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:1496ce38-f882-40c3-89d6-512c77ce9b65@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260815T090000
+DTEND;TZID=Europe/Helsinki:20260815T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10\, kyykky 15\, vatsarutistus 15\, lankku 30 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:90ccd040-8f7e-499d-b4e5-bbfabf85da1b@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260816T090000
+DTEND;TZID=Europe/Helsinki:20260816T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 10\, lonkankoukistajan venytys 40 s/puoli\, bird dog 10/puoli\, lankku 30 s\, sivulankku 25 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:0c20cb8a-8b3a-40de-88a6-ce93a7ca3413@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260817T090000
+DTEND;TZID=Europe/Helsinki:20260817T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15\, goblet-kyykky 15\, vatsarutistus penkillä 18\, käsipainosoutu 14/puoli\, lankku 50 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ecbf9be2-2334-46a1-8759-7c6f420b6d84@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260818T090000
+DTEND;TZID=Europe/Helsinki:20260818T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 20\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 10–12\, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:a04b1700-12a5-4eed-bb39-2ba846857f17@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260819T090000
+DTEND;TZID=Europe/Helsinki:20260819T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15\, goblet-kyykky 15\, vatsarutistus penkillä 18\, käsipainosoutu 14/puoli\, lankku 50 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:23fb099d-c69f-4cdd-9912-e2346821a449@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260820T090000
+DTEND;TZID=Europe/Helsinki:20260820T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 20\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 10–12\, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:2c3c348e-6426-4f01-b583-520b15ba9ead@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260821T090000
+DTEND;TZID=Europe/Helsinki:20260821T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15\, goblet-kyykky 15\, vatsarutistus penkillä 18\, käsipainosoutu 14/puoli\, lankku 50 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:86096ead-3b74-4fa4-9485-e6f3432d9af1@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260822T090000
+DTEND;TZID=Europe/Helsinki:20260822T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10\, kyykky 15\, vatsarutistus 15\, lankku 30 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:82b814a7-7d7c-4172-8262-4b48e915d8ee@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260823T090000
+DTEND;TZID=Europe/Helsinki:20260823T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 10\, lonkankoukistajan venytys 40 s/puoli\, bird dog 10/puoli\, lankku 30 s\, sivulankku 25 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d53b7eac-ca27-4320-b816-b76e182f7da0@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260824T090000
+DTEND;TZID=Europe/Helsinki:20260824T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15\, goblet-kyykky 15\, vatsarutistus penkillä 18\, käsipainosoutu 14/puoli\, lankku 50 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:7b8ad3c8-9d5c-461c-ae77-0c989480834b@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260825T090000
+DTEND;TZID=Europe/Helsinki:20260825T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 20\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 10–12\, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:8864b3ed-c5c7-45b7-b9a5-96aebd6e91bd@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260826T090000
+DTEND;TZID=Europe/Helsinki:20260826T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15\, goblet-kyykky 15\, vatsarutistus penkillä 18\, käsipainosoutu 14/puoli\, lankku 50 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:8d65a3d8-98cf-4aed-8f80-f75ee3469287@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260827T090000
+DTEND;TZID=Europe/Helsinki:20260827T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 25\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 12–15\, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:89c0d0a9-dbff-4a6d-a9cd-d54144b38f4e@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260828T090000
+DTEND;TZID=Europe/Helsinki:20260828T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20\, goblet-kyykky 18\, vatsarutistus penkillä 20\, käsipainosoutu 15/puoli\, lankku 60 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:57cfc79a-f4d4-403a-97cb-ea2349e7a0c7@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260829T090000
+DTEND;TZID=Europe/Helsinki:20260829T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 12\, kyykky 15\, vatsarutistus 15\, lankku 35 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:7cac2404-66d8-4839-b1e5-c06368a0c20c@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260830T090000
+DTEND;TZID=Europe/Helsinki:20260830T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 12\, lonkankoukistajan venytys 40 s/puoli\, bird dog 12/puoli\, lankku 35 s\, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:4a34e81a-f0f0-4bfc-84d7-2c4f9f5bb1a6@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260831T090000
+DTEND;TZID=Europe/Helsinki:20260831T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20\, goblet-kyykky 18\, vatsarutistus penkillä 20\, käsipainosoutu 15/puoli\, lankku 60 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:daef1bda-5d23-4a02-9f79-e1775a101f00@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260901T090000
+DTEND;TZID=Europe/Helsinki:20260901T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 25\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 12–15\, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:0b478668-945b-417f-a026-cc6df71ffc12@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260902T090000
+DTEND;TZID=Europe/Helsinki:20260902T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20\, goblet-kyykky 18\, vatsarutistus penkillä 20\, käsipainosoutu 15/puoli\, lankku 60 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e7bd7ef7-991e-49a8-9062-8358d192ecc7@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260903T090000
+DTEND;TZID=Europe/Helsinki:20260903T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 25\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 12–15\, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:cfce4545-04a3-40bb-a46a-df79b45002cf@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260904T090000
+DTEND;TZID=Europe/Helsinki:20260904T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20\, goblet-kyykky 18\, vatsarutistus penkillä 20\, käsipainosoutu 15/puoli\, lankku 60 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:90a87afb-2429-42f8-a0e6-3c65ad7c3cfa@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260905T090000
+DTEND;TZID=Europe/Helsinki:20260905T091500
+SUMMARY:Kevyt voimaharjoittelu
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 12\, kyykky 15\, vatsarutistus 15\, lankku 35 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt voimaharjoittelu
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:5d18c154-8b55-49b5-80b3-1b6b2f429c6a@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260906T090000
+DTEND;TZID=Europe/Helsinki:20260906T091500
+SUMMARY:Palauttava core ja liikkuvuus
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 12\, lonkankoukistajan venytys 40 s/puoli\, bird dog 12/puoli\, lankku 35 s\, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Palauttava core ja liikkuvuus
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:7d64796e-82b6-41ed-8a4f-5b8dfa36cf7b@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260907T090000
+DTEND;TZID=Europe/Helsinki:20260907T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20\, goblet-kyykky 18\, vatsarutistus penkillä 20\, käsipainosoutu 15/puoli\, lankku 60 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:0c37787a-8dc3-4423-a455-fa342e0f078a@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260908T090000
+DTEND;TZID=Europe/Helsinki:20260908T092000
+SUMMARY:Voima B – jalat ja core
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka\, kahvakuulaheilautus 25\, vinot vatsarutistukset 15/puoli\, timanttipunnerrus 12–15\, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima B – jalat ja core
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:07e9487b-7cc8-4ecd-8e67-155c0de12da0@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260909T090000
+DTEND;TZID=Europe/Helsinki:20260909T092000
+SUMMARY:Voima A – rinta ja keskivartalo
+DESCRIPTION:Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20\, goblet-kyykky 18\, vatsarutistus penkillä 20\, käsipainosoutu 15/puoli\, lankku 60 s. Tauko 30–45 s liikkeiden välissä.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Voima A – rinta ja keskivartalo
+END:VALARM
+END:VEVENT
+BEGIN:VTIMEZONE
+TZID:Europe/Helsinki
+X-LIC-LOCATION:Europe/Helsinki
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0300
+TZNAME:EEST
+DTSTART:19700329T030000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0300
+TZOFFSETTO:+0200
+TZNAME:EET
+DTSTART:19701025T040000
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+UID:38d73297-81e8-48fe-9d5e-e0d18b03ce0f@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260718T120000
+DTEND;TZID=Europe/Helsinki:20260718T124200
+SUMMARY:Pitkä rauhallinen juoksu – 7 km
+DESCRIPTION:Viikko 1/8. Juokse 7 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 7 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:dc5aa563-0800-4b13-be7b-3d75ab0313d8@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260719T120000
+DTEND;TZID=Europe/Helsinki:20260719T123000
+SUMMARY:Reippaampi juoksu – 5 km
+DESCRIPTION:Viikko 1/8. Yhteensä 5 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 5 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:8a692800-7e34-431f-a85b-ca698ffb6775@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260722T120000
+DTEND;TZID=Europe/Helsinki:20260722T123000
+SUMMARY:Kevyt juoksu – 5 km
+DESCRIPTION:Viikko 1/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 5 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:d9ee2f5c-2914-46b1-8b32-c887572f8321@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260725T120000
+DTEND;TZID=Europe/Helsinki:20260725T124200
+SUMMARY:Pitkä rauhallinen juoksu – 7 km
+DESCRIPTION:Viikko 2/8. Juokse 7 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 7 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:4a9db12b-cb59-40e2-9f87-eb9d8b8f2500@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260726T120000
+DTEND;TZID=Europe/Helsinki:20260726T123000
+SUMMARY:Reippaampi juoksu – 5 km
+DESCRIPTION:Viikko 2/8. Yhteensä 5 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 5 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:f70e7338-8c55-4519-9d87-1f905b9f6151@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260729T120000
+DTEND;TZID=Europe/Helsinki:20260729T123000
+SUMMARY:Kevyt juoksu – 5 km
+DESCRIPTION:Viikko 2/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 5 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:74b3b5fe-df76-4eb9-91e6-5f0d2987905f@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260801T120000
+DTEND;TZID=Europe/Helsinki:20260801T124800
+SUMMARY:Pitkä rauhallinen juoksu – 8 km
+DESCRIPTION:Viikko 3/8. Juokse 8 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 8 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e0f7f144-f789-492e-b27c-2943893b714c@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260802T120000
+DTEND;TZID=Europe/Helsinki:20260802T123600
+SUMMARY:Reippaampi juoksu – 6 km
+DESCRIPTION:Viikko 3/8. Yhteensä 6 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:600cdfe9-1ca8-49ab-94e7-98aeaf5e5bcb@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260805T120000
+DTEND;TZID=Europe/Helsinki:20260805T123000
+SUMMARY:Kevyt juoksu – 5 km
+DESCRIPTION:Viikko 3/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 5 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:45a4ceae-1767-4f5f-a81c-4f5dac814885@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260808T120000
+DTEND;TZID=Europe/Helsinki:20260808T124800
+SUMMARY:Pitkä rauhallinen juoksu – 8 km
+DESCRIPTION:Viikko 4/8. Juokse 8 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 8 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:88165681-3f59-4837-80fc-d3ec2479edc0@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260809T120000
+DTEND;TZID=Europe/Helsinki:20260809T123600
+SUMMARY:Reippaampi juoksu – 6 km
+DESCRIPTION:Viikko 4/8. Yhteensä 6 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:fb8cb9a1-a016-43cf-91d6-09d93e58ed43@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260812T120000
+DTEND;TZID=Europe/Helsinki:20260812T123000
+SUMMARY:Kevyt juoksu – 5 km
+DESCRIPTION:Viikko 4/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 5 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:9829b828-b17b-450e-a3e1-00c8d6a88baf@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260815T120000
+DTEND;TZID=Europe/Helsinki:20260815T125400
+SUMMARY:Pitkä rauhallinen juoksu – 9 km
+DESCRIPTION:Viikko 5/8. Juokse 9 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 9 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:50902c2a-ba8c-4f5a-a74e-f8cae2f43cf5@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260816T120000
+DTEND;TZID=Europe/Helsinki:20260816T123600
+SUMMARY:Reippaampi juoksu – 6 km
+DESCRIPTION:Viikko 5/8. Yhteensä 6 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:2e6a740c-3681-4562-902c-ac9cdcba6cf2@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260819T120000
+DTEND;TZID=Europe/Helsinki:20260819T123600
+SUMMARY:Kevyt juoksu – 6 km
+DESCRIPTION:Viikko 5/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:aebfc20d-8d30-4691-8211-d79c3a90500c@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260822T120000
+DTEND;TZID=Europe/Helsinki:20260822T125400
+SUMMARY:Pitkä rauhallinen juoksu – 9 km
+DESCRIPTION:Viikko 6/8. Juokse 9 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 9 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:390da044-c0f4-4099-b437-6a2c4a5157ca@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260823T120000
+DTEND;TZID=Europe/Helsinki:20260823T123600
+SUMMARY:Reippaampi juoksu – 6 km
+DESCRIPTION:Viikko 6/8. Yhteensä 6 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:f5405204-2dd1-4013-a70c-0c10cc4673f0@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260826T120000
+DTEND;TZID=Europe/Helsinki:20260826T123600
+SUMMARY:Kevyt juoksu – 6 km
+DESCRIPTION:Viikko 6/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:661d8917-6c72-445c-8ee7-60a5d64263ad@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260829T120000
+DTEND;TZID=Europe/Helsinki:20260829T130000
+SUMMARY:Pitkä rauhallinen juoksu – 10 km
+DESCRIPTION:Viikko 7/8. Juokse 10 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 10 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:b3ce3a51-6df3-4196-9500-678b9b813b32@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260830T120000
+DTEND;TZID=Europe/Helsinki:20260830T124200
+SUMMARY:Reippaampi juoksu – 7 km
+DESCRIPTION:Viikko 7/8. Yhteensä 7 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 7 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:2254af1d-575b-40e8-a0a6-4f71b1b59ff9@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260902T120000
+DTEND;TZID=Europe/Helsinki:20260902T123600
+SUMMARY:Kevyt juoksu – 6 km
+DESCRIPTION:Viikko 7/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 6 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:e69baaae-6a95-46ac-8813-5dc27d618b31@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260905T120000
+DTEND;TZID=Europe/Helsinki:20260905T130000
+SUMMARY:Pitkä rauhallinen juoksu – 10 km
+DESCRIPTION:Viikko 8/8. Juokse 10 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena\, että pystyt puhumaan.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Pitkä rauhallinen juoksu – 10 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:be12fd86-94ce-4aa6-b28e-8377355192fb@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260906T120000
+DTEND;TZID=Europe/Helsinki:20260906T124200
+SUMMARY:Reippaampi juoksu – 7 km
+DESCRIPTION:Viikko 8/8. Yhteensä 7 km: 1 km rauhallisesti\, keskiosa noin 5:25–5:35 min/km\, viimeinen 1 km rauhallisesti.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Reippaampi juoksu – 7 km
+END:VALARM
+END:VEVENT
+BEGIN:VEVENT
+UID:ecd4742b-880f-4363-b74d-dc416d29fc57@openai.local
+DTSTAMP:20260714T210833Z
+DTSTART;TZID=Europe/Helsinki:20260909T120000
+DTEND;TZID=Europe/Helsinki:20260909T123600
+SUMMARY:Kevyt juoksu – 6 km
+DESCRIPTION:Viikko 8/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.
+BEGIN:VALARM
+TRIGGER:PT0M
+ACTION:DISPLAY
+DESCRIPTION:Kevyt juoksu – 6 km
+END:VALARM
+END:VEVENT
+END:VCALENDAR
