@@ -225,6 +225,7 @@ class TrainingRepositoryTest {
   fun `rescheduling closes the old row and links a new one`() = runTest {
     repository.importPlan(PLAN)
 
+    val oldSession = db.workoutSessionDao().getById("s-1")!!
     val result = repository.reschedule("s-1", LocalDate.parse("2026-08-12"))
     assertEquals(TransitionResult.Applied, result)
 
@@ -359,6 +360,7 @@ class TrainingRepositoryTest {
   fun `rescheduling a session without time preserves null time without crashing`() = runTest {
     val importRes = repository.importPlan(PLAN.replace("\"07:00\"", "null")) // make s-1 time null
     assertTrue("Import failed: $importRes", importRes is fi.merilainen.treenivalmentaja.data.importer.ImportResult.Success)
+    val oldSession = db.workoutSessionDao().getById("s-1")!!
     val result = repository.reschedule("s-1", LocalDate.parse("2026-08-11"), null, EventSource.USER, null)
     assertTrue("Reschedule should return Applied but got " + result.javaClass.simpleName, result is TransitionResult.Applied)
     
@@ -366,4 +368,5 @@ class TrainingRepositoryTest {
     val newSession = allSessions.find { it.originalSessionId == "s-1" }!!
     assertNull("Scheduled time should remain null", newSession.scheduledTime)
     assertEquals("2026-08-11", newSession.scheduledDate)
+    assertTrue("remindAtUtc should be updated to a newer timestamp", newSession.remindAtUtc > oldSession.remindAtUtc)
   }}

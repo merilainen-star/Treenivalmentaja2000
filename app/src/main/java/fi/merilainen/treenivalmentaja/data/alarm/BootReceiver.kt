@@ -12,12 +12,12 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val app = context.applicationContext as TreenivalmentajaApplication
         
-        val pendingResult = goAsync()
+        val pendingResult: android.content.BroadcastReceiver.PendingResult? = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 app.rescheduleAlarmsUseCase.execute()
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }

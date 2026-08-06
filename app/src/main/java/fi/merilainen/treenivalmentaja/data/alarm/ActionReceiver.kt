@@ -20,13 +20,14 @@ class ActionReceiver : BroadcastReceiver() {
         
         if (action == "fi.merilainen.treenivalmentaja.ACTION_POSTPONE") {
             NotificationManagerCompat.from(context).cancel(sessionId.hashCode())
-            val pendingResult = goAsync()
+            val pendingResult: android.content.BroadcastReceiver.PendingResult? = goAsync()
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val tomorrow = LocalDate.now(ZoneId.of("Europe/Helsinki")).plusDays(1)
+                    val tomorrow = LocalDate.now(app.repository.activePlanTimeZone()).plusDays(1)
                     app.repository.reschedule(sessionId, tomorrow, null)
+                    app.rescheduleAlarmsUseCase.execute()
                 } finally {
-                    pendingResult.finish()
+                    pendingResult?.finish()
                 }
             }
         }

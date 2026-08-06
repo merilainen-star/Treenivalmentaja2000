@@ -6,9 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 
-class ReminderScheduler(private val context: Context) {
+open class ReminderScheduler(private val context: Context) {
 
-    fun schedule(sessionId: String, remindAtUtc: Long, requestCode: Int) {
+    open fun schedule(sessionId: String, remindAtUtc: Long, requestCode: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             putExtra("SESSION_ID", sessionId)
@@ -33,7 +33,7 @@ class ReminderScheduler(private val context: Context) {
         alarmManager.cancel(pendingIntent)
     }
 
-    fun cancelAll(requestCodes: List<Int>) {
+    open fun cancelAll(requestCodes: List<Int>) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         requestCodes.forEach { requestCode ->
             val intent = Intent(context, ReminderReceiver::class.java)

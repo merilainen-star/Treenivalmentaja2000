@@ -24,7 +24,7 @@ class ReminderReceiver : BroadcastReceiver() {
         val sessionId = intent.getStringExtra("SESSION_ID") ?: return
         val app = context.applicationContext as TreenivalmentajaApplication
 
-        val pendingResult = goAsync()
+        val pendingResult: android.content.BroadcastReceiver.PendingResult? = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (sessionId == "REARM") {
@@ -34,19 +34,19 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 val session = app.repository.getSession(sessionId) ?: return@launch
                 if (session.status != SessionStatus.PLANNED) return@launch
+                if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    return@launch
+                }
 
                 app.repository.transition(sessionId, SessionStatus.NOTIFIED, EventSource.ALARM)
                 showNotification(context, session)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }
 
     private fun showNotification(context: Context, session: TrainingSession) {
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            return
-        }
 
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -74,14 +74,14 @@ class ReminderReceiver : BroadcastReceiver() {
         )
 
         val notification = NotificationCompat.Builder(context, NotificationChannels.WORKOUT_REMINDERS)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(pendingOpen)
-            .addAction(R.drawable.ic_launcher_foreground, "Aloita", pendingOpen)
-            .addAction(R.drawable.ic_launcher_foreground, "Siirrä huomiselle", pendingPostpone)
+            .addAction(0, "Aloita", pendingOpen)
+            .addAction(0, "Siirrä huomiselle", pendingPostpone)
             .build()
 
 

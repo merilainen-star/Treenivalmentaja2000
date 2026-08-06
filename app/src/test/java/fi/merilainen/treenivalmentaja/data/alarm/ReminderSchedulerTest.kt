@@ -34,8 +34,8 @@ class ReminderSchedulerTest {
         val time = System.currentTimeMillis() + 10000
         scheduler.schedule("session1", time, 1)
 
-        val nextAlarm = shadowAlarmManager.nextScheduledAlarm
+        val nextAlarm = shadowAlarmManager.peekNextScheduledAlarm()
         assertNotNull(nextAlarm)
-        assert(nextAlarm!!.triggerAtTime == time)
+        assert(nextAlarm!!.getTriggerAtMs() == time)
     }
 }
