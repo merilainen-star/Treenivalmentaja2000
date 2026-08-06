@@ -1,6 +1,5 @@
 package fi.merilainen.treenivalmentaja.data.importer
 
-import com.squareup.moshi.JsonClass
 
 /**
  * Wire model for the Treenivalmentaja Training Plan Schema v1 (`docs/PLAN_SCHEMA.md`).
@@ -10,14 +9,14 @@ import com.squareup.moshi.JsonClass
  * once with a JSON path and a Finnish message. Letting Moshi throw on a missing field would give
  * the user one cryptic error at a time.
  */
-@JsonClass(generateAdapter = true)
+
 data class PlanDocumentDto(
   val schemaVersion: Int? = null,
   val plan: PlanMetaDto? = null,
   val weeks: List<WeekDto?>? = null,
 )
 
-@JsonClass(generateAdapter = true)
+
 data class PlanMetaDto(
   val id: String? = null,
   val name: String? = null,
@@ -27,14 +26,14 @@ data class PlanMetaDto(
   val author: String? = null,
 )
 
-@JsonClass(generateAdapter = true)
+
 data class WeekDto(
   val weekNumber: Int? = null,
   val focus: String? = null,
   val sessions: List<SessionDto?>? = null,
 )
 
-@JsonClass(generateAdapter = true)
+
 data class SessionDto(
   val id: String? = null,
   val type: String? = null,
@@ -54,7 +53,7 @@ data class SessionDto(
   val lighterAlternative: LighterAlternativeDto? = null,
 )
 
-@JsonClass(generateAdapter = true)
+
 data class ExerciseDto(
   val name: String? = null,
   val sets: Int? = null,
@@ -68,7 +67,7 @@ data class ExerciseDto(
   val notes: String? = null,
 )
 
-@JsonClass(generateAdapter = true)
+
 data class LighterAlternativeDto(
   val durationMin: Int? = null,
   val distanceKm: Double? = null,

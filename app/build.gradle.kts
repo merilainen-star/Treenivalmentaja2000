@@ -145,5 +145,4 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   coreLibraryDesugaring(libs.desugar.jdk.libs)
   "ksp"(libs.androidx.room.compiler)
-  "ksp"(libs.moshi.kotlin.codegen)
 }

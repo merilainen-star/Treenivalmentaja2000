@@ -52,15 +52,23 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A1A)),
+            .background(Color(0xFF1D262F)),
         contentAlignment = Alignment.Center
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.splash_notext),
-            contentDescription = "Splash Background",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .alpha(alphaAnim)
+                .scale(scaleAnim)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.splash_logo),
+                contentDescription = "App Background and Logo",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+        
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
