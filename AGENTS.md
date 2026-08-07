@@ -1,6 +1,33 @@
 # Instructions for AI Coding Agents
 
 These are binding instructions for future coding agents working on Treenivalmentaja.
+This file is the single source of truth; there is no separate per-vendor copy.
+
+## Reporting Protocol (v4)
+
+Begin every completion report with the line: `AGENTS.md luettu (v4)`
+
+## Verification Rules
+
+- **Compiling is not working.** "Builds without errors" says nothing about behaviour.
+  Instrumented tests must be *run* on a device or emulator, not merely compiled. If no
+  emulator is available, say so plainly — never report an unrun test as passing, and do not
+  attach a prediction about whether it would pass.
+- **Never hand-write generated artifacts.** Room schema JSON under `app/schemas/` is written
+  by KSP. If a schema file is missing or wrong, fix the build configuration and re-run the
+  build. Editing the JSON by hand is always the wrong fix.
+- **Do not undo previous fixes.** Before touching resources, dependencies, or build config,
+  check `git log -- <path>` for recent deliberate changes. Re-introducing something that was
+  removed on purpose is a regression, not a feature.
+- **Stay in scope.** Do not change product or visual design while fixing tests or
+  refactoring. Cosmetic changes belong in their own commit, proposed first.
+- **Throwaway scripts stay out of the repo.** Patch and migration helper scripts go in
+  `.scratch/` (git-ignored), never the repository root.
+- **Reports must contain measured numbers**, not adjectives: APK size in MB, test counts as
+  `tests/failures/errors`, and the exact commands that produced them.
+- **Asset budget.** No bitmaps in `-nodpi` — it disables density stripping and ships every
+  image to every device. WebP is the default format; PNG needs a reason. Launcher icons need
+  every density bucket because `minSdk = 24`.
 
 ## General Rules
 - **Inspect Before Implementing:** Always inspect existing implementations (via `cat`, `grep`, or file viewing tools) before adding new ones. Do not assume architecture.
