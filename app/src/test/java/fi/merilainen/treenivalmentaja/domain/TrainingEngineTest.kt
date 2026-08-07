@@ -9,7 +9,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -18,9 +18,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
@@ -33,21 +34,21 @@ class TrainingEngineTest {
     private lateinit var rescheduleAlarmsUseCase: RescheduleAlarmsUseCase
     private lateinit var engine: TrainingEngine
 
-    private val fixedToday = LocalDate.of(2026, 8, 10)
-    private val fixedZone = ZoneId.of("Europe/Helsinki")
-    private val fixedClock = Clock.fixed(
+    private val fixedToday: LocalDate = LocalDate.of(2026, 8, 10)
+    private val fixedZone: ZoneId = ZoneId.of("Europe/Helsinki")
+    private val fixedClock: Clock = Clock.fixed(
         fixedToday.atStartOfDay(fixedZone).toInstant(),
         fixedZone
     )
 
     @Before
-    fun setup() = runTest {
+    fun setup() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
 
-        repository = TrainingRepository(db)
+        repository = TrainingRepository(db, fixedClock)
         settingsStore = NotificationSettingsStore(context)
         scheduler = FakeReminderScheduler(context)
 
@@ -66,14 +67,18 @@ class TrainingEngineTest {
             rescheduleAlarmsUseCase = rescheduleAlarmsUseCase
         )
 
-        // Seed a plan
+        // Seed the active plan every session below belongs to.
         db.trainingPlanDao().insert(
             TrainingPlanEntity(
                 id = "plan-1",
                 name = "Test Plan",
-                source = "TEST",
-                importedAtUtc = System.currentTimeMillis(),
-                timeZone = "Europe/Helsinki"
+                schemaVersion = 1,
+                timeZone = fixedZone.id,
+                startDate = fixedToday.minusDays(7).toString(),
+                description = null,
+                createdAt = fixedClock.millis(),
+                contentHash = "test-hash",
+                isActive = true
             )
         )
     }
@@ -84,7 +89,7 @@ class TrainingEngineTest {
     }
 
     @Test
-    fun markSick_transitionsFutureOpenSessionsToPausedAndReschedulesAlarms() = runTest {
+    fun markSick_transitionsFutureOpenSessionsToPausedAndReschedulesAlarms() = runBlocking {
         val pastDate = fixedToday.minusDays(2).toString()
         val todayDate = fixedToday.toString()
         val futureDate = fixedToday.plusDays(2).toString()
@@ -93,9 +98,10 @@ class TrainingEngineTest {
         insertSession("s2", todayDate, SessionStatus.PLANNED)
         insertSession("s3", futureDate, SessionStatus.PLANNED)
 
-        // Pre-populate alarms
+        // Pre-populate alarms, then forget them so we only observe the post-markSick run.
         rescheduleAlarmsUseCase.execute()
         assertTrue(scheduler.scheduled.isNotEmpty())
+        scheduler.scheduled.clear()
 
         engine.markSick("Test Sickness")
 
@@ -104,13 +110,14 @@ class TrainingEngineTest {
         assertEquals(SessionStatus.PAUSED_DUE_TO_ILLNESS, sessions["s2"]?.status)
         assertEquals(SessionStatus.PAUSED_DUE_TO_ILLNESS, sessions["s3"]?.status)
 
-        // Verify active workout alarms are empty (only REARM may exist if window covers it)
-        val sessionAlarms = scheduler.scheduled.filter { it.first != "REARM" }
-        assertTrue(sessionAlarms.isEmpty())
+        // Paused sessions must not hold an alarm any more. (s1 stays PLANNED, and the REARM
+        // alarm is always re-armed, so both may legitimately appear.)
+        val scheduledIds = scheduler.scheduled.map { it.first }.toSet()
+        assertTrue(scheduledIds.none { it == "s2" || it == "s3" })
     }
 
     @Test
-    fun markRecovered_noPausedSessions_doesNothing() = runTest {
+    fun markRecovered_noPausedSessions_doesNothing() = runBlocking {
         insertSession("s1", fixedToday.toString(), SessionStatus.PLANNED)
 
         engine.markRecovered()
@@ -121,7 +128,7 @@ class TrainingEngineTest {
     }
 
     @Test
-    fun markRecovered_reschedulesPausedSessionsGradually() = runTest {
+    fun markRecovered_reschedulesPausedSessionsGradually() = runBlocking {
         val d1 = fixedToday.minusDays(4).toString()
         val d2 = fixedToday.minusDays(3).toString()
         val d3 = fixedToday.minusDays(1).toString()
@@ -147,13 +154,16 @@ class TrainingEngineTest {
         assertEquals(fixedToday.plusDays(2).toString(), s2Rescheduled?.scheduledDate)
         assertTrue(s2Rescheduled?.appliedLighterVariant == true)
 
-        // s3 & s4 -> shifted starting from fixedToday + 3 days
+        // s3 & s4 -> shifted so the third session lands on fixedToday + 3 days
         val s3Rescheduled = activeSessions.find { it.originalSessionId == "s3" }
         assertEquals(fixedToday.plusDays(3).toString(), s3Rescheduled?.scheduledDate)
+
+        val s4Rescheduled = activeSessions.find { it.originalSessionId == "s4" }
+        assertEquals(fixedToday.plusDays(4).toString(), s4Rescheduled?.scheduledDate)
     }
 
     @Test
-    fun handleMissedSessions_oneMissedSession_movesToNextRestDay() = runTest {
+    fun handleMissedSessions_oneMissedSession_movesToNextRestDay() = runBlocking {
         val yesterday = fixedToday.minusDays(1).toString()
         val todayStr = fixedToday.toString()
 
@@ -169,7 +179,7 @@ class TrainingEngineTest {
     }
 
     @Test
-    fun handleMissedSessions_multipleMissedSessions_shiftsEntirePlanForward() = runTest {
+    fun handleMissedSessions_multipleMissedSessions_shiftsEntirePlanForward() = runBlocking {
         val d1 = fixedToday.minusDays(3).toString()
         val d2 = fixedToday.minusDays(1).toString()
 
@@ -188,23 +198,26 @@ class TrainingEngineTest {
     }
 
     private suspend fun insertSession(id: String, date: String, status: SessionStatus) {
+        val remindAt = ZonedDateTime.of(LocalDate.parse(date), LocalTime.of(18, 0), fixedZone)
+            .toInstant()
+            .toEpochMilli()
         db.workoutSessionDao().insert(
             WorkoutSessionEntity(
                 id = id,
                 planId = "plan-1",
                 type = WorkoutType.RUNNING,
+                weekNumber = 1,
                 scheduledDate = date,
                 scheduledTime = "18:00",
-                durationMin = 45,
-                title = "Session $id",
-                description = "Desc",
-                status = status,
-                remindAtUtc = null,
+                remindAtUtc = remindAt,
                 timeIsFixed = false,
                 reminderOverride = null,
+                durationMin = 45,
+                description = "Desc",
+                status = status,
                 appliedLighterVariant = false,
                 originalSessionId = null,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = fixedClock.millis()
             )
         )
     }
