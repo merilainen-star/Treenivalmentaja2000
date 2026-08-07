@@ -146,6 +146,18 @@ class ComponentScreenshotTest {
         )
     }
 
+    /** Tapping a week row unrolls the session's content beneath it; the chevron flips. */
+    @Test
+    fun weekCard_expanded_strength() = capture("week_card_expanded_strength") {
+        WorkoutCardWeek(strengthWorkout, expanded = true, onToggle = {})
+    }
+
+    /** A run has no parsed movements, so the description is shown as written. */
+    @Test
+    fun weekCard_expanded_running() = capture("week_card_expanded_running") {
+        WorkoutCardWeek(runningWorkout, expanded = true, onToggle = {})
+    }
+
     // ------------------------------------------------------------------ Recovery card
 
     @Test

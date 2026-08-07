@@ -277,36 +277,12 @@ fun WorkoutCardToday(
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
-            } else if (workout.type == WorkoutType.STRENGTH && parsedWorkout.exercises.isNotEmpty()) {
-                if (parsedWorkout.intro.isNotBlank()) {
-                    Text(text = parsedWorkout.intro, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                for (round in 1..parsedWorkout.rounds) {
-                    if (parsedWorkout.rounds > 1) {
-                        Text(
-                            text = "Kierros $round", 
-                            style = MaterialTheme.typography.titleSmall, 
-                            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    parsedWorkout.exercises.forEach { exercise ->
-                        Text(text = "• ${exercise.name}", style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-                if (parsedWorkout.outro.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = parsedWorkout.outro, style = MaterialTheme.typography.bodyLarge)
-                }
             } else {
-                Text(
-                    text = workout.description,
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                // Same read-only rendering the expanded Week card uses.
+                WorkoutDetails(workout)
             }
 
-            if (workout.appliedLighterVariant) {
+            if (isInteractive && parsedWorkout.exercises.isNotEmpty() && workout.appliedLighterVariant) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Kevennetty versio käytössä.",
