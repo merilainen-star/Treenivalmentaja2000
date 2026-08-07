@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.local
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -117,11 +118,38 @@ abstract class AppDatabase : RoomDatabase() {
           instance ?: build(context.applicationContext).also { instance = it }
         }
 
-    private fun build(context: Context): AppDatabase =
-      Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
+    /**
+     * There is deliberately no `fallbackToDestructiveMigration` here.
+     *
+     * With it, a schema change that has no migration wipes the database without a word: no error,
+     * no log line, just an empty training history on the next launch. Without it, Room throws on
+     * open and the app fails to start — loud, immediate, and the data is still on disk waiting for
+     * the migration to be written. For a single-user app the loud failure is strictly the better
+     * one; the quiet one is only discovered once the history is already gone.
+     *
+     * Adding a version therefore means, every time:
+     *  1. change the entities and bump [version];
+     *  2. for purely additive changes (new table, new nullable column, new column with a default,
+     *     new index) declare `autoMigrations = [AutoMigration(from = N, to = N+1)]` on `@Database`
+     *     — Room writes the SQL by diffing the exported schemas under `app/schemas/`;
+     *  3. for a rename or a drop, add `@RenameColumn`/`@DeleteColumn` specs, or hand-write a
+     *     [Migration] the way [MIGRATION_3_4] does, and pass it to `addMigrations`;
+     *  4. add a case to `MigrationTest` — a migration nobody ran is not a migration.
+     *
+     * `tools/backup-db.ps1` copies the database off the device first, which is worth doing before
+     * installing any build that bumps the version.
+     */
+    private fun build(context: Context): AppDatabase = builder(context, DB_NAME).build()
+
+    /**
+     * The one place the database is configured. `MigrationGuardTest` builds through here under a
+     * throwaway file name, so what it asserts about is the real configuration rather than a copy
+     * of it that could drift.
+     */
+    @VisibleForTesting
+    internal fun builder(context: Context, name: String): RoomDatabase.Builder<AppDatabase> =
+      Room.databaseBuilder(context, AppDatabase::class.java, name)
         .addMigrations(MIGRATION_3_4)
-        .fallbackToDestructiveMigration(dropAllTables = true)
         .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-        .build()
   }
 }

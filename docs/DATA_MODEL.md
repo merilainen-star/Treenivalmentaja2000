@@ -1,7 +1,7 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 1 with `exportSchema = false`; the
-first schema change must add a schema export and a migration.)*
+*(Status: **implemented**. `AppDatabase` is at schema version 4 with `exportSchema = true`;
+schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
 The schema below is implemented in `fi.merilainen.treenivalmentaja.data.local`.
@@ -149,6 +149,39 @@ Moving a session never edits `scheduledDate` in place:
 - Backward: follow `originalSessionId` until it is `null` to reach the originally imported session.
 
 A session may be moved repeatedly, producing a chain. Only the last link is non-terminal.
+
+## Schema versions and migrations
+
+The version number describes the **shape** of the tables, never how much data they hold. Inserting
+rows never changes it. It changes when a column, table or index appears, disappears or is renamed.
+
+A consequence worth stating, because it is easy to assume otherwise: the Oura tables already exist
+at version 4. Wiring up the Oura integration will insert rows into tables that are already there,
+and will not bump the version by itself. Only a new field — somewhere to keep an OAuth token, say —
+would.
+
+**There is no `fallbackToDestructiveMigration`, on purpose.** With it, a schema change lacking a
+migration empties the database silently: no error, no log line, just a blank history on the next
+launch. Without it Room throws on open and the app refuses to start, while the data sits untouched
+on disk waiting for the migration to be written. The loud failure is the one you can act on.
+
+Adding a version means, every time:
+
+1. Change the entities and bump `version` on `@Database`.
+2. **Additive change** (new table, new nullable column, new column with a default, new index):
+   declare `autoMigrations = [AutoMigration(from = N, to = N+1)]`. Room generates the SQL by
+   diffing the exported schema JSONs — no hand-written SQL, and nothing to get wrong.
+3. **Rename or drop:** add `@RenameColumn` / `@DeleteColumn` specs, or hand-write a `Migration`.
+   `MIGRATION_3_4` is the worked example: SQLite cannot rename a column in place, so it builds the
+   new table, copies every column across, drops the old one and recreates the indices.
+4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
+   catches the copy that silently dropped a column.
+
+Only `3.json` and `4.json` are in `app/schemas/`; versions 1 and 2 predate the export and cannot be
+migrated from. That matters only for an install still sitting on one of them.
+
+Before installing a build that bumps the version, take a copy of the device database with
+`tools/backup-db.ps1`.
 
 ## Mapping
 - **JSON to DB:** Import DTOs (Moshi) are validated, then mapped to Room entities in the

@@ -4,11 +4,11 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 68 unit tests + 8 instrumented tests, all passing.
+**Status:** 68 unit tests + 9 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 60 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 8 screenshot comparisons
-- `./gradlew :app:connectedDebugAndroidTest` — 8 tests / 0 failures / 0 errors
+- `./gradlew :app:testDebugUnitTest` — 68 tests / 0 failures / 0 errors
+- `./gradlew :app:verifyRoborazziDebug` — 8 screenshot comparisons (a subset of the 68 above)
+- `./gradlew :app:connectedDebugAndroidTest` — 9 tests / 0 failures / 0 errors
 
 | Suite | Covers |
 | --- | --- |
@@ -19,6 +19,7 @@ The testing strategy ensures the deterministic training engine works flawlessly 
 | `data/repository/TrainingRepositoryTest` | Real Room schema in memory: import, event-history accumulation, rejected transitions writing nothing, lighter-version payload and fallback, reschedule chain, duplicate/conflict detection, seeding, cascade delete. |
 | `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the recovery card and every status badge. |
 | `data/local/MigrationTest` (instrumented) | Room migration 3 → 4 against the KSP-generated schemas. |
+| `data/local/MigrationGuardTest` (instrumented) | That a missing migration throws and leaves the rows on disk, instead of emptying the database quietly. Fails if `fallbackToDestructiveMigration` is ever reintroduced. |
 | `data/alarm/ReminderReceiverTest`, `ReminderReceiverNoPermissionTest`, `BootReceiverTest` (instrumented) | Alarm delivery, the missing-notification-permission path, and the BootReceiver action guard. |
 
 **Gaps:** no ViewModel tests, and no test renders a whole screen — `TodayScreen`, `WeekScreen` and
@@ -35,9 +36,12 @@ layer, which does not exist yet.
 - Run command: `./gradlew :app:testDebugUnitTest`
 
 ### Room Database Tests
-- Target: DAO queries, transactional writes, foreign-key cascades, and (later) migrations.
+- Target: DAO queries, transactional writes and foreign-key cascades.
 - Executed via Robolectric against an in-memory database, so no device or emulator is needed.
 - Deterministic by construction: the repository takes an injectable `Clock` and id generator.
+- Migrations are the exception and run instrumented, because `MigrationTestHelper` needs a real
+  device: see `MigrationTest` and `MigrationGuardTest`, and the migration policy in
+  [DATA_MODEL.md](DATA_MODEL.md#schema-versions-and-migrations).
 
 ### UI & Screenshot Tests
 - Framework: Roborazzi on Robolectric — runs on the JVM, no device or emulator needed.
