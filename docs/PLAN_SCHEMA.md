@@ -3,6 +3,12 @@
 The JSON format used to import a training plan into Treenivalmentaja, from a file or from the
 clipboard. It is also the format the future AI advisor must produce for a proposal.
 
+**This document is the source to write a plan against.** When a plan is drafted with AI
+assistance, give the model this file and have it emit JSON directly. The ICS route
+(`tools/parse_ics*.py`) exists only because the first plan arrived as a calendar export; it
+infers structure from Finnish prose with regular expressions and gets it wrong in ways nobody
+notices until the import fails. It is a legacy path, not the intended one.
+
 - **`schemaVersion`: `1`** — a document without it, or with an unknown value, is rejected outright.
 - Validation happens **before** anything is written to Room. A document is imported whole or not
   at all.

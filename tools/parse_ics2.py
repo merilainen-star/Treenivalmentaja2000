@@ -1,9 +1,12 @@
 import re
 import json
+import sys
 from datetime import datetime
 
 def parse_ics(file_path):
-    with open(file_path, 'r') as f:
+    # encoding is explicit on purpose: open() defaults to the system code page on Windows
+    # (cp1252 here), which mangles every Finnish character in a UTF-8 calendar.
+    with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     # Unfold lines
@@ -41,7 +44,9 @@ def parse_ics(file_path):
 
     return events
 
-events = parse_ics('treeniohjelma_16-7-2026_kaikki.ics')
+ics_path = sys.argv[1] if len(sys.argv) > 1 else 'treeniohjelma_16-7-2026_kaikki.ics'
+out_path = sys.argv[2] if len(sys.argv) > 2 else 'plan.json'
+events = parse_ics(ics_path)
 
 def parse_date(date_str):
     return datetime.strptime(date_str, '%Y%m%dT%H%M%S')
@@ -82,7 +87,13 @@ def extract_pace(desc):
         return match.group(1)
     return None
 
-def parse_exercises(desc, exercise_sentence):
+def parse_exercises(exercise_sentence):
+    """Split a comma-separated movement sentence into exercise objects.
+
+    A fragment that yields neither reps nor a duration is prose, not a movement, and is
+    dropped. The schema requires one or the other (docs/PLAN_SCHEMA.md), and an exercise
+    carrying only a name says nothing anyway.
+    """
     exercises = []
     if not exercise_sentence:
         return exercises
@@ -90,20 +101,23 @@ def parse_exercises(desc, exercise_sentence):
     for part in parts:
         part = part.strip()
         if not part: continue
-        
+
         name = part
         reps_min, reps_max = None, None
         duration = None
         per_side = False
-        
+
         if 'lankku' in part.lower() or 'venytys' in part.lower():
             duration = extract_duration(part)
         else:
             reps_min, reps_max = extract_reps(part)
-            
+
+        if reps_min is None and duration is None:
+            continue
+
         if '/puoli' in part.lower() or '/jalka' in part.lower():
             per_side = True
-            
+
         ex = {
             "name": name,
         }
@@ -140,18 +154,21 @@ for i, ev in enumerate(events):
     warmup_match = re.search(r'Lämmittely (\d+)\s*min', desc)
     warmup_sec = int(warmup_match.group(1)) * 60 if warmup_match else None
     
-    # Simple parse of sentences
-    sentences = [s.strip() for s in re.split(r'(?<=\.)\s+|\n+', desc) if s.strip()]
-    exercise_sentence = None
-    for s in sentences:
-        if s.count(',') > 0 and 'kierro' not in s.lower() and 'tauko' not in s.lower():
-            exercise_sentence = s
-            break
-            
-    exercises = parse_exercises(desc, exercise_sentence)
-    
     session_type = "RUNNING" if "juoksu" in ev.get('SUMMARY', '').lower() or "vetoja" in ev.get('SUMMARY', '').lower() else "STRENGTH"
-    
+
+    # Only strength sessions list their movements comma-separated. On a run the one sentence
+    # with a comma is ordinary prose — "Pidä vauhti sellaisena, että pystyt puhumaan." — and
+    # splitting it produced two nameless "exercises" that the importer rightly rejected.
+    exercises = []
+    if session_type == "STRENGTH":
+        sentences = [s.strip() for s in re.split(r'(?<=\.)\s+|\n+', desc) if s.strip()]
+        exercise_sentence = None
+        for s in sentences:
+            if s.count(',') > 0 and 'kierro' not in s.lower() and 'tauko' not in s.lower():
+                exercise_sentence = s
+                break
+        exercises = parse_exercises(exercise_sentence)
+
     session = {
         "id": f"s-{i}",
         "type": session_type,
@@ -198,7 +215,7 @@ for wk in sorted(weeks.keys()):
         "sessions": weeks[wk]
     })
 
-with open('plan.json', 'w') as f:
+with open(out_path, 'w', encoding='utf-8') as f:
     json.dump(plan, f, indent=2, ensure_ascii=False)
 
-print("Created plan.json")
+print('Wrote %s: %d weeks, %d sessions' % (out_path, len(plan['weeks']), sum(len(w['sessions']) for w in plan['weeks'])))

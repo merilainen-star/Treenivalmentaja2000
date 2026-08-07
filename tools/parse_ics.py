@@ -68,7 +68,13 @@ def extract_reps(desc):
         return int(match2.group(1)), int(match2.group(1))
     return None, None
 
-def parse_exercises(desc, exercise_sentence):
+def parse_exercises(exercise_sentence):
+    """Split a comma-separated movement sentence into exercise objects.
+
+    A fragment that yields neither reps nor a duration is prose, not a movement, and is
+    dropped. The schema requires one or the other (docs/PLAN_SCHEMA.md), and an exercise
+    carrying only a name says nothing anyway.
+    """
     exercises = []
     if not exercise_sentence:
         return exercises
@@ -76,33 +82,37 @@ def parse_exercises(desc, exercise_sentence):
     for part in parts:
         part = part.strip()
         if not part: continue
-        
+
         name = part
         reps_min, reps_max = None, None
         duration = None
         per_side = False
-        
+
         if 'lankku' in part.lower() or 'venytys' in part.lower():
             duration = extract_duration(part)
         else:
             reps_min, reps_max = extract_reps(part)
-            
+
+        if reps_min is None and duration is None:
+            continue
+
         if '/puoli' in part.lower() or '/jalka' in part.lower():
             per_side = True
-            
+
         ex = {
             "name": name,
         }
         if reps_min is not None:
             ex["repsMin"] = reps_min
-            if reps_max is not reps_min:
+            # `!=`, not `is not`: identity holds for small ints by interning only.
+            if reps_max != reps_min:
                 ex["repsMax"] = reps_max
             ex["reps"] = reps_min
         if duration is not None:
             ex["durationSec"] = duration
         if per_side:
             ex["perSide"] = True
-            
+
         exercises.append(ex)
     return exercises
 
@@ -121,21 +131,25 @@ for i, ev in enumerate(events):
     
     rounds_min, rounds_max = extract_rounds(desc)
     
-    # Simple parse of sentences
-    sentences = [s.strip() for s in re.split(r'(?<=\.)\s+|\n+', desc) if s.strip()]
-    exercise_sentence = None
-    for s in sentences:
-        if s.count(',') > 0 and 'kierro' not in s.lower() and 'tauko' not in s.lower():
-            exercise_sentence = s
-            break
-            
-    exercises = parse_exercises(desc, exercise_sentence)
-    
+    summary = ev.get('SUMMARY', '')
+    session_type = "RUNNING" if "juoksu" in summary.lower() or "vetoja" in summary.lower() else "STRENGTH"
+
+    # Only strength sessions list their movements comma-separated. On a run the one sentence
+    # with a comma is ordinary prose — "Pidä vauhti sellaisena, että pystyt puhumaan." — and
+    # splitting it produced two nameless "exercises" that the importer rightly rejected.
+    exercises = []
+    if session_type == "STRENGTH":
+        sentences = [s.strip() for s in re.split(r'(?<=\.)\s+|\n+', desc) if s.strip()]
+        exercise_sentence = None
+        for s in sentences:
+            if s.count(',') > 0 and 'kierro' not in s.lower() and 'tauko' not in s.lower():
+                exercise_sentence = s
+                break
+        exercises = parse_exercises(exercise_sentence)
+
     # Clean description
     clean_desc = desc
-    
-    session_type = "RUNNING" if "juoksu" in ev.get('SUMMARY', '').lower() or "vetoja" in ev.get('SUMMARY', '').lower() else "STRENGTH"
-    
+
     session = {
         "id": f"s-{i}",
         "type": session_type,
@@ -143,8 +157,9 @@ for i, ev in enumerate(events):
         "time": time_str,
         "durationMin": duration_min,
         "description": clean_desc,
-        "exercises": exercises
     }
+    if exercises:
+        session["exercises"] = exercises
     if rounds_min:
         session["roundsMin"] = rounds_min
         session["roundsMax"] = rounds_max

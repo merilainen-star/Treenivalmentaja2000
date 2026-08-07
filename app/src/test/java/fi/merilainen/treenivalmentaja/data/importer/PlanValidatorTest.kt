@@ -305,6 +305,81 @@ class PlanValidatorTest {
     assertTrue(duplicate.message.contains("weeks[0]"))
   }
 
+  // ------------------------------------------------------------------ prose as exercises
+
+  /**
+   * Regression: `tools/parse_ics2.py` split a running session's description on its commas and
+   * emitted the sentence fragments as exercises. "Pidä vauhti sellaisena, että pystyt puhumaan."
+   * became two exercises with a name and nothing else, 16 of them across an eight-week plan, and
+   * the whole import failed. An exercise carrying only a name is prose, and must be rejected.
+   */
+  @Test
+  fun `exercise with neither reps nor duration is rejected`() {
+    val paths =
+      pathsOf(
+        """
+        {
+          "schemaVersion": 1,
+          "plan": {
+            "id": "plan-testi", "name": "Testi", "timeZone": "Europe/Helsinki",
+            "startDate": "2026-08-10"
+          },
+          "weeks": [
+            {
+              "weekNumber": 1,
+              "sessions": [
+                {
+                  "id": "s-1", "type": "RUNNING", "date": "2026-08-10", "time": "18:00",
+                  "durationMin": 42,
+                  "description": "Pitkä lenkki. Pidä vauhti sellaisena, että pystyt puhumaan.",
+                  "exercises": [
+                    { "name": "Pidä vauhti sellaisena" },
+                    { "name": "että pystyt puhumaan" },
+                    { "name": "Lankku", "durationSec": 30 }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """
+      )
+    assertEquals(
+      listOf("weeks[0].sessions[0].exercises[0]", "weeks[0].sessions[0].exercises[1]"),
+      paths,
+    )
+  }
+
+  /** The session itself stays valid on `durationMin` alone once the prose is gone. */
+  @Test
+  fun `running session with no exercises at all is valid`() {
+    val outcome =
+      validate(
+        """
+        {
+          "schemaVersion": 1,
+          "plan": {
+            "id": "plan-testi", "name": "Testi", "timeZone": "Europe/Helsinki",
+            "startDate": "2026-08-10"
+          },
+          "weeks": [
+            {
+              "weekNumber": 1,
+              "sessions": [
+                {
+                  "id": "s-1", "type": "RUNNING", "date": "2026-08-10", "time": "18:00",
+                  "durationMin": 42, "description": "Pitkä rauhallinen lenkki."
+                }
+              ]
+            }
+          ]
+        }
+        """
+      )
+    val plan = (outcome as ValidationOutcome.Valid).plan
+    assertNull(plan.sessions.single().exercises)
+  }
+
   // ------------------------------------------------------------------ content hash
 
   @Test

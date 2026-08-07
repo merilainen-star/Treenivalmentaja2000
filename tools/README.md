@@ -1,13 +1,23 @@
 # Tools
 
-## ICS to JSON Parser
+## ICS to JSON Parser (legacy)
 
-`parse_ics.py` and `parse_ics2.py` can be used to parse ICS calendar files into the `PlanDto` format used by the application for import.
+`parse_ics.py` and `parse_ics2.py` turn an ICS calendar export into the import JSON described in
+`docs/PLAN_SCHEMA.md`. `parse_ics2.py` is the newer of the two and the one that produced the
+existing plan: it also carries the event summary into the description and extracts pace, warmup
+and round counts.
 
-Usage:
 ```bash
-python tools/parse_ics.py sample-data/treeniohjelma_16-7-2026_kaikki.ics
+python tools/parse_ics2.py path/to/treeniohjelma.ics plan.json
 ```
+
+**Prefer writing the JSON directly.** These scripts infer structure from Finnish prose with
+regular expressions, and that inference is unreliable: movements are recognised by splitting the
+first comma-bearing sentence, so a running session's `"Pidä vauhti sellaisena, että pystyt
+puhumaan."` became two exercises with a name and nothing else, failing the import 16 times over
+in an eight-week plan. Sentence fragments are now dropped and exercises are parsed for strength
+sessions only, but the approach stays a guess. When drafting a plan with AI assistance, hand the
+model `docs/PLAN_SCHEMA.md` and have it produce the JSON.
 
 ## Icon and Splash Assets
 
