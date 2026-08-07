@@ -9,6 +9,23 @@ Usage:
 python tools/parse_ics.py sample-data/treeniohjelma_16-7-2026_kaikki.ics
 ```
 
+## Icon and Splash Assets
+
+`generate_icons.py` rebuilds every launcher and splash raster from the master artwork.
+
+```bash
+python tools/generate_icons.py path/to/Icon.png
+```
+
+The master is the finished 2048x2048 icon: the logo mark on its own dark background, inside a
+rounded square, on a white margin. The script floods in from the corners to find that margin,
+grows the mask so the anti-aliased rim of the rounded square goes with it, keys the mark off the
+`#232323` background and unpremultiplies the edges, then writes the adaptive-icon foreground, the
+themed-icon monochrome layer and the splash mark at all five densities as lossless WebP.
+
+Verify by rendering, never by reading a header: `aapt2` and a RIFF size check both pass happily on
+a file whose pixels are noise. That is exactly how the previous assets went unnoticed.
+
 ## Database Backup
 
 `backup-db.ps1` copies the app database off an attached device and prints its Room schema version.

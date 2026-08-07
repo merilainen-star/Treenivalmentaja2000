@@ -26,8 +26,17 @@ Begin every completion report with the line: `AGENTS.md luettu (v4)`
 - **Reports must contain measured numbers**, not adjectives: APK size in MB, test counts as
   `tests/failures/errors`, and the exact commands that produced them.
 - **Asset budget.** No bitmaps in `-nodpi` — it disables density stripping and ships every
-  image to every device. WebP is the default format; PNG needs a reason. Launcher icons need
-  every density bucket because `minSdk = 24`.
+  image to every device. WebP is the default format; PNG needs a reason. The launcher icon is
+  an adaptive icon; `minSdk = 26` means no legacy per-density fallback bitmaps are needed.
+- **Never write a binary file through a text tool.** Every image in this repository was once
+  destroyed that way: each byte `>= 0x80` became U+FFFD (`ef bf bd`), and no intact copy
+  survived in any branch. Copy binaries with `cp`, `git mv` or a byte-mode write — never
+  through an editor, a clipboard, a heredoc or anything that applies an encoding.
+- **Verify images by rendering them.** A valid header proves nothing: `aapt2` compiled the
+  corrupted icons without complaint and the RIFF chunk sizes added up exactly, while the
+  pixels were noise. Open the image and look at it, and check that the app actually launches
+  — a broken drawable is a startup crash, not a build error. `tools/generate_icons.py`
+  regenerates every asset from the master artwork.
 
 ## General Rules
 - **Inspect Before Implementing:** Always inspect existing implementations (via `cat`, `grep`, or file viewing tools) before adding new ones. Do not assume architecture.

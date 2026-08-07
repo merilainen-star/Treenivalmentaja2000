@@ -3,6 +3,6 @@
     <item
         android:width="200dp"
         android:height="200dp"
-        android:drawable="@drawable/splash_icon_transparent"
+        android:drawable="@drawable/splash_logo"
         android:gravity="center" />
 </layer-list>

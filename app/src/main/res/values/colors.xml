@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_background">#1D262F</color>
+    <!-- The dark the logo mark was drawn against in the master artwork. The adaptive icon's
+         background layer has to match it, or the keyed foreground shows a rim. -->
+    <color name="icon_background">#232323</color>
 </resources>
