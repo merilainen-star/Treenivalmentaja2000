@@ -19,7 +19,10 @@ android {
 
   defaultConfig {
     applicationId = "fi.merilainen.treenivalmentaja"
-    minSdk = 24
+    // 26 rather than 24: the scheduling code is built on java.time, adaptive launcher icons need
+    // no per-density fallback bitmaps from here up, and the notification-settings intent constants
+    // are available natively. Drops Android 7.x, which this app has never run on.
+    minSdk = 26
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
@@ -55,8 +58,6 @@ android {
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
-    // minSdk is 24 but the scheduling code relies on java.time (API 26+).
-    isCoreLibraryDesugaringEnabled = true
   }
   buildFeatures {
     compose = true
@@ -145,6 +146,5 @@ dependencies {
   androidTestImplementation(libs.androidx.rules)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-  coreLibraryDesugaring(libs.desugar.jdk.libs)
   "ksp"(libs.androidx.room.compiler)
 }
