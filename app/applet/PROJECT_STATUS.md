@@ -75,5 +75,6 @@
 - `docs/TRAINING_ENGINE.md` (binding rules)
 
 ## Nykyinen tila
-- Suoritusaika ja muistutusaika erotettu (Migraatio versioon 2).
-- Datastore asetuksille lisätty.
+- **AlarmManager notifications.** Reminder system implemented with 7-day sliding window, `BOOT_COMPLETED` / timezone restore, and permission checks.
+- **Rule-based deterministic training engine.** `TrainingEngine` handles missed sessions, plan shifting, and illness pause/recovery progression.
+- **Room migrations.** Schema version 4 with `exportSchema = true` and `MIGRATION_3_4`.

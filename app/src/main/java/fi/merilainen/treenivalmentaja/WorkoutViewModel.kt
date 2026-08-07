@@ -88,8 +88,22 @@ class WorkoutViewModel(
   private val _importFeedback = MutableStateFlow<ImportFeedback?>(null)
   val importFeedback: StateFlow<ImportFeedback?> = _importFeedback.asStateFlow()
 
+  private var lastMissedSessionsCheckDate: LocalDate? = null
+
   init {
-    viewModelScope.launch { repository.seedIfEmpty() }
+    viewModelScope.launch {
+      repository.seedIfEmpty()
+      checkMissedSessions()
+    }
+  }
+
+  fun checkMissedSessions() {
+    val today = LocalDate.now()
+    if (lastMissedSessionsCheckDate == today) return
+    lastMissedSessionsCheckDate = today
+    viewModelScope.launch {
+      engine.handleMissedSessions()
+    }
   }
 
   fun updateWorkoutStatus(workoutId: String, newStatus: SessionStatus) {

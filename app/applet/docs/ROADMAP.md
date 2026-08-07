@@ -1,5 +1,10 @@
 # Roadmap
 
+## Completed (MVP Phase 3)
+- Reminder system: AlarmManager notifications with a 7-day sliding window, `BOOT_COMPLETED` & timezone change restoration, and notification permission checks. (Uses inexact `setAndAllowWhileIdle` to comply with Google Play exact alarm policies).
+- Room database migrations: `AppDatabase` updated to schema version 4 (`exportSchema = true`), with tested migrations (`MIGRATION_3_4`) and schema JSON exports.
+- Deterministic Training Engine: `TrainingEngine` rules implemented for handling missed sessions, plan shifting, illness pause (`markSick()`), and recovery progression (`markRecovered()`).
+
 ## Completed (MVP Phase 2)
 - Room database as the local source of truth (entities, DAOs, repository).
 - Session state machine with a validated transition table and an append-only event log.
@@ -17,17 +22,13 @@
 - `WorkoutViewModel` utilizing static mock data.
 
 ## In Progress (MVP Phase 3)
-- Deterministic training engine rules on top of the persistent state machine (missed sessions,
-  plan shifting, illness pause and return).
+- Oura API V2 Integration via Retrofit.
 
 ## Next Milestone (MVP Phase 3)
-- Oura API V2 Integration via Retrofit.
 - In-app OAuth2 token exchange with PKCE ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend).
 - WorkManager integration for background biometric syncing.
-- AlarmManager integration for exact training notifications.
 
 ## Later (Phase 4 & Beyond)
-- Implementation of the local deterministic Training Engine rules (handling missed days and illness).
 - Remote AI advisor integration (sending prompt, parsing JSON, user approval flow).
 - Strava API integration for richer workout telemetry.
 
@@ -37,6 +38,4 @@
 ## Technical Debt
 - Extract Use Cases from `TrainingRepository` once the engine rules land — the repository
   currently carries some domain logic (lighter-version fallback, reschedule chaining).
-- No Room migrations yet. `AppDatabase` is at version 1 with `exportSchema = false`; the first
-  schema change must add both a schema export and a migration.
 - Roborazzi screenshot tests were removed from the template and have not been reinstated.

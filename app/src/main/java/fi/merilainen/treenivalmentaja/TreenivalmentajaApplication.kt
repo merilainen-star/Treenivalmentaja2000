@@ -21,7 +21,10 @@ class TreenivalmentajaApplication : Application() {
   }
 
   val engine: TrainingEngine by lazy {
-    TrainingEngine(repository)
+    TrainingEngine(
+      repository = repository,
+      rescheduleAlarmsUseCase = rescheduleAlarmsUseCase
+    )
   }
 
   val settingsStore: NotificationSettingsStore by lazy {

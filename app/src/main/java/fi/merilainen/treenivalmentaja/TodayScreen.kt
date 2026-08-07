@@ -60,6 +60,10 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
     val recoveryState by viewModel.recoveryState.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.checkMissedSessions()
+    }
+
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
     Column(

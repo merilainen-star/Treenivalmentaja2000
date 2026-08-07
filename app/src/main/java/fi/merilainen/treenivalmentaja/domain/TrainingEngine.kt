@@ -6,7 +6,8 @@ import java.time.LocalDate
 
 class TrainingEngine(
   private val repository: TrainingRepository,
-  private val clock: Clock = Clock.systemDefaultZone()
+  private val clock: Clock = Clock.systemDefaultZone(),
+  private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase? = null
 ) {
 
   /**
@@ -28,6 +29,7 @@ class TrainingEngine(
         note = reason ?: "Sairastuminen merkitty"
       )
     }
+    rescheduleAlarmsUseCase?.execute()
   }
 
   /**
@@ -96,6 +98,7 @@ class TrainingEngine(
         repository.applyLighterVersion(session.id, EventSource.ENGINE)
       }
     }
+    rescheduleAlarmsUseCase?.execute()
   }
 
   /**
@@ -142,6 +145,8 @@ class TrainingEngine(
         )
       }
     }
+
+    rescheduleAlarmsUseCase?.execute()
   }
 
   private fun findNextRestDay(sessions: List<TrainingSession>, fromDate: LocalDate): LocalDate {
