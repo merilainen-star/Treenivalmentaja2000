@@ -14,6 +14,11 @@ notices until the import fails. It is a legacy path, not the intended one.
   at all.
 - All dates are local dates in the plan's `timeZone`, never UTC. Absolute alarm timestamps are
   derived at import time.
+- **The dates in the file are not always where the plan should land.** Import asks: keep them, or
+  move the whole plan so its first day is today. The second option shifts every session by one
+  delta, so the spacing and the rest days survive, and recomputes each reminder from its new date
+  rather than shifting the timestamps — otherwise a plan crossing a daylight-saving boundary would
+  fire an hour out on the far side of it. Write the dates you mean; the reader decides.
 
 ## Top-level structure
 

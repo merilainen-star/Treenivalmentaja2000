@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -37,6 +38,9 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
 
+    /** Plan text waiting for the user to say where in the calendar it should land. */
+    var pendingImportJson by rememberSaveable { mutableStateOf<String?>(null) }
+
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -50,8 +54,20 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                         ?.use { it.readText() }
                 }.getOrNull()
             }
-            viewModel.importPlanJson(text)
+            // The start-date question is asked once the text is in hand, so a cancelled picker
+            // never raises it.
+            pendingImportJson = text
         }
+    }
+
+    pendingImportJson?.let { json ->
+        ImportStartDialog(
+            onDismiss = { pendingImportJson = null },
+            onConfirm = { startToday ->
+                pendingImportJson = null
+                viewModel.importPlanJson(json, startToday = startToday)
+            }
+        )
     }
 
     Column(
@@ -196,7 +212,16 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                 }
 
                 OutlinedButton(
-                    onClick = { viewModel.importPlanJson(clipboard.getText()?.text) },
+                    onClick = {
+                        // An empty clipboard is reported straight away rather than after asking
+                        // a question about a plan that is not there.
+                        val text = clipboard.getText()?.text
+                        if (text.isNullOrBlank()) {
+                            viewModel.importPlanJson(text)
+                        } else {
+                            pendingImportJson = text
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Tuo leikepöydältä")

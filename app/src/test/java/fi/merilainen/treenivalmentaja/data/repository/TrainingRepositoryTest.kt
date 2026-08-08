@@ -10,7 +10,9 @@ import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -311,6 +313,61 @@ class TrainingRepositoryTest {
 
     assertEquals(0, db.workoutSessionDao().count())
     assertEquals(0, db.sessionEventDao().countForSession("s-1"))
+  }
+
+  // ---------------------------------------------------------------- import start date
+
+  /**
+   * A plan file's dates are the coach's calendar, not necessarily the athlete's. Importing with
+   * `startToday` moves the whole thing so day one is today, which is a different question from
+   * "did the plan validate" and is therefore worth pinning separately.
+   */
+  @Test
+  fun `startToday moves the plan to today and keeps the gaps`() = runTest {
+    // Same plan, written a fortnight before the fixed clock's 2026-08-10.
+    val past = PLAN.replace("2026-08-10", "2026-07-27").replace("2026-08-11", "2026-07-28")
+
+    assertTrue(repository.importPlan(past, startToday = true) is ImportResult.Success)
+
+    val dates = repository.getSessions().map { it.scheduledDate }.sorted()
+    assertEquals(listOf("2026-08-10", "2026-08-11"), dates)
+  }
+
+  /** Without the flag the document is taken at its word, wherever that falls. */
+  @Test
+  fun `by default the file's own dates are used`() = runTest {
+    val past = PLAN.replace("2026-08-10", "2026-07-27").replace("2026-08-11", "2026-07-28")
+
+    assertTrue(repository.importPlan(past) is ImportResult.Success)
+
+    val dates = repository.getSessions().map { it.scheduledDate }.sorted()
+    assertEquals(listOf("2026-07-27", "2026-07-28"), dates)
+  }
+
+  /**
+   * The reminder has to be recomputed from the new date, not shifted by a fixed number of
+   * milliseconds: 27 July is inside summer time and a plan shifted across the October change
+   * would otherwise fire an hour out for every session on the far side.
+   */
+  @Test
+  fun `startToday recomputes the reminder for the new date`() = runTest {
+    val past = PLAN.replace("2026-08-10", "2026-07-27").replace("2026-08-11", "2026-07-28")
+
+    repository.importPlan(past, startToday = true)
+
+    val session = repository.getSessions().single { it.scheduledDate == "2026-08-10" }
+    val expected =
+      ZonedDateTime.of(LocalDate.of(2026, 8, 10), LocalTime.of(7, 0), zone).toInstant().toEpochMilli()
+    assertEquals(expected, session.remindAtUtc)
+  }
+
+  /** Nothing to move when the plan already starts today; the rows must come through untouched. */
+  @Test
+  fun `startToday on a plan that already starts today changes nothing`() = runTest {
+    assertTrue(repository.importPlan(PLAN, startToday = true) is ImportResult.Success)
+
+    val dates = repository.getSessions().map { it.scheduledDate }.sorted()
+    assertEquals(listOf("2026-08-10", "2026-08-11"), dates)
   }
 
   private companion object {

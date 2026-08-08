@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.ImportStartDialog
 import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.RecoveryState
 import fi.merilainen.treenivalmentaja.Workout
@@ -197,6 +198,14 @@ class ComponentScreenshotTest {
             onCheck = {},
         )
         UpdateCard(status = UpdateStatus.Failed("GitHub vastasi HTTP 503"), onCheck = {})
+    }
+
+    // ------------------------------------------------------------------ Import dialog
+
+    /** Both readings of a plan file's dates, offered once at the moment of import. */
+    @Test
+    fun importStartDialog() = capture("import_start_dialog") {
+        ImportStartDialog(onDismiss = {}, onConfirm = {})
     }
 
     // ------------------------------------------------------------------ Status badges

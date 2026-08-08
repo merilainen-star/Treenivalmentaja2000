@@ -168,15 +168,20 @@ class WorkoutViewModel(
     }
   }
 
-  /** Imports a plan from raw JSON text — the same path for a picked file and for the clipboard. */
-  fun importPlanJson(rawJson: String?) {
+  /**
+   * Imports a plan from raw JSON text — the same path for a picked file and for the clipboard.
+   *
+   * @param startToday move the whole plan so its first day is today, instead of using the dates
+   *   written in the file.
+   */
+  fun importPlanJson(rawJson: String?, startToday: Boolean = false) {
     if (rawJson.isNullOrBlank()) {
       _importFeedback.value =
         ImportFeedback("Ei tuotavaa", "Tiedosto tai leikepöytä oli tyhjä.", isError = true)
       return
     }
     viewModelScope.launch {
-      val result = repository.importPlan(rawJson)
+      val result = repository.importPlan(rawJson, startToday = startToday)
       if (result is ImportResult.Success) {
         rescheduleAlarmsUseCase.execute()
       }

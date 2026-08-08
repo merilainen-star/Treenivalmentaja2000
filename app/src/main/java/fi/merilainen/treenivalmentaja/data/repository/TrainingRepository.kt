@@ -5,6 +5,7 @@ import fi.merilainen.treenivalmentaja.data.importer.ImportError
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.importer.PlanJson
 import fi.merilainen.treenivalmentaja.data.importer.PlanValidator
+import fi.merilainen.treenivalmentaja.data.importer.ValidatedPlan
 import fi.merilainen.treenivalmentaja.data.importer.ValidationOutcome
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
@@ -229,17 +230,24 @@ class TrainingRepository(
    * Validates [rawJson] against the plan schema and writes it only if the whole document is
    * valid and does not collide with stored data.
    */
-  suspend fun importPlan(rawJson: String, activate: Boolean = true): ImportResult {
+  suspend fun importPlan(
+    rawJson: String,
+    activate: Boolean = true,
+    startToday: Boolean = false,
+  ): ImportResult {
     val document =
       PlanJson.parse(rawJson).getOrElse { error ->
         return ImportResult.Unreadable(error.message ?: "tuntematon lukuvirhe")
       }
 
-    val validated =
+    val validatedAsWritten =
       when (val outcome = PlanValidator.validate(document)) {
         is ValidationOutcome.Errors -> return ImportResult.Invalid(outcome.errors)
         is ValidationOutcome.Valid -> outcome.plan
       }
+
+    val validated =
+      if (startToday) shiftToStartToday(validatedAsWritten) else validatedAsWritten
 
     val hash = PlanJson.contentHash(rawJson)
 
@@ -293,6 +301,40 @@ class TrainingRepository(
       )
       ImportResult.Success(validated.id, validated.name, entities.size)
     }
+  }
+
+  /**
+   * Moves the whole plan so its first day is today, keeping every gap between sessions intact.
+   *
+   * A plan written weeks ago is still a good plan; its dates are just the coach's calendar rather
+   * than yours. Shifting by a single delta preserves the structure — which day of the week each
+   * session falls on relative to the start, and the rest days between them.
+   *
+   * `remindAtUtc` is recomputed from the new date rather than shifted by the same number of
+   * milliseconds: a plan that crosses a daylight-saving boundary would otherwise drift by an hour
+   * for every session on the far side of it.
+   */
+  private suspend fun shiftToStartToday(plan: ValidatedPlan): ValidatedPlan {
+    val originalStart = LocalDate.parse(plan.startDate)
+    val today = LocalDate.now(clock)
+    val delta = today.toEpochDay() - originalStart.toEpochDay()
+    if (delta == 0L) return plan
+
+    val zone = runCatching { ZoneId.of(plan.timeZone) }.getOrDefault(clock.zone)
+
+    return plan.copy(
+      startDate = today.toString(),
+      sessions =
+        plan.sessions.map { session ->
+          val newDate = LocalDate.parse(session.scheduledDate).plusDays(delta)
+          val time =
+            session.scheduledTime?.let { LocalTime.parse(it, timeFormat) } ?: LocalTime.NOON
+          session.copy(
+            scheduledDate = newDate.toString(),
+            remindAtUtc = ZonedDateTime.of(newDate, time, zone).toInstant().toEpochMilli(),
+          )
+        },
+    )
   }
 
   // ---------------------------------------------------------------- seeding
