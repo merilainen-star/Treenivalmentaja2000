@@ -38,19 +38,35 @@ a file whose pixels are noise. That is exactly how the previous assets went unno
 
 ## Database Backup
 
-`backup-db.ps1` copies the app database off an attached device and prints its Room schema version.
-Run it before installing a build that bumps the version.
+`backup-db.ps1` copies the app database off an attached device, prints its Room schema version,
+and puts it back again. Run it before installing a build that bumps the version.
 
 ```powershell
 .\tools\backup-db.ps1
 ```
 
-Writes a timestamped directory under `.scratch/` (git-ignored) unless `-OutputDir` says otherwise;
-pass `-Serial` when more than one device is attached. The script prints the restore commands when
-it finishes.
+```powershell
+.\tools\backup-db.ps1 -Restore .scratch\db-backup-2026-08-08_170000
+```
 
-Two details it handles that a hand-rolled `adb pull` usually gets wrong: the journal mode is WAL,
-so the database is three files and copying only `treenivalmentaja.db` loses the most recent
-writes; and the schema version is read from bytes 60-63 of the SQLite header, because `sqlite3`
-is not present on current Android system images. Debug builds only — `run-as` needs a debuggable
-package.
+Backups go to a timestamped directory under `.scratch/` (git-ignored) unless `-OutputDir` says
+otherwise; pass `-Serial` when more than one device is attached. Debug builds only — `run-as`
+needs a debuggable package.
+
+Four things it handles that hand-rolled adb commands get wrong, each of them hit while writing it:
+
+- **Three files, not one.** The journal mode is WAL, so copying only `treenivalmentaja.db` can
+  lose every recent write. The app is stopped first so the three are not captured mid-write.
+- **`/sdcard` is unusable.** Scoped storage denies the app uid, so
+  `run-as ... cp -r databases /sdcard/...` fails with Permission denied. Reading streams through
+  `adb exec-out cat`; restoring stages through `/data/local/tmp`, which adb owns and the app can
+  read once the file is world-readable.
+- **PowerShell corrupts binary pipes.** Both `Get-Content | adb shell` and
+  `adb exec-out ... > file` apply a text encoding; the first attempt at a restore put a single
+  211,860-byte file on the device in place of three. The script copies the raw stream instead.
+- **The schema version hides in the WAL.** Until a checkpoint runs, page 1 of the main file still
+  reports version 0 while the real value sits in `-wal` — the script read 0 for a version-4
+  database. It now takes the newest copy of page 1 from the WAL frames.
+
+Verified end to end against the emulator: back up, wipe the app's data, restore, launch, and the
+plan and its eight sessions are still there.

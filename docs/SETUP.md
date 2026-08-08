@@ -112,5 +112,6 @@ higher.
 
 Android compares signing certificates, not version numbers. If it refuses to update, the installed
 app was signed with a different key, and the only route is to uninstall it first — **which deletes
-the training database**. Take a copy with `tools/backup-db.ps1` before uninstalling. Once the app
-has been installed from a GitHub build, every later GitHub build updates it in place.
+the training database**. Take a copy with `tools/backup-db.ps1` first and put it back afterwards
+with its `-Restore` switch. Once the app has been installed from a GitHub build, every later
+GitHub build updates it in place.
