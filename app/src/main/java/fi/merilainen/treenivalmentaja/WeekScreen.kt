@@ -141,31 +141,33 @@ fun WorkoutCardWeek(workout: Workout, expanded: Boolean, onToggle: () -> Unit) {
     )
     val cardShape = CardDefaults.shape
 
-    // The click is on the inner Column rather than on Card(onClick = ...): Material3 1.3
-    // decoupled the ripple from the theme, so the clickable Card takes its indication from
-    // LocalIndication, which is no longer a bounded ripple and drew a large grey circle over
-    // the row. An explicit bounded ripple on a clipped surface stays inside the card's shape.
+    // The click belongs to the header row alone, not to the card.
+    //
+    // Two reasons. A bounded ripple grows until it covers its own bounds, so on the whole card it
+    // became a circle the height of the expanded content, sweeping across the exercise list every
+    // time a row was opened. And Card(onClick = ...) cannot be used either: Material3 1.3
+    // decoupled the ripple from the theme, so a clickable Card takes its indication from
+    // LocalIndication, which is no longer a bounded ripple at all.
+    //
+    // Confined to the header the ripple has a fixed, short box to fill whether the card is open
+    // or shut — and tapping the title is what opening a row should mean anyway.
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = cardShape,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-      Column(
-          modifier = Modifier
-              .fillMaxWidth()
-              .clip(cardShape)
-              .clickable(
-                  interactionSource = remember { MutableInteractionSource() },
-                  indication = ripple(bounded = true),
-                  role = Role.Button,
-                  onClickLabel = if (expanded) "Piilota tiedot" else "Näytä tiedot",
-                  onClick = onToggle
-              )
-      ) {
+      Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = ripple(bounded = true),
+                    role = Role.Button,
+                    onClickLabel = if (expanded) "Piilota tiedot" else "Näytä tiedot",
+                    onClick = onToggle
+                )
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
