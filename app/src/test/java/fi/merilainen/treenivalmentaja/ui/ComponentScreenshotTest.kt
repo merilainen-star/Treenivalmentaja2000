@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
+import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.RecoveryState
@@ -66,8 +67,20 @@ class ComponentScreenshotTest {
         status = SessionStatus.PLANNED,
     )
 
+    /**
+     * Tolerate the sub-pixel text antialiasing that differs between the machine baselines are
+     * recorded on and the Linux CI runner. Measured against the runner's output: at most 0.046%
+     * of pixels differ, and not one of them by more than 32/255 in any channel — the images are
+     * indistinguishable by eye. 0.5% leaves an order of magnitude of headroom over that noise
+     * while staying far below any change a person would notice; a 4dp-to-16dp shadow, the change
+     * used to prove these tests bite, moves vastly more.
+     */
+    private val options = RoborazziOptions(
+        compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.005f)
+    )
+
     private fun capture(name: String, content: @Composable () -> Unit) {
-        captureRoboImage("src/test/screenshots/$name.png") {
+        captureRoboImage("src/test/screenshots/$name.png", roborazziOptions = options) {
             MyApplicationTheme {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     Column(
