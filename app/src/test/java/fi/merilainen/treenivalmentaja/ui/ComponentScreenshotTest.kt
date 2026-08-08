@@ -17,8 +17,10 @@ import fi.merilainen.treenivalmentaja.RecoveryState
 import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.WorkoutCardToday
 import fi.merilainen.treenivalmentaja.WorkoutCardWeek
+import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
 import org.junit.Test
@@ -178,6 +180,23 @@ class ComponentScreenshotTest {
         RecoveryState.entries.forEach { state ->
             RecoveryCard(state, onSickClicked = {}, onRecoveredClicked = {})
         }
+    }
+
+    // ------------------------------------------------------------------ Update card
+
+    /** The three states the version card can be read in; "checking" is transient. */
+    @Test
+    fun updateCard_states() = capture("update_card_states") {
+        UpdateCard(status = UpdateStatus.UpToDate("1.0-c07cfac"), onCheck = {})
+        UpdateCard(
+            status = UpdateStatus.Available(
+                versionName = "1.0-a1b2c3d",
+                apkUrl = "https://example.invalid/app.apk",
+                sizeMb = 19,
+            ),
+            onCheck = {},
+        )
+        UpdateCard(status = UpdateStatus.Failed("GitHub vastasi HTTP 503"), onCheck = {})
     }
 
     // ------------------------------------------------------------------ Status badges

@@ -2,6 +2,8 @@ package fi.merilainen.treenivalmentaja
 
 import android.app.Application
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
+import fi.merilainen.treenivalmentaja.data.update.HttpUpdateService
+import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
@@ -38,6 +40,13 @@ class TreenivalmentajaApplication : Application() {
 
   val reminderScheduler: ReminderScheduler by lazy {
     ReminderScheduler(this)
+  }
+
+  val checkForUpdateUseCase: CheckForUpdateUseCase by lazy {
+    CheckForUpdateUseCase(
+      service = HttpUpdateService(),
+      installedVersionName = BuildConfig.VERSION_NAME,
+    )
   }
 
   val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase by lazy {

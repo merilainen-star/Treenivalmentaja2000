@@ -209,6 +209,14 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                 ) {
                     Text("Palauta esimerkkidata")
                 }
+
+                HorizontalDivider()
+
+                val updateStatus by viewModel.updateStatus.collectAsState()
+                // Checked once per visit to Settings rather than on a timer: the whole point is
+                // to answer the question you have while looking at this screen.
+                LaunchedEffect(Unit) { viewModel.checkForUpdate() }
+                UpdateCard(status = updateStatus, onCheck = { viewModel.checkForUpdate() })
             }
         }
     }

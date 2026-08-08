@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     
+    <!-- Only use: fetching the rolling test build's metadata so Settings can say whether the
+         installed build is the current one. See data/update/UpdateService.kt. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 

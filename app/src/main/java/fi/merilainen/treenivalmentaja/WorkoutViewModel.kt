@@ -11,7 +11,9 @@ import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
+import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import java.time.LocalDate
@@ -66,7 +68,8 @@ class WorkoutViewModel(
   private val repository: TrainingRepository,
   private val engine: TrainingEngine,
   private val settingsStore: NotificationSettingsStore,
-  private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase
+  private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase,
+  private val checkForUpdateUseCase: CheckForUpdateUseCase
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -88,12 +91,24 @@ class WorkoutViewModel(
   private val _importFeedback = MutableStateFlow<ImportFeedback?>(null)
   val importFeedback: StateFlow<ImportFeedback?> = _importFeedback.asStateFlow()
 
+  private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
+  val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
+
   private var lastMissedSessionsCheckDate: LocalDate? = null
 
   init {
     viewModelScope.launch {
       repository.seedIfEmpty()
       checkMissedSessions()
+    }
+  }
+
+  /** Cheap enough to run whenever Settings opens: one GET of a few hundred bytes. */
+  fun checkForUpdate() {
+    if (_updateStatus.value is UpdateStatus.Checking) return
+    viewModelScope.launch {
+      _updateStatus.value = UpdateStatus.Checking
+      _updateStatus.value = checkForUpdateUseCase.execute()
     }
   }
 
@@ -227,7 +242,8 @@ class WorkoutViewModel(
           application.repository,
           application.engine,
           application.settingsStore,
-          application.rescheduleAlarmsUseCase
+          application.rescheduleAlarmsUseCase,
+          application.checkForUpdateUseCase
         )
       }
     }

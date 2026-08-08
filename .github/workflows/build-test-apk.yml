@@ -122,6 +122,20 @@ jobs:
           cp "$APK" dist/Treenivalmentaja-test.apk
           echo "apk_mb=$(du -m "$APK" | cut -f1)" >> "$GITHUB_OUTPUT"
 
+          # The app reads this to tell whether the installed build is the published one. It is a
+          # release asset rather than a call to GitHub's API, which is rate-limited to 60 requests
+          # an hour for unauthenticated callers.
+          cat > dist/latest.json <<JSON
+          {
+            "versionName": "1.0-${GITHUB_SHA::7}",
+            "commit": "${GITHUB_SHA::7}",
+            "builtAtUtc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "apkUrl": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/test-build/Treenivalmentaja-test.apk",
+            "apkSizeBytes": $(stat -c%s "$APK")
+          }
+          JSON
+          python3 -c "import json;json.load(open('dist/latest.json'))"             || { echo "::error::latest.json is not valid JSON"; exit 1; }
+
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import glob, re
           t = f = e = 0
@@ -198,12 +212,15 @@ jobs:
               --notes-file notes.md --prerelease
           fi
 
-          gh release upload test-build dist/Treenivalmentaja-test.apk \
+          gh release upload test-build dist/Treenivalmentaja-test.apk dist/latest.json \
             --repo "$GITHUB_REPOSITORY" --clobber
 
           gh release view test-build --repo "$GITHUB_REPOSITORY" --json assets \
-            --jq '.assets[].name' | grep -qx 'Treenivalmentaja-test.apk' \
-            || { echo "::error::the release does not carry Treenivalmentaja-test.apk"; exit 1; }
+            --jq '.assets[].name' > assets.txt
+          for want in Treenivalmentaja-test.apk latest.json; do
+            grep -qx "$want" assets.txt \
+              || { echo "::error::the release does not carry $want"; exit 1; }
+          done
 
       - name: Write the job summary
         run: |
