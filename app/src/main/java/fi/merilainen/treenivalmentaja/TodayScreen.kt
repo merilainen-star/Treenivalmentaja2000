@@ -60,9 +60,8 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
     val recoveryState by viewModel.recoveryState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.checkMissedSessions()
-    }
+    // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
+    // every launch and rewrote the calendar — see WorkoutViewModel.checkMissedSessions.
 
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 

@@ -94,12 +94,10 @@ class WorkoutViewModel(
   private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
   val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
 
-  private var lastMissedSessionsCheckDate: LocalDate? = null
-
   init {
     viewModelScope.launch {
+      // Seeding only writes when the database is empty, so it cannot disturb an imported plan.
       repository.seedIfEmpty()
-      checkMissedSessions()
     }
   }
 
@@ -112,10 +110,21 @@ class WorkoutViewModel(
     }
   }
 
+  /**
+   * Reschedules sessions that were not done. **Never called on startup** — see below.
+   *
+   * It used to run from `init`, which meant every launch, including the one right after an app
+   * update, rewrote the calendar. With a plan imported from a file whose dates had already
+   * passed, `TrainingEngine.handleMissedSessions` saw every past session as missed and applied
+   * its bulk-shift rule to all of them, moving the whole programme so that week 1 landed on
+   * today. An eight-week plan in its fourth week silently restarted from the beginning, and
+   * every session came back marked as moved.
+   *
+   * Installing a new build must not change what is in the calendar. Rescheduling is a training
+   * decision, so it needs a training decision to trigger it — this is left for an explicit
+   * action in the UI, which does not exist yet.
+   */
   fun checkMissedSessions() {
-    val today = LocalDate.now()
-    if (lastMissedSessionsCheckDate == today) return
-    lastMissedSessionsCheckDate = today
     viewModelScope.launch {
       engine.handleMissedSessions()
     }
