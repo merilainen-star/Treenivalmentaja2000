@@ -18,6 +18,9 @@ Every number below was measured on this commit, not carried over from a previous
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 40 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 9 tests, 0 failures, 0 errors |
 
+Instrumented tests run locally only. CI has no device, and the workflow says so rather than
+implying the suite ran.
+
 The 40 lint warnings are all non-functional: 38 are dependency-update notices, one is a
 `RedundantLabel`, and one is an `ObsoleteSdkInt` that must stay — see below.
 
@@ -53,7 +56,15 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 - **Expandable week rows.** Tapping a row in the Week view unrolls the session's content beneath
   it.
 - **Screenshot tests.** 10 Roborazzi baselines over the Today and Week cards, the recovery card
-  and every status badge. They run on the JVM, no device needed.
+  and every status badge. They run on the JVM, no device needed. The comparison tolerates 0.5% of
+  changed pixels, because Windows and Linux antialias text differently — measured at 0.046%, with
+  no pixel differing by more than 32/255. A 2dp shadow change still fails them.
+- **Test APK distribution from GitHub Actions.** Every push to `main` that touches code builds,
+  verifies and republishes one rolling prerelease at a permanent URL, signed with the same
+  `debug.keystore` as local builds so it updates the phone in place. Installing a test build needs
+  no PC, cable or adb — see [SETUP.md](docs/SETUP.md#7-installing-a-test-build-on-the-phone).
+  Verified end to end: the published APK reports package `fi.merilainen.treenivalmentaja`,
+  `versionName 1.0-e4dfc2a`, and certificate SHA-256 `ED:64:98:…:10:C0`, matching the local key.
 
 ## Partially working
 

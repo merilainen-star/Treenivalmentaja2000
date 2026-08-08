@@ -16,6 +16,11 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   card, every status badge and the expanded row.
 - `BootReceiverTest`, `MigrationGuardTest`, and `PlanValidatorTest` cases for exercises that carry
   neither reps nor a duration.
+- GitHub Actions builds and publishes a signed test APK to one rolling prerelease on every push
+  to `main` that touches code, and on demand from the Actions page. Installing the next test
+  build needs only a phone; the permanent link is in the README. The APK is signed with the same
+  debug key as local builds, restored from a secret, so it updates in place instead of demanding
+  an uninstall — verified against the published binary, not assumed.
 - `tools/generate_icons.py`, which rebuilds every launcher and splash raster from the master
   artwork, and `tools/backup-db.ps1`, which copies the database off a device and reports its
   schema version.
