@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,16 +29,19 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -134,14 +139,30 @@ fun WorkoutCardWeek(workout: Workout, expanded: Boolean, onToggle: () -> Unit) {
         targetValue = if (expanded) 180f else 0f,
         label = "chevron"
     )
+    val cardShape = CardDefaults.shape
 
+    // The click is on the inner Column rather than on Card(onClick = ...): Material3 1.3
+    // decoupled the ripple from the theme, so the clickable Card takes its indication from
+    // LocalIndication, which is no longer a bounded ripple and drew a large grey circle over
+    // the row. An explicit bounded ripple on a clipped surface stays inside the card's shape.
     Card(
-        onClick = onToggle,
         modifier = Modifier.fillMaxWidth(),
+        shape = cardShape,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-      Column(modifier = Modifier.fillMaxWidth()) {
+      Column(
+          modifier = Modifier
+              .fillMaxWidth()
+              .clip(cardShape)
+              .clickable(
+                  interactionSource = remember { MutableInteractionSource() },
+                  indication = ripple(bounded = true),
+                  role = Role.Button,
+                  onClickLabel = if (expanded) "Piilota tiedot" else "Näytä tiedot",
+                  onClick = onToggle
+              )
+      ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -194,7 +215,9 @@ fun WorkoutCardWeek(workout: Workout, expanded: Boolean, onToggle: () -> Unit) {
 
             Icon(
                 imageVector = Icons.Default.ExpandMore,
-                contentDescription = if (expanded) "Piilota tiedot" else "Näytä tiedot",
+                // The row carries the label via onClickLabel; naming the icon too would make
+                // TalkBack announce the same thing twice.
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .padding(start = 8.dp)
