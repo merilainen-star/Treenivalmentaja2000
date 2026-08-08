@@ -1,8 +1,9 @@
 # Training Engine
 
-*(Status: the **state machine below is implemented and enforced** by `TrainingRepository` — every
-transition is validated and logged. The higher-level rescheduling, illness, and Oura-matching
-**rules** are still planned.)*
+*(Status: the **state machine is implemented and enforced** by `TrainingRepository` — every
+transition is validated and logged. The **rescheduling and illness rules are implemented** in
+`TrainingEngine` and covered by `TrainingEngineTest`. Only **Oura matching** is still planned,
+since no Oura data reaches the app yet.)*
 
 ## Overview
 The Training Engine is the core domain logic responsible for modifying the training schedule based on user actions and external factors (missed days, illness). It is a local, deterministic rule engine.

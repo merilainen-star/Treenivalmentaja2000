@@ -1,6 +1,8 @@
 # Notifications
 
-*(Note: Notification scheduling is **planned**).*
+*(Status: **implemented**. `RescheduleAlarmsUseCase` keeps a 7-day sliding window of alarms,
+`BootReceiver` re-arms them after a reboot, a reinstall or a timezone change, and Settings
+checks the notification permission. Only Oura-driven adjustments remain planned.)*
 
 ## Overview
 The app replaces static calendar events with dynamic, actionable Android notifications using `AlarmManager`.

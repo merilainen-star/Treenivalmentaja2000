@@ -1,7 +1,10 @@
 # Architecture
 
 This document outlines the architecture for the Treenivalmentaja Android application. 
-*(Note: Most components described here are **planned** and not yet fully implemented).*
+*(Note: the local half of this architecture — Compose UI, `WorkoutViewModel`, `TrainingEngine`,
+`TrainingRepository`, Room and the AlarmManager reminders — is **implemented**. Everything
+involving Oura — the Retrofit clients, OAuth, WorkManager sync and workout matching — is
+**planned**; the Oura tables exist in the database but nothing writes to them.)*
 
 ## System Context
 The application is a standalone Android app that acts as an offline-first training companion. It

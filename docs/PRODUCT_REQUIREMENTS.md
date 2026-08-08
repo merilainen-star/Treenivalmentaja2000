@@ -34,11 +34,11 @@ Individuals following a progressive training programme who want an adaptive, con
 - **Localization:** Finnish is the default UI language. Timezone defaults to Europe/Helsinki.
 
 ## MVP Scope
-- UI for Today and Week views (Implemented with Mock Data).
-- Local deterministic rule engine for rescheduling (Planned).
+- UI for Today and Week views (implemented, backed by Room — the mock data is gone).
+- Local deterministic rule engine for rescheduling (implemented in `TrainingEngine`).
 - Manual completion/skipping of workouts (Partially implemented in memory).
-- Local Room storage (Planned).
-- Android AlarmManager notifications (Planned).
+- Local Room storage (implemented, schema version 4).
+- Android AlarmManager notifications (implemented).
 
 ## Excluded Scope (Out of MVP)
 - Remote AI advisor (Planned for future).

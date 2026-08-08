@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+Entries below a date describe what was true when they were written; they are history and are not
+rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
+
+## [Unreleased] - 2026-08-08
+
+### Added
+- Week rows expand on tap to show the session's content, animated with `expandVertically` so the
+  rest of the week is pushed down rather than jumping. State survives scrolling and process death.
+- `WorkoutDetails`, one read-only rendering of a session's content, shared by the Today card and
+  the expanded Week row instead of being written twice.
+- Roborazzi screenshot tests reinstated: 10 baselines over the Today and Week cards, the recovery
+  card, every status badge and the expanded row.
+- `BootReceiverTest`, `MigrationGuardTest`, and `PlanValidatorTest` cases for exercises that carry
+  neither reps nor a duration.
+- `tools/generate_icons.py`, which rebuilds every launcher and splash raster from the master
+  artwork, and `tools/backup-db.ps1`, which copies the database off a device and reports its
+  schema version.
+
+### Fixed
+- **The app could not start.** Every image in the repository had been destroyed by being written
+  through a text encoding — each byte `>= 0x80` replaced by U+FFFD — so `splash_logo` threw on
+  launch. No intact copy existed in any commit. All assets regenerated from the master artwork.
+- A missing Room migration silently emptied the database; `fallbackToDestructiveMigration` is gone
+  and a missing migration now fails loudly with the data intact.
+- `BootReceiver` re-armed alarms for any intent it was handed, without reading `intent.action`.
+- The ICS parsers split a running session's description on its commas and emitted the sentence
+  fragments as exercises, failing the import 16 times in an eight-week plan.
+- The week row's press ripple was unbounded and drew a grey circle over the content; Material3 1.3
+  no longer supplies a bounded ripple through `LocalIndication`.
+- `TrainingEngineTest` did not compile: it built entities with fields that do not exist.
+
+### Changed
+- `minSdk` raised 24 → 26. Core library desugaring dropped with it, worth 1.2 MB of APK, along
+  with both `InlinedApi` warnings and a dead `SDK_INT` guard.
+- Documentation moved from `app/applet/` to the repository root and `docs/`, where the paths cited
+  from the source actually point. `GEMINI.md` merged into `AGENTS.md`.
+- `AGENTS.md` gained two rules learned the hard way: never write a binary through a text tool, and
+  verify images by rendering them — `aapt2` compiled the corrupted icons without complaint.
+
 ## [Unreleased] - 2026-08-05
 
 ### Added (Room persistence)

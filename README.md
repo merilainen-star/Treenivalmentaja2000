@@ -7,25 +7,30 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 **Status:** MVP Prototype
 
 **Implemented:**
-- Basic Jetpack Compose UI (Today, Week, and Settings screens)
-- Navigation graph with bottom tabs
-- Room database as the local source of truth, observed by `WorkoutViewModel`
+- Jetpack Compose UI (Today, Week and Settings) with bottom-tab navigation; a Week row expands to
+  show what that session is
+- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 4
+  with tested migrations
 - Session state machine with an append-only event history
 - Training plan JSON import (file + clipboard) with validation and duplicate detection
-- App icon and Splash screen
+- Deterministic training engine: missed sessions, plan shifting, illness pause and the graduated
+  return
+- AlarmManager reminders with a 7-day window, restored after reboot, reinstall and timezone change
+- App icon and splash screen
 
 **Planned / Missing:**
-- Deterministic training engine rules (missed sessions, illness return)
 - Oura API V2 integration (OAuth exchange happens in-app; no backend — see ADR-006)
-- AlarmManager integration (notifications)
 - WorkManager integration (background sync)
-- Rule-based training engine and offline support
 - Remote AI advisor
 
-## Main Features (Planned)
+## Main Features
+Implemented today:
 - View daily and weekly training plans.
 - Receive actionable training notifications.
-- Adapt training plans based on recovery data and missed sessions.
+- Adapt the plan when sessions are missed, or when training pauses for illness.
+
+Planned:
+- Adapt training based on recovery data.
 - Connect to Oura to track completed workouts.
 
 ## Technology Stack
@@ -34,8 +39,9 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 - **Architecture:** MVVM and Clean Architecture
 - **Local Storage:** Room
 - **JSON:** Moshi (plan import, JSON columns)
-- **Background Work:** WorkManager & AlarmManager (Planned)
-- **Network:** Retrofit & OkHttp (Planned)
+- **Background Work:** AlarmManager (implemented); WorkManager (planned)
+- **Network:** Retrofit & OkHttp (planned — currently commented out in `app/build.gradle.kts`)
+- **Screenshot tests:** Roborazzi on Robolectric (JVM, no device needed)
 - **Backend:** None ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp))
 
 ## Repository Structure
@@ -46,7 +52,8 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 
 ## Prerequisites
 - JDK 17 or newer (verified on Temurin 21)
-- Android SDK Platform 36.1, Build-Tools 36.0.0
+- Android SDK Platform 36.1, Build-Tools 36.1.0
+- `minSdk` 26 (Android 8.0)
 - Android Studio (optional)
 
 ## Quick-Start Commands
@@ -77,7 +84,8 @@ backend to set up ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-th
 - [AI Agents Instructions](AGENTS.md)
 
 ## Known Limitations
-- No Oura connection yet; the recovery card on the Today screen is a placeholder.
-- No notifications and no background sync.
-- The deterministic engine enforces the session state machine but does not yet shift a plan when
-  sessions are missed.
+- No Oura connection yet; the recovery card on the Today screen is a fixed placeholder that always
+  reads "Kohtalainen".
+- No background sync.
+- No screen renders in a test: every screen takes a `WorkoutViewModel` directly, so screenshot
+  cover stops at the individual cards and `WorkoutViewModel` has no tests.
