@@ -48,7 +48,7 @@ jobs:
       # The runner image does not necessarily carry platform 36.1 / build-tools 36.1.0, and
       # without this step Gradle tries to fetch them itself and stops on unaccepted licences.
       - name: Set up the Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: >-
             platforms;android-36
