@@ -24,8 +24,14 @@ android {
     // are available natively. Drops Android 7.x, which this app has never run on.
     minSdk = 26
     targetSdk = 36
+    // versionCode stays at 1 deliberately. Android accepts a sideloaded reinstall when the
+    // package id and signing certificate match and versionCode is equal or higher, so a rolling
+    // test build does not need to burn version numbers — and keeping it at 1 leaves the future
+    // Play versioning policy unconstrained.
     versionCode = 1
-    versionName = "1.0"
+    // CI passes -PversionSuffix=-<short sha> so an installed build can be identified from the
+    // phone's app info. Local builds get a plain "1.0", which keeps screenshots deterministic.
+    versionName = "1.0" + (findProperty("versionSuffix")?.toString() ?: "")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

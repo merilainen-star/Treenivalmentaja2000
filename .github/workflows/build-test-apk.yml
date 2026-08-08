@@ -1,0 +1,225 @@
+name: Build Treenivalmentaja Test APK
+
+# The point of this workflow is that installing the next test build needs nothing but a phone:
+# push (or press "Run workflow"), wait, then open the direct APK link below on Android.
+#
+#   https://github.com/merilainen-star/Treenivalmentaja2000/releases/download/test-build/Treenivalmentaja-test.apk
+#
+# The APK is signed with the same debug.keystore used for local builds, restored from the
+# ANDROID_DEBUG_KEYSTORE_BASE64 secret, so builds from here update an app installed from a PC
+# in place rather than demanding an uninstall.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'sample-data/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+# A superseded build must never overwrite a newer APK, so an in-flight run is cancelled when a
+# newer commit lands.
+concurrency:
+  group: treenivalmentaja-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build, verify and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Temurin JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # The runner image does not necessarily carry platform 36.1 / build-tools 36.1.0, and
+      # without this step Gradle tries to fetch them itself and stops on unaccepted licences.
+      - name: Set up the Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: >-
+            platforms;android-36
+            platform-tools
+            build-tools;36.0.0
+
+      - name: Install the SDK packages this project needs
+        run: |
+          sdkmanager --install "platforms;android-36" "build-tools;36.1.0" > /dev/null
+          echo "ANDROID_BUILD_TOOLS=$ANDROID_SDK_ROOT/build-tools/36.1.0" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # app/build.gradle.kts signs debug builds with a keystore at the repository root. It is
+      # git-ignored, so CI restores it from the secret. Failing loudly here is deliberate: a
+      # freshly generated key would silently change the signing identity and break every
+      # in-place update on the phone.
+      - name: Restore the debug signing key
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_DEBUG_KEYSTORE_BASE64 is not set. Add it with:"
+            echo "::error::base64 -w 0 debug.keystore | gh secret set ANDROID_DEBUG_KEYSTORE_BASE64 --repo ${{ github.repository }}"
+            exit 1
+          fi
+          printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/debug.keystore"
+          test -s "$GITHUB_WORKSPACE/debug.keystore" || { echo "::error::decoded keystore is empty"; exit 1; }
+
+      - name: Verify the restored key
+        run: |
+          FINGERPRINT=$(keytool -list -v \
+            -keystore "$GITHUB_WORKSPACE/debug.keystore" \
+            -storepass android -alias androiddebugkey \
+            | grep 'SHA256:' | head -1 | sed 's/.*SHA256: //')
+          if [ -z "$FINGERPRINT" ]; then
+            echo "::error::alias androiddebugkey not found in the restored keystore"; exit 1
+          fi
+          echo "Keystore certificate SHA-256: $FINGERPRINT"
+          echo "KEYSTORE_SHA256=$FINGERPRINT" >> "$GITHUB_ENV"
+
+      # Oura is not implemented, and the Secrets Gradle Plugin falls back to .env.example, so no
+      # Oura credentials are needed to compile.
+      - name: Build and verify
+        run: |
+          ./gradlew --no-daemon \
+            -PversionSuffix="-${GITHUB_SHA::7}" \
+            :app:assembleDebug \
+            :app:testDebugUnitTest \
+            :app:verifyRoborazziDebug \
+            :app:lintDebug
+
+      # Roborazzi baselines were recorded on Windows; if Linux renders text even slightly
+      # differently the comparison fails, and the diff images are the only way to tell an
+      # environment difference from a real regression.
+      - name: Upload screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: roborazzi-diffs
+          path: app/build/outputs/roborazzi/
+          if-no-files-found: ignore
+
+      - name: Collect measured results
+        id: results
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK" || { echo "::error::$APK is missing or empty"; exit 1; }
+          mkdir -p dist
+          cp "$APK" dist/Treenivalmentaja-test.apk
+          echo "apk_mb=$(du -m "$APK" | cut -f1)" >> "$GITHUB_OUTPUT"
+
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import glob, re
+          t = f = e = 0
+          for path in glob.glob('app/build/test-results/testDebugUnitTest/*.xml'):
+              with open(path, encoding='utf-8') as fh:
+                  head = fh.read(2000)
+              m = re.search(r'tests="(\d+)".*?failures="(\d+)".*?errors="(\d+)"', head, re.S)
+              if m:
+                  t += int(m.group(1)); f += int(m.group(2)); e += int(m.group(3))
+          print(f"unit_tests={t}")
+          print(f"unit_failures={f}")
+          print(f"unit_errors={e}")
+          print(f"screenshots={len(glob.glob('app/src/test/screenshots/*.png'))}")
+          try:
+              report = open('app/build/reports/lint-results-debug.xml', encoding='utf-8').read()
+          except OSError:
+              report = ''
+          print(f"lint_errors={report.count('severity=\"Error\"')}")
+          print(f"lint_warnings={report.count('severity=\"Warning\"')}")
+          PY
+
+      # Configuring signing in Gradle is not evidence the output is signed.
+      - name: Verify the APK is signed with that key
+        run: |
+          APKSIGNER=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs --verbose dist/Treenivalmentaja-test.apk > signer.txt
+          APK_SHA=$(grep -i 'SHA-256 digest' signer.txt | head -1 | sed 's/.*: //' \
+            | tr 'a-f' 'A-F' | sed 's/\(..\)/\1:/g;s/:$//')
+          echo "APK certificate SHA-256: $APK_SHA"
+          if [ "$APK_SHA" != "$KEYSTORE_SHA256" ]; then
+            echo "::error::APK certificate does not match the restored keystore"
+            echo "::error::keystore=$KEYSTORE_SHA256 apk=$APK_SHA"
+            exit 1
+          fi
+
+      - name: Upload the APK as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: Treenivalmentaja-test
+          path: dist/Treenivalmentaja-test.apk
+          if-no-files-found: error
+
+      # One rolling prerelease rather than one release per commit. --clobber replaces the asset
+      # in place, so the previous APK stays downloadable until the new one is stored.
+      - name: Publish the rolling test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          Automatically generated Treenivalmentaja test build.
+
+          | | |
+          | --- | --- |
+          | Commit | \`${GITHUB_SHA::7}\` |
+          | Branch | \`${GITHUB_REF_NAME}\` |
+          | Actions run | [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) |
+          | Version | 1.0-${GITHUB_SHA::7} |
+          | Signing certificate SHA-256 | \`${KEYSTORE_SHA256}\` |
+
+          Unit tests ${{ steps.results.outputs.unit_tests }}/${{ steps.results.outputs.unit_failures }}/${{ steps.results.outputs.unit_errors }} ·
+          ${{ steps.results.outputs.screenshots }} screenshot comparisons ·
+          lint ${{ steps.results.outputs.lint_errors }} errors, ${{ steps.results.outputs.lint_warnings }} warnings.
+          Instrumented tests are **not** run in CI; they need a device.
+
+          Open **Treenivalmentaja-test.apk** below on Android to install or update.
+          EOF
+
+          if gh release view test-build --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release edit test-build --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --notes-file notes.md --prerelease
+          else
+            gh release create test-build --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "Latest Treenivalmentaja Test APK" \
+              --notes-file notes.md --prerelease
+          fi
+
+          gh release upload test-build dist/Treenivalmentaja-test.apk \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+          gh release view test-build --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[].name' | grep -qx 'Treenivalmentaja-test.apk' \
+            || { echo "::error::the release does not carry Treenivalmentaja-test.apk"; exit 1; }
+
+      - name: Write the job summary
+        run: |
+          BASE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          # Treenivalmentaja Test APK
+
+          | Check | Result |
+          | --- | --- |
+          | Build | app-debug.apk, ${{ steps.results.outputs.apk_mb }} MB |
+          | Unit tests | ${{ steps.results.outputs.unit_tests }} / ${{ steps.results.outputs.unit_failures }} failures / ${{ steps.results.outputs.unit_errors }} errors |
+          | Screenshots | ${{ steps.results.outputs.screenshots }} comparisons, no diffs |
+          | Lint | ${{ steps.results.outputs.lint_errors }} errors, ${{ steps.results.outputs.lint_warnings }} warnings |
+          | Instrumented | not run in CI — needs a device |
+
+          **[Download Treenivalmentaja-test.apk]($BASE/releases/download/test-build/Treenivalmentaja-test.apk)**
+
+          Commit \`${GITHUB_SHA::7}\` · [release page]($BASE/releases/tag/test-build) · version 1.0-${GITHUB_SHA::7}
+          EOF

@@ -56,6 +56,22 @@ Planned:
 - `minSdk` 26 (Android 8.0)
 - Android Studio (optional)
 
+## Install the latest test APK
+
+No PC, cable or ADB needed — open this on the phone and accept *Install* / *Update*:
+
+**<https://github.com/merilainen-star/Treenivalmentaja2000/releases/download/test-build/Treenivalmentaja-test.apk>**
+
+The link is permanent and always serves the newest successful build.
+[Release page](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/test-build) ·
+[Actions](https://github.com/merilainen-star/Treenivalmentaja2000/actions) (press *Run workflow* to
+build on demand, works from a phone).
+
+GitHub Actions rebuilds on every push to `main` that touches code, and publishes only when the
+build, unit tests, screenshot comparisons and lint all pass. See
+[SETUP.md](docs/SETUP.md#7-installing-a-test-build-on-the-phone) for what to do if Android refuses
+an update.
+
 ## Quick-Start Commands
 Always use the wrapper:
 - **Build app:** `./gradlew assembleDebug`
