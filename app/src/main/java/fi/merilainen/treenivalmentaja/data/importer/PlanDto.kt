@@ -65,6 +65,16 @@ data class ExerciseDto(
   val durationSec: Int? = null,
   val restSec: Int? = null,
   val notes: String? = null,
+  /** Per-set loads, when the sets are not all alike. See `docs/PLAN_SCHEMA.md`. */
+  val setPlan: List<ExerciseSetDto?>? = null,
+)
+
+
+/** One set of an exercise whose sets differ from each other. */
+data class ExerciseSetDto(
+  val weightKg: Double? = null,
+  val reps: Int? = null,
+  val durationSec: Int? = null,
 )
 
 

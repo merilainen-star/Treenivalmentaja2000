@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.importer
 
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.ExerciseSet
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.LighterAlternative
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -310,10 +311,29 @@ object PlanValidator {
       if (!positiveOrNull(dto.durationSec, "$itemPath.durationSec", errors)) ok = false
       if (!nonNegativeOrNull(dto.weightKg, "$itemPath.weightKg", errors)) ok = false
       if (!nonNegativeOrNull(dto.restSec, "$itemPath.restSec", errors)) ok = false
-      if (dto.reps == null && dto.durationSec == null) {
+
+      val setPlan = validateSetPlan(dto.setPlan, "$itemPath.setPlan", errors)
+      if (setPlan == null) ok = false
+      // Whether the writer *wrote* a setPlan, not whether it survived validation. A broken set
+      // should be reported once, as the broken set — not also as "this exercise has no reps",
+      // which would point at a field they deliberately left out.
+      val hasSetPlan = dto.setPlan != null
+
+      // Two descriptions of the same sets could disagree, and there would be no way to tell
+      // which the writer meant, so carrying both is an error rather than a precedence rule.
+      if (hasSetPlan && (dto.sets != null || dto.reps != null || dto.weightKg != null)) {
+        errors +=
+          ImportError(
+            itemPath,
+            "setPlan kuvaa jo sarjat — jätä sets, reps ja weightKg pois",
+          )
+        ok = false
+      }
+      if (!hasSetPlan && dto.reps == null && dto.durationSec == null) {
         errors += ImportError(itemPath, "liikkeellä on oltava joko reps tai durationSec")
         ok = false
       }
+
       if (name != null) {
         result +=
           Exercise(
@@ -327,8 +347,44 @@ object PlanValidator {
             durationSec = dto.durationSec,
             restSec = dto.restSec,
             notes = dto.notes,
+            setPlan = setPlan?.takeIf { it.isNotEmpty() },
           )
       }
+    }
+    return if (ok) result else null
+  }
+
+  /**
+   * Returns `null` when a set was invalid, and an empty list when there was no `setPlan` at all —
+   * the same convention [validateExercises] uses, so "absent" and "broken" never look alike.
+   */
+  private fun validateSetPlan(
+    dtos: List<ExerciseSetDto?>?,
+    path: String,
+    errors: MutableList<ImportError>,
+  ): List<ExerciseSet>? {
+    if (dtos == null) return emptyList()
+    if (dtos.isEmpty()) {
+      errors += ImportError(path, "sarjalista on tyhjä — jätä kenttä kokonaan pois")
+      return null
+    }
+    var ok = true
+    val result = mutableListOf<ExerciseSet>()
+    dtos.forEachIndexed { index, dto ->
+      val itemPath = "$path[$index]"
+      if (dto == null) {
+        errors += ImportError(itemPath, "sarja on tyhjä (null)")
+        ok = false
+        return@forEachIndexed
+      }
+      if (!positiveOrNull(dto.reps, "$itemPath.reps", errors)) ok = false
+      if (!positiveOrNull(dto.durationSec, "$itemPath.durationSec", errors)) ok = false
+      if (!nonNegativeOrNull(dto.weightKg, "$itemPath.weightKg", errors)) ok = false
+      if (dto.reps == null && dto.durationSec == null) {
+        errors += ImportError(itemPath, "sarjalla on oltava joko reps tai durationSec")
+        ok = false
+      }
+      result += ExerciseSet(weightKg = dto.weightKg, reps = dto.reps, durationSec = dto.durationSec)
     }
     return if (ok) result else null
   }

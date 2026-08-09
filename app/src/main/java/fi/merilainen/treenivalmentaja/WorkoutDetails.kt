@@ -61,6 +61,15 @@ fun WorkoutDetails(workout: Workout, modifier: Modifier = Modifier) {
                                 text = "• ${exercise.name}",
                                 style = MaterialTheme.typography.bodyLarge
                             )
+                            val prescription = exercise.prescription()
+                            if (prescription.isNotEmpty()) {
+                                Text(
+                                    text = prescription,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 12.dp)
+                                )
+                            }
                             if (exercise.durationSec != null) {
                                 // Keyed by round so each round gets its own clock rather than
                                 // inheriting the previous round's finished one.

@@ -140,8 +140,53 @@ a session with none of them describes no actual work and is rejected.
 | `durationSec` | integer | no | > 0 if present. For held movements (plank, hang) instead of `reps`. |
 | `restSec` | integer | no | ≥ 0 if present. |
 | `notes` | string | no | Free text. |
+| `setPlan` | array of set objects | no | The sets spelled out, when they are not all alike. See below. |
 
 An exercise must have at least one of `reps` or `durationSec`.
+
+#### `setPlan[]` — sets that differ from each other
+
+**Added after schema v1 shipped. Optional and backwards compatible: a plan without it is read
+exactly as before, and one is never written for you.**
+
+`sets`, `reps` and `weightKg` describe sets that are all the same. A gym session often is not —
+the load ramps, and the reps may fall as it climbs:
+
+```json
+{ "name": "Alasoutu", "setPlan": [
+  { "weightKg": 25, "reps": 10 },
+  { "weightKg": 35, "reps": 10 },
+  { "weightKg": 45, "reps": 10 },
+  { "weightKg": 55, "reps": 10 }
+] }
+```
+
+| Field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `weightKg` | number | no | >= 0 if present. |
+| `reps` | integer | no | > 0 if present. |
+| `durationSec` | integer | no | > 0 if present. |
+
+Each set needs at least one of `reps` or `durationSec`, the same rule the exercise itself follows.
+
+**An exercise carrying `setPlan` must not also carry `sets`, `reps` or `weightKg`.** Two
+descriptions of the same sets could disagree, and nothing in the document would say which was
+meant, so the importer rejects it rather than applying a precedence rule nobody would remember.
+`perSide`, `restSec` and `notes` still apply to the exercise as a whole.
+
+Nothing changed in the database: exercises live in a single JSON column, so this needs no
+migration and no schema version bump.
+
+#### Circuits versus straight sets
+
+These are different shapes and the schema distinguishes them:
+
+- **Circuit** — the whole exercise list is repeated. Put `rounds` on the *session*.
+- **Straight sets** — every set of one exercise is done before moving to the next, as in a gym.
+  Leave `rounds` off and give each exercise its own `sets` or `setPlan`.
+
+Writing a gym session with session-level `rounds` would tell the app to send you back to the
+same machine between sets.
 
 #### Timed exercises and how often the clock runs
 

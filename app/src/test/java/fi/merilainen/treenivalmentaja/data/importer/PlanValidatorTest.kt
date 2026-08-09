@@ -380,6 +380,89 @@ class PlanValidatorTest {
     assertNull(plan.sessions.single().exercises)
   }
 
+  // ------------------------------------------------------------------ per-set loads
+
+  private fun planWithExercise(exerciseJson: String) = """
+    {
+      "schemaVersion": 1,
+      "plan": {
+        "id": "plan-testi", "name": "Testi", "timeZone": "Europe/Helsinki",
+        "startDate": "2026-08-10"
+      },
+      "weeks": [
+        { "weekNumber": 1, "sessions": [
+          { "id": "s-1", "type": "STRENGTH", "date": "2026-08-10", "time": "18:00",
+            "durationMin": 45, "exercises": [ $exerciseJson ] } ] } ]
+    }
+  """
+
+  /** A ramp: the load changes every set, which a single weightKg cannot say. */
+  @Test
+  fun `a setPlan is accepted and carried through`() {
+    val outcome = validate(
+      planWithExercise(
+        """
+        { "name": "Alasoutu", "setPlan": [
+          { "weightKg": 25, "reps": 10 },
+          { "weightKg": 35, "reps": 10 },
+          { "weightKg": 55, "reps": 8 }
+        ] }
+        """
+      )
+    )
+
+    val exercise = (outcome as ValidationOutcome.Valid).plan.sessions.single().exercises!!.single()
+    assertEquals(3, exercise.setPlan!!.size)
+    assertEquals(25.0, exercise.setPlan!![0].weightKg!!, 0.001)
+    assertEquals(8, exercise.setPlan!![2].reps)
+  }
+
+  /**
+   * Both descriptions of the same sets could disagree, and nothing would say which was meant, so
+   * carrying both is rejected rather than resolved by a precedence rule nobody would remember.
+   */
+  @Test
+  fun `a setPlan alongside sets or weight is rejected`() {
+    val paths = pathsOf(
+      planWithExercise(
+        """
+        { "name": "Alasoutu", "sets": 3, "reps": 10, "weightKg": 55,
+          "setPlan": [ { "weightKg": 25, "reps": 10 } ] }
+        """
+      )
+    )
+
+    assertEquals(listOf("weeks[0].sessions[0].exercises[0]"), paths)
+  }
+
+  @Test
+  fun `a set with neither reps nor duration is rejected`() {
+    val paths = pathsOf(
+      planWithExercise("""{ "name": "Alasoutu", "setPlan": [ { "weightKg": 25 } ] }""")
+    )
+
+    assertEquals(listOf("weeks[0].sessions[0].exercises[0].setPlan[0]"), paths)
+  }
+
+  @Test
+  fun `an empty setPlan is rejected rather than silently ignored`() {
+    val paths = pathsOf(planWithExercise("""{ "name": "Alasoutu", "setPlan": [] }"""))
+
+    assertTrue(paths.any { it.endsWith("setPlan") })
+  }
+
+  /** Plans written before setPlan existed must keep importing exactly as they did. */
+  @Test
+  fun `an exercise without a setPlan is unaffected`() {
+    val outcome = validate(
+      planWithExercise("""{ "name": "Lankku", "durationSec": 30, "perSide": true }""")
+    )
+
+    val exercise = (outcome as ValidationOutcome.Valid).plan.sessions.single().exercises!!.single()
+    assertNull(exercise.setPlan)
+    assertEquals(30, exercise.durationSec)
+  }
+
   // ------------------------------------------------------------------ content hash
 
   @Test

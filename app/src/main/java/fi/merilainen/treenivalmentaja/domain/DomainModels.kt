@@ -43,6 +43,21 @@ data class Exercise(
   val durationSec: Int? = null,
   val restSec: Int? = null,
   val notes: String? = null,
+  /**
+   * The sets spelled out, for an exercise whose sets are not all alike — a ramp such as
+   * 25/35/45/55 kg, or a drop in reps as the weight climbs.
+   *
+   * `null` for the ordinary case, where [sets], [reps] and [weightKg] describe every set. When
+   * this is present those three must not be, so there is never a second opinion about the load.
+   */
+  val setPlan: List<ExerciseSet>? = null,
+)
+
+/** One set of an exercise whose sets differ from each other. */
+data class ExerciseSet(
+  val weightKg: Double? = null,
+  val reps: Int? = null,
+  val durationSec: Int? = null,
 )
 
 /**

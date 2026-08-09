@@ -43,6 +43,44 @@ internal fun Exercise.timedRounds(): List<String> {
 }
 
 /**
+ * What to actually do, in the shorthand a gym log uses: `4 × 10 · 55 kg`, `10 / puoli`, `30 s`.
+ *
+ * Empty when the plan says nothing beyond the name, so the caller can leave the line out rather
+ * than print a stray separator.
+ */
+internal fun Exercise.prescription(): String {
+    // A ramp is listed set by set: the weights are the whole point of writing it that way.
+    setPlan?.takeIf { it.isNotEmpty() }?.let { plan ->
+        return plan.joinToString(" · ") { set ->
+            val work = when {
+                set.reps != null -> "× ${set.reps}"
+                set.durationSec != null -> "${set.durationSec} s"
+                else -> ""
+            }
+            listOfNotNull(set.weightKg?.let { formatKg(it) }, work.ifEmpty { null })
+                .joinToString(" ")
+        }
+    }
+
+    val work = when {
+        reps != null -> "$reps"
+        repsMin != null && repsMax != null -> "$repsMin–$repsMax"
+        durationSec != null -> "$durationSec s"
+        else -> null
+    } ?: return ""
+
+    val withSets = if ((sets ?: 1) > 1) "$sets × $work" else work
+    val withSide = if (perSide == true) "$withSets / puoli" else withSets
+    return listOfNotNull(withSide, weightKg?.let { formatKg(it) }).joinToString(" · ")
+}
+
+/** 55.0 reads as "55 kg", 17.5 as "17,5 kg" — Finnish decimal comma, no trailing zero. */
+private fun formatKg(kg: Double): String {
+    val text = if (kg % 1.0 == 0.0) kg.toInt().toString() else kg.toString().replace('.', ',')
+    return "$text kg"
+}
+
+/**
  * The clock for one timed exercise, run once per entry in [timedRounds].
  *
  * Each round is ticked off as it finishes, so the exercise is only done when they all are and

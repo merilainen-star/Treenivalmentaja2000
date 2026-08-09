@@ -335,6 +335,36 @@ class TrainingRepositoryTest {
     assertEquals(0, db.sessionEventDao().countForSession("s-1"))
   }
 
+  /**
+   * Exercises are stored as JSON in a single column, so a new nested field only works if the
+   * Moshi adapter handles it — and a Moshi mismatch in this project has already shipped once,
+   * compiling cleanly and failing on the phone. This goes through the real import and reads the
+   * session back out of Room.
+   */
+  @Test
+  fun `per-set loads survive the round trip through the database`() = runTest {
+    // s-1 in the fixture carries no exercises, so one is added to it here.
+    val ramp = PLAN.replace(
+      """"description": "Aamun keskivartalo."""",
+      """"description": "Aamun keskivartalo.",
+                "exercises": [
+                  { "name": "Alasoutu", "setPlan": [
+                    { "weightKg": 25, "reps": 10 },
+                    { "weightKg": 55.5, "reps": 8 }
+                  ] }
+                ]"""
+    )
+
+    assertTrue(repository.importPlan(ramp) is ImportResult.Success)
+
+    val stored = repository.getSession("s-1")!!.exercises!!.first { it.name == "Alasoutu" }
+    assertEquals(2, stored.setPlan!!.size)
+    assertEquals(25.0, stored.setPlan!![0].weightKg!!, 0.001)
+    assertEquals(10, stored.setPlan!![0].reps)
+    assertEquals(55.5, stored.setPlan!![1].weightKg!!, 0.001)
+    assertEquals(8, stored.setPlan!![1].reps)
+  }
+
   // ---------------------------------------------------------------- replacing a plan
 
   /** A second plan, distinct in every id so nothing can pass by accident. */

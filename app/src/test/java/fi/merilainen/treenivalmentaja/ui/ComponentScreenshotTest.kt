@@ -21,6 +21,7 @@ import fi.merilainen.treenivalmentaja.WorkoutCardWeek
 import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.ExerciseSet
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -202,6 +203,44 @@ class ComponentScreenshotTest {
                     Exercise(name = "Bird dog", reps = 10, perSide = true),
                     Exercise(name = "Lankku", durationSec = 25),
                     Exercise(name = "Sivulankku", durationSec = 20, perSide = true),
+                ),
+            ),
+            onStatusChange = {},
+            onMoveToTomorrow = {},
+        )
+    }
+
+    /**
+     * A gym session in the shape a strength log actually takes: each exercise's sets done
+     * consecutively rather than in circuits, and a ramp where both the load and the reps move.
+     */
+    @Test
+    fun todayCard_gymSessionWithLoads() = capture("today_card_gym_loads") {
+        WorkoutCardToday(
+            strengthWorkout.copy(
+                description = "Huoltava koko vartalon harjoitus.",
+                rounds = 1,
+                exercises = listOf(
+                    Exercise(
+                        name = "Alasoutu",
+                        setPlan = listOf(
+                            ExerciseSet(weightKg = 25.0, reps = 10),
+                            ExerciseSet(weightKg = 35.0, reps = 10),
+                            ExerciseSet(weightKg = 45.0, reps = 10),
+                            ExerciseSet(weightKg = 55.0, reps = 10),
+                        ),
+                    ),
+                    Exercise(name = "Face pull", sets = 3, reps = 12, weightKg = 17.5),
+                    Exercise(name = "Hauiskääntö", sets = 3, reps = 10, weightKg = 18.0),
+                    Exercise(
+                        name = "Nautilus yhden jalan jalkaprässi",
+                        perSide = true,
+                        setPlan = listOf(
+                            ExerciseSet(weightKg = 36.0, reps = 15),
+                            ExerciseSet(weightKg = 55.0, reps = 12),
+                            ExerciseSet(weightKg = 73.0, reps = 10),
+                        ),
+                    ),
                 ),
             ),
             onStatusChange = {},
