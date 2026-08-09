@@ -98,6 +98,10 @@ class WorkoutViewModel(
     viewModelScope.launch {
       // Seeding only writes when the database is empty, so it cannot disturb an imported plan.
       repository.seedIfEmpty()
+      // Neither can this: it removes plans an import has already replaced, which no screen reads.
+      // It is here rather than only in the importer so that phones carrying plans from before
+      // imports deleted them are cleaned up without having to import again.
+      repository.deleteReplacedPlans()
     }
   }
 

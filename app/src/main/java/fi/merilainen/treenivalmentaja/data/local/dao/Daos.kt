@@ -34,6 +34,9 @@ interface TrainingPlanDao {
   @Query("UPDATE training_plans SET isActive = 0") suspend fun deactivateAll()
 
   @Query("DELETE FROM training_plans WHERE id = :id") suspend fun deleteById(id: String)
+
+  /** Plans an import has superseded. Sessions and their events cascade away with them. */
+  @Query("DELETE FROM training_plans WHERE isActive = 0") suspend fun deleteInactive(): Int
   @Query("DELETE FROM training_plans") suspend fun deleteAll()
 }
 

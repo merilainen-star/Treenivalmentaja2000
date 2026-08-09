@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
+import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.domain.EventSource
 import fi.merilainen.treenivalmentaja.data.repository.TransitionResult
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -112,12 +113,31 @@ class TrainingRepositoryTest {
     assertEquals(45, repository.getSession("s-1")?.durationMin)
   }
 
+  /**
+   * This used to be a conflict, and the change is deliberate. An activated import now deletes the
+   * plan it replaces, so by the time session ids are checked the old ones are gone and there is
+   * nothing to collide with. Reusing ids across successive plans — the same programme re-exported,
+   * say — is therefore ordinary rather than an error the user has to clear by hand.
+   */
   @Test
-  fun `a different plan reusing an existing session id is a conflict`() = runTest {
+  fun `a new plan reusing session ids replaces the old one instead of conflicting`() = runTest {
     repository.importPlan(PLAN)
 
     val other = PLAN.replace("\"id\": \"plan-testi\"", "\"id\": \"plan-toinen\"")
     val result = repository.importPlan(other)
+
+    assertTrue("expected success, was $result", result is ImportResult.Success)
+    assertEquals(listOf("s-1", "s-2"), repository.getSessions().map { it.id }.sorted())
+    assertEquals(1, db.trainingPlanDao().count())
+  }
+
+  /** An import that does not activate keeps what is there, so ids must still not clash. */
+  @Test
+  fun `an inactive import reusing session ids is still a conflict`() = runTest {
+    repository.importPlan(PLAN)
+
+    val other = PLAN.replace("\"id\": \"plan-testi\"", "\"id\": \"plan-toinen\"")
+    val result = repository.importPlan(other, activate = false)
 
     assertTrue(result is ImportResult.Conflict)
     result as ImportResult.Conflict
@@ -313,6 +333,76 @@ class TrainingRepositoryTest {
 
     assertEquals(0, db.workoutSessionDao().count())
     assertEquals(0, db.sessionEventDao().countForSession("s-1"))
+  }
+
+  // ---------------------------------------------------------------- replacing a plan
+
+  /** A second plan, distinct in every id so nothing can pass by accident. */
+  private val secondPlan
+    get() = PLAN.replace("plan-testi", "plan-toinen").replace("\"s-", "\"t-")
+
+  /**
+   * Importing used to deactivate the previous plan and leave its rows behind: invisible in the
+   * UI, growing the database with every import, and still holding alarms — which is how a
+   * replaced programme carried on notifying. The rows go now.
+   */
+  @Test
+  fun `importing a plan deletes the one it replaces`() = runTest {
+    assertTrue(repository.importPlan(PLAN) is ImportResult.Success)
+    assertEquals(2, repository.getSessions().size)
+
+    assertTrue(repository.importPlan(secondPlan) is ImportResult.Success)
+
+    // getSessions only reads the active plan, so the count is checked against the table itself.
+    val allIds = db.workoutSessionDao().getByStatus(SessionStatus.PLANNED).map { it.id }
+    assertEquals(listOf("t-1", "t-2"), allIds.sorted())
+    assertEquals(1, db.trainingPlanDao().count())
+  }
+
+  /** The cascade has to reach the event log too, or the history outlives its sessions. */
+  @Test
+  fun `replacing a plan takes its session history with it`() = runTest {
+    repository.importPlan(PLAN)
+    repository.transition("s-1", SessionStatus.COMPLETED)
+    assertTrue(repository.getEvents("s-1").isNotEmpty())
+
+    repository.importPlan(secondPlan)
+
+    assertNull(repository.getSession("s-1"))
+    assertTrue(repository.getEvents("s-1").isEmpty())
+  }
+
+  /**
+   * Phones that imported before plans were deleted still carry the leftovers, so the cleanup runs
+   * at startup too. It must remove exactly the replaced plans and nothing the user can see.
+   */
+  @Test
+  fun `deleteReplacedPlans removes the leftovers and keeps the active plan`() = runTest {
+    repository.importPlan(PLAN)
+    // A leftover of the shape older builds produced: deactivated, rows still present.
+    db.trainingPlanDao().insert(
+      TrainingPlanEntity(
+        id = "plan-vanha", name = "Vanha", schemaVersion = 1, timeZone = "Europe/Helsinki",
+        startDate = "2026-07-01", description = null, createdAt = 1, contentHash = "x",
+        isActive = false,
+      )
+    )
+    assertEquals(2, db.trainingPlanDao().count())
+
+    val removed = repository.deleteReplacedPlans()
+
+    assertEquals(1, removed)
+    assertEquals(1, db.trainingPlanDao().count())
+    assertEquals(listOf("s-1", "s-2"), repository.getSessions().map { it.id }.sorted())
+  }
+
+  /** Nothing to clean up is not an error, and must not touch the plan in use. */
+  @Test
+  fun `deleteReplacedPlans leaves a lone active plan alone`() = runTest {
+    repository.importPlan(PLAN)
+
+    assertEquals(0, repository.deleteReplacedPlans())
+    assertEquals(2, repository.getSessions().size)
   }
 
   // ---------------------------------------------------------------- import start date

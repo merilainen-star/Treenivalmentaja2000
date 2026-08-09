@@ -150,6 +150,25 @@ Moving a session never edits `scheduledDate` in place:
 
 A session may be moved repeatedly, producing a chain. Only the last link is non-terminal.
 
+## Replacing a plan
+
+Importing a plan **deletes** the one it replaces, rather than deactivating it and leaving the rows
+behind. Deleting the `training_plans` row is enough: `workout_sessions` cascades from it and
+`session_events` cascades from those.
+
+Completed sessions go with it. That is deliberate — the record of what was actually trained lives
+in Oura, which already collects both tracked workouts and ones it detects on its own, and there is
+no value in a second, thinner copy here. This app's job is the plan ahead.
+
+Keeping the old rows was not free. They were invisible in every screen, since those all join on
+`isActive = 1`, and they grew the database with every import — but they also still owned alarms,
+so a replaced programme carried on sending its own reminders beside the current one.
+
+Plans left behind by builds that only deactivated are cleared at startup by
+`TrainingRepository.deleteReplacedPlans`. It is the one thing the app does to the database on
+launch besides seeding an empty install, and it is safe there precisely because it can only remove
+rows nothing reads.
+
 ## Schema versions and migrations
 
 The version number describes the **shape** of the tables, never how much data they hold. Inserting

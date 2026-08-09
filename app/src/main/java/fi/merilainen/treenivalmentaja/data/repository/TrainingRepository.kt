@@ -270,6 +270,19 @@ class TrainingRepository(
         }
       }
 
+      // Activating a plan replaces the previous one outright: the old rows are deleted, not just
+      // marked inactive. They were dead weight in every sense — invisible in the UI, growing the
+      // database with each import, and still owning AlarmManager slots, which is how a replaced
+      // programme kept sending its own reminders. Completed sessions go with them; the record of
+      // what was actually trained belongs in Oura, and this app's job is the plan ahead.
+      //
+      // Deleting the plan row is enough: workout_sessions cascades from training_plans and
+      // session_events cascades from workout_sessions.
+      val now = clock.millis()
+      if (activate) planDao.deleteAll()
+
+      // Only reachable when a plan was kept — an inactive import, since an active one just
+      // cleared the table. Two plans must never share a session id.
       val collidingSessions = sessionDao.existingIds(validated.sessions.map { it.id })
       if (collidingSessions.isNotEmpty()) {
         return@withTransaction ImportResult.Conflict(
@@ -278,8 +291,6 @@ class TrainingRepository(
         )
       }
 
-      val now = clock.millis()
-      if (activate) planDao.deactivateAll()
       planDao.insert(
         TrainingPlanEntity(
           id = validated.id,
@@ -345,6 +356,22 @@ class TrainingRepository(
         },
     )
   }
+
+  /**
+   * Removes plans left behind by earlier imports, and returns how many went.
+   *
+   * Imports before this behaviour existed only deactivated the plan they replaced, so a phone can
+   * be carrying several dead programmes whose sessions still hold alarms. This is safe to run at
+   * startup even though nothing else is: it can only delete rows that are already invisible —
+   * every screen reads the active plan — so it cannot change what is in the calendar, which is
+   * the thing an app update must never do.
+   */
+  suspend fun deleteReplacedPlans(): Int =
+    db.withTransaction {
+      // Guarded on there being an active plan, so a database holding only inactive rows — which
+      // should not happen, but would mean every plan is deleted — is left alone to be looked at.
+      if (planDao.getActivePlanId() == null) 0 else planDao.deleteInactive()
+    }
 
   // ---------------------------------------------------------------- seeding
 
