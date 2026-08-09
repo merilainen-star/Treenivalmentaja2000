@@ -113,7 +113,12 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
-  // implementation(libs.coil.compose)
+  // Coil loads the exercise-guide animations. coil-gif is not optional: Coil decodes no animated
+  // GIF without it, and the guide images are the one thing this feature exists to show.
+  // The loader is configured in TreenivalmentajaApplication with its disk cache disabled —
+  // required by the provider's terms, see docs/EXERCISE_GUIDE.md.
+  implementation(libs.coil.compose)
+  implementation(libs.coil.gif)
   // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
   // Uncomment to use Firestore:

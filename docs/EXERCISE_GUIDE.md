@@ -1,8 +1,8 @@
-# Exercise Guide (planned)
+# Exercise Guide
 
-*(Status: **not implemented**. This document is the plan. Everything in "Findings" was measured
-on 2026-08-09 and should be re-checked before the work starts, because it depends on a third
-party's terms.)*
+*(Status: **implemented** on 2026-08-09. Sections 1–6 are the design and describe what was built;
+["As built"](#as-built) at the end records where reality differed from the plan and why. Findings
+depend on a third party's terms and should be re-checked before this feature is changed.)*
 
 ## The problem
 
@@ -195,8 +195,191 @@ The session itself must remain fully usable in every one of these cases. The gui
   attribution and could be shipped inside the APK.
 - Any use of guide data to alter a plan.
 
-## Before starting
+## Before changing this
 
 Re-read both terms documents. They are a third party's and they change; the caching rule in
 particular is the one this design bends around, and if it has loosened the design should be
 revisited rather than followed out of habit.
+
+## As built
+
+Everything below was measured against the live service on 2026-08-09, the day the feature was
+built. Where it contradicts the design above, this section is what the code does.
+
+### The terms, re-checked
+
+The free V1 restrictions were re-read from the API's own description (`GET
+https://oss.exercisedb.dev/swagger`, the document the docs page renders) and are **unchanged**:
+non-commercial use allowed, 180p GIF only, "Strict rate limits apply", and "Credit to AscendAPI is
+required when using this dataset in any project".
+
+The Terms of Use at <https://dub.sh/exercisedb-api-tos> could **not** be retrieved: the shortener
+answers `403` to non-browser clients. The reading in "Findings" therefore stands unverified on
+that document, which is another reason the design stores nothing — the conservative choice is the
+one that does not depend on which document governs.
+
+### The endpoints
+
+| Design said | Built as | Why |
+| --- | --- | --- |
+| `GET /exercises/{id}` | unchanged | Returns the eight documented fields. |
+| a name search | `GET /exercises?name=<q>&limit=25` | `/exercises/search` returns only `exerciseId`, `name` and `gifUrl`, so every suggestion would have needed a second request — and it answered `503` under load while `?name=` kept serving. |
+
+The service sits behind Cloudflare Workers and answers `503` with the **plain text** body
+`error code: 1102` when it is over its resource limit. The status is therefore checked before the
+body is treated as JSON at all.
+
+### The fuzzy search invents, and had to be filtered
+
+This is the finding that changed the design. `?name=` does not miss when there is nothing to find —
+it answers confidently with something else:
+
+| Query | What the service returned |
+| --- | --- |
+| `cat cow` | "cable squat row", "band squat row" |
+| `bench press` | "ez bar standing french press" among the top hits |
+| `kissa` (via `/search`, default threshold) | seven unrelated results, e.g. "resistance band seated biceps curl" |
+
+"Tarkoititko: *cable squat row*?" for **Kissa-lehmä** is worse than showing nothing. Every result
+is now filtered client-side: a match is kept only if the movement's name contains **every** word
+of the query that is at least three characters long, and the shortest surviving name is offered
+first, because among "front plank with twist" and "kneeling plank tap shoulder (male)" the short
+one is the plain movement. A Finnish name survives none of this, which is the honest outcome and
+the one the design asked for.
+
+### Smaller differences
+
+- **One hit is shown outright** rather than as a list of one — still labelled `Ehdotus`, because a
+  single hit is no more certain than the top of five.
+- **The suggestion list carries no thumbnails.** Five suggestions would be five image requests
+  against a service whose only published rate limit is the word "strict", four of them for
+  movements the user is about to not pick. The image appears once a suggestion is chosen.
+- **`ExerciseGuideProvider.search` returns full `ExerciseGuide`s**, as designed, because
+  `?name=` returns the whole record. No second round trip.
+- **The step numbering is stripped.** Instructions arrive as `"Step:1 Lie flat on a bench…"`, and
+  the sheet numbers them itself; printing both would number every line twice.
+
+### The no-storage rule, verified
+
+`TreenivalmentajaApplication.newImageLoader` passes Coil **no disk cache at all**
+(`diskCache(null)`) as well as `diskCachePolicy(CachePolicy.DISABLED)`. Both, deliberately: the
+policy stops requests reading and writing, and passing no cache means there is no directory to
+create, so the guarantee does not rest on every code path honouring a flag.
+
+Measured on the emulator (`treeni-test`, API 36) by loading a real guide GIF through the app's own
+image loader: the request returned `SuccessResult`, and `cacheDir` afterwards contained the
+directory itself and nothing else — no `image_cache`, no files. `filesDir` was untouched.
+`ImageLoaderConfigurationTest` holds the configuration in place; the empirical check was done by
+hand because a test that fetched from a rate-limited free service would fail for reasons that have
+nothing to do with this app.
+
+## The second source: wger
+
+Added 2026-08-09, after the gaps below turned out to be permanent. <https://wger.de>, API v2.
+Everything here was measured against the live service that day.
+
+**Why a second source rather than a replacement.** Neither is enough alone:
+
+| | ExerciseDB | wger |
+| --- | --- | --- |
+| Movements | 1500 | 834 |
+| Media | animated GIF, **every** movement | still image, **264 of 834** (32%) |
+| Licence | unclear; the strictest readable clause forbids storing anything | CC-BY-SA, CC-BY, CC0, ODbL — storage permitted |
+| Attribution | one line, "AscendAPI" | per image, naming its author |
+| Instructions | numbered steps throughout | HTML prose, quality varies |
+| Name search | fuzzy, works | **none** — see below |
+| Finnish | no | no |
+
+ExerciseDB has the animation, which is the whole reason to open the sheet. wger has the movements
+ExerciseDB does not. A plan pins each movement to whichever source actually has it, and
+`ExerciseGuideProvider` was an interface from the start precisely so this would cost one class.
+
+**wger does no name search, and makes no request pretending to.** `/exercise/search/` answers
+`404` — it was removed — and the filter that remains, `?name=`, is an exact **case-sensitive**
+match: `name=Bird Dog` returns four rows, `name=bird dog` returns none. A Finnish movement name
+cannot hit that under any capitalisation, so `WgerProvider.search` returns an empty list without
+touching the network rather than spending a guaranteed-miss request on a volunteer-run service
+every time a movement is tapped. The fuzzy path stays with ExerciseDB, which has a working one.
+
+**Its instructions are HTML.** wger stores prose as `<p>` blocks, so each block becomes one line
+and the markup is stripped; the sheet numbers them itself, exactly as it does for ExerciseDB's
+`Step:1` prefixes.
+
+**Its attribution is per image.** CC-BY-SA needs the licence and the author named, and each
+picture carries its own — so the credit line moved onto [ExerciseGuide] rather than staying a
+per-source constant. A movement with no picture credits only the source and the licence. The
+states that show no data at all show no credit, because there is nothing to attribute.
+
+**The no-storage rule did not loosen.** wger's licences would permit caching, and even bundling
+images into the APK. ExerciseDB's do not, one image loader serves both, and the stricter rule
+wins. If ExerciseDB were ever dropped, this is the constraint that would lift with it.
+
+## The references this programme uses
+
+Written down so the next plan does not have to look them up again, and so a movement keeps the
+same reference every time it appears. **Finnish names stay Finnish** — the `name` field is what
+you read mid-session, and the whole point of `guide` is that the reference settles the question
+without translating anything.
+
+Verified against the live service on 2026-08-09; each row was checked by reading the returned
+movement, not by trusting the name.
+
+| Plan's name | `provider` | `id` | The source's name |
+| --- | --- | --- | --- |
+| Punnerrus | exercisedb | `I4hDWkc` | push-up |
+| Kevyt punnerrus | exercisedb | `ZOuKWir` | kneeling push-up (male) |
+| Timanttipunnerrus | exercisedb | `soIB2rj` | diamond push-up |
+| Kahvakuulaheilautus | exercisedb | `UHJlbu3` | kettlebell swing |
+| Goblet-kyykky | exercisedb | `ZA8b5hc` | kettlebell goblet squat |
+| Käsipainosoutu | exercisedb | `C0MA9bC` | dumbbell one arm bent-over row |
+| Vatsarutistus | exercisedb | `TFqbd8t` | crunch floor |
+| Vinot vatsarutistukset | exercisedb | `QUDd8WS` | oblique crunches floor |
+| Lankku | wger | `458` | Plank |
+| Sivulankku | wger | `580` | Side Plank *(no picture)* |
+| Kyykky | wger | `615` | Squats *(no picture)* |
+| Bird dog | wger | `1572` | Bird Dog |
+| Kissanlehmä | wger | `1938` | Cat-Cow *(no picture)* |
+| Bulgarialainen askelkyykky | wger | `988` | Bulgarian split squats left |
+| Lonkankoukistajan venytys | wger | `1867` | Hip Flexor Stretch |
+
+This is our mapping for our plan, not a copy of either catalogue. Reproducing one is a different
+act: ExerciseDB forbids commercial use and sells full dataset access, so the whole list does not
+belong in this repository however convenient it would be. wger's licence would permit it, but
+there is still no reason to carry 834 rows we do not use.
+
+### Where each source falls short
+
+**ExerciseDB is missing bodyweight basics.** Checked against all 1500 free-tier exercises, these
+are absent in every spelling: `plank` · `side plank` · `squat` (plain) · `bird dog` · `cat cow`.
+It leans heavily towards gym machines. Every one of them exists in wger, which is why wger is
+here — and why five of this programme's movements are pinned to it.
+
+**wger is missing pictures.** Two thirds of its movements have none, including Side Plank, Squats
+and Cat-Cow above. Those sheets still carry the name, the instructions, the muscles and the
+equipment, which beats the alternative of nothing at all.
+
+One movement has a reference from neither: **Vatsarutistus penkillä**. ExerciseDB's nearest is
+`9Ap7miY decline crunch` — a decline bench, not a flat one — and wger has no equivalent. It was
+left out rather than approximated, because `guide` is the plan author's assertion that the
+movement *is* this one. Two others that were rejected on ExerciseDB for the same reason are now
+pinned to wger instead, exactly:
+
+| Plan's name | Rejected on ExerciseDB | Resolved on wger |
+| --- | --- | --- |
+| Bulgarialainen askelkyykky | `9E25EOx` split squats — rear foot not elevated | `988`, and per side |
+| Lonkankoukistajan venytys | `2LQkNPW` — needs a stability ball | `1867` |
+
+### Where the code is
+
+| Piece | File |
+| --- | --- |
+| Provider interface, `ExerciseGuide`, error types | `data/guide/ExerciseGuideProvider.kt` |
+| One GET and one reading of what went wrong, shared | `data/guide/GuideHttp.kt` |
+| ExerciseDB implementation and the relevance filter | `data/guide/ExerciseDbProvider.kt` |
+| wger implementation and the HTML stripping | `data/guide/WgerProvider.kt` |
+| States, the two lookup paths, the in-memory cache | `domain/LoadExerciseGuideUseCase.kt` |
+| The sheet | `ExerciseGuideSheet.kt` |
+| The tappable rows | `WorkoutDetails.kt` |
+| The image loader's configuration | `TreenivalmentajaApplication.kt` |
+
+Captured real payloads used by the parsing tests live in `app/src/test/resources/guide/`.

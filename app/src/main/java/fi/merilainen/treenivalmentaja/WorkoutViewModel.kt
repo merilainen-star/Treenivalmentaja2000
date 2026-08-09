@@ -11,8 +11,11 @@ import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
+import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
@@ -81,7 +84,8 @@ class WorkoutViewModel(
   private val engine: TrainingEngine,
   private val settingsStore: NotificationSettingsStore,
   private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase,
-  private val checkForUpdateUseCase: CheckForUpdateUseCase
+  private val checkForUpdateUseCase: CheckForUpdateUseCase,
+  private val loadExerciseGuideUseCase: LoadExerciseGuideUseCase,
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -105,6 +109,13 @@ class WorkoutViewModel(
 
   private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
   val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
+
+  /** `null` means no guide sheet is open. */
+  private val _guideState = MutableStateFlow<ExerciseGuideState?>(null)
+  val guideState: StateFlow<ExerciseGuideState?> = _guideState.asStateFlow()
+
+  /** The exercise the open sheet is about, so "Yritä uudelleen" knows what to retry. */
+  private var guideExercise: Exercise? = null
 
   init {
     viewModelScope.launch {
@@ -144,6 +155,38 @@ class WorkoutViewModel(
     viewModelScope.launch {
       engine.handleMissedSessions()
     }
+  }
+
+  /** Opens the guide sheet for one movement and starts the lookup. */
+  fun openExerciseGuide(exercise: Exercise) {
+    guideExercise = exercise
+    _guideState.value = ExerciseGuideState.Loading(exercise.name)
+    viewModelScope.launch {
+      // A sheet closed or reopened while the request was in flight must not be overwritten by
+      // the answer to the previous question.
+      val state = loadExerciseGuideUseCase.execute(exercise)
+      if (guideExercise == exercise) _guideState.value = state
+    }
+  }
+
+  fun retryExerciseGuide() {
+    guideExercise?.let { openExerciseGuide(it) }
+  }
+
+  /**
+   * Shows the guide the user picked from the suggestion list.
+   *
+   * No request: the search already returned the whole thing. It stays marked as a suggestion —
+   * picking one does not make it what the plan meant.
+   */
+  fun selectGuideSuggestion(guide: ExerciseGuide) {
+    val name = _guideState.value?.exerciseName ?: return
+    _guideState.value = ExerciseGuideState.Loaded(name, guide, suggested = true)
+  }
+
+  fun closeExerciseGuide() {
+    guideExercise = null
+    _guideState.value = null
   }
 
   fun updateWorkoutStatus(workoutId: String, newStatus: SessionStatus) {
@@ -273,7 +316,8 @@ class WorkoutViewModel(
           application.engine,
           application.settingsStore,
           application.rescheduleAlarmsUseCase,
-          application.checkForUpdateUseCase
+          application.checkForUpdateUseCase,
+          application.loadExerciseGuideUseCase,
         )
       }
     }

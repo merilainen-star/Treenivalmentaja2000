@@ -33,24 +33,27 @@ the numbers behind them.
   plan rather than leaving it behind.
 - Exercises are shown as the plan wrote them: prescriptions (`3 × 12 · 17,5 kg`), per-set ramps,
   and clocks for timed movements that run once per side or per set.
+- Exercise guides: tap a movement for an animation and instructions, fetched on demand and never
+  stored, with attribution — [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md). Two sources, because neither
+  has everything: ExerciseDB animates all 1500 of its movements but has no plank, side plank,
+  plain squat, bird dog or cat-cow, and wger has all of those under CC-BY-SA but pictures for only
+  a third. There is no disk cache anywhere in the path, because ExerciseDB permits free personal
+  use with attribution but not persistent caching.
 
 ## In Progress
 - Nothing. The app is being used in real training between milestones.
 
 ## Next Milestone
-1. **Exercise guides** — tap a movement, see an animation and instructions. Fully specified in
-   [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md), including the ExerciseDB terms that constrain it: free
-   personal use is permitted with attribution, persistent caching is not.
-2. **Screen state hoisting.** Split each screen into a stateless `…Content(state, callbacks)` and
+1. **Screen state hoisting.** Split each screen into a stateless `…Content(state, callbacks)` and
    a thin stateful wrapper. Today the screens take a `WorkoutViewModel` directly, so nothing can
    render one in a test and `WorkoutViewModel` has no tests at all.
-3. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
+2. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
    credentials until the end.
-4. **In-app OAuth2 token exchange with PKCE**
+3. **In-app OAuth2 token exchange with PKCE**
    ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend), tokens in
    `EncryptedSharedPreferences`.
-5. **WorkManager** for background biometric syncing.
-6. **Feed readiness into the recovery card**, which is a fixed placeholder today and is the first
+4. **WorkManager** for background biometric syncing.
+5. **Feed readiness into the recovery card**, which is a fixed placeholder today and is the first
    point at which the Oura work becomes visible to the user.
 
 ## Later (Phase 4 & Beyond)

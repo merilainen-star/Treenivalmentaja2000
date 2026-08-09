@@ -79,9 +79,11 @@ promoted to their own table with a migration.
 ```
 
 An exercise whose sets differ from each other carries `setPlan` instead of `sets`/`reps`/
-`weightKg` — see [PLAN_SCHEMA.md](PLAN_SCHEMA.md#setplan--sets-that-differ-from-each-other).
-Because the whole array is one column, fields can be added to it without a Room migration, which
-is why the schema is still at version 4.
+`weightKg` — see [PLAN_SCHEMA.md](PLAN_SCHEMA.md#setplan--sets-that-differ-from-each-other). An
+exercise may also carry `guide`, the plan author's pointer into an exercise catalogue; nothing
+fetched with it is ever stored, only the pointer itself
+([EXERCISE_GUIDE.md](EXERCISE_GUIDE.md)). Because the whole array is one column, fields can be
+added to it without a Room migration, which is why the schema is still at version 4.
 
 
 #### Reminder Resolution (`remindAtUtc`)

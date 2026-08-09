@@ -8,6 +8,26 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-08-09
 
 ### Added
+- Exercise guides. Tapping a movement opens a sheet with an animation or picture, numbered
+  instructions, target muscles and equipment, so a name you do not recognise no longer sends you
+  to a search engine. Fetched when the sheet opens and **never stored**: the image loader is given
+  no disk cache at all, nothing goes in Room, and the only cache is a map that dies with the
+  process. Credit is shown wherever guide data appears, as the sources require.
+- A second guide source, **wger** (<https://wger.de>, CC-BY-SA), alongside ExerciseDB — because
+  neither has everything. ExerciseDB carries an animation for all 1500 of its movements but has no
+  plank, side plank, plain squat, bird dog or cat-cow *at all*; wger has every one of them, though
+  only a third of its movements carry a picture and those are stills. A plan pins each movement to
+  whichever source has it, and a reference is resolved by the provider it names — never quietly by
+  the other. Without a reference both are searched at once, and one being down no longer hides the
+  other's answer.
+- `guide` on an exercise — `{ "provider": "exercisedb" | "wger", "id": "…" }`, the plan author's
+  pointer into a catalogue. Optional and backwards compatible; an unknown `provider` is an import
+  error rather than something ignored. No Room migration.
+- An exercise without `guide` is searched by name, and the result is offered as a suggestion that
+  has to be picked. The service's fuzzy matching does not miss when there is nothing to find —
+  `cat cow` comes back as "cable squat row" — so every result is filtered down to names that
+  contain each word of the query. A Finnish name matches nothing, which is the honest answer, and
+  the sheet says to add a `guide` instead.
 - Exercises are shown as the plan wrote them: the prescription under each name
   (`3 × 12 · 17,5 kg`, `10 / puoli`, `30 s`), and a clock for timed movements that runs once per
   side or per set. Previously the screens printed only the name, and decided a movement was timed

@@ -1,7 +1,9 @@
 package fi.merilainen.treenivalmentaja.data.importer
 
+import fi.merilainen.treenivalmentaja.data.guide.GuideProviders
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseSet
+import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.LighterAlternative
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -314,6 +316,9 @@ object PlanValidator {
 
       val setPlan = validateSetPlan(dto.setPlan, "$itemPath.setPlan", errors)
       if (setPlan == null) ok = false
+
+      val guide = validateGuide(dto.guide, "$itemPath.guide", errors)
+      if (guide == null && dto.guide != null) ok = false
       // Whether the writer *wrote* a setPlan, not whether it survived validation. A broken set
       // should be reported once, as the broken set — not also as "this exercise has no reps",
       // which would point at a field they deliberately left out.
@@ -348,10 +353,50 @@ object PlanValidator {
             restSec = dto.restSec,
             notes = dto.notes,
             setPlan = setPlan?.takeIf { it.isNotEmpty() },
+            guide = guide,
           )
       }
     }
     return if (ok) result else null
+  }
+
+  /**
+   * Returns `null` both when there was no `guide` and when the one written was unusable; the
+   * caller tells the two apart by looking at the DTO, the same way it does for `setPlan`.
+   *
+   * An unknown `provider` is an error rather than something to ignore. A plan that names a
+   * catalogue this build cannot read is a plan whose guides would silently never appear, and the
+   * writer should hear about it at import instead of discovering it mid-session.
+   */
+  private fun validateGuide(
+    dto: GuideRefDto?,
+    path: String,
+    errors: MutableList<ImportError>,
+  ): GuideRef? {
+    if (dto == null) return null
+    var ok = true
+
+    val provider = dto.provider?.takeIf { it.isNotBlank() }
+    if (provider == null) {
+      errors += ImportError("$path.provider", "pakollinen kenttä puuttuu tai on tyhjä")
+      ok = false
+    } else if (provider !in GuideProviders.known) {
+      errors +=
+        ImportError(
+          "$path.provider",
+          "tuntematon lähde \"$provider\" (sallitut: ${GuideProviders.known.joinToString(", ")})",
+        )
+      ok = false
+    }
+
+    val id = dto.id?.takeIf { it.isNotBlank() }
+    if (id == null) {
+      errors += ImportError("$path.id", "pakollinen kenttä puuttuu tai on tyhjä")
+      ok = false
+    }
+
+    if (!ok || provider == null || id == null) return null
+    return GuideRef(provider = provider, id = id)
   }
 
   /**

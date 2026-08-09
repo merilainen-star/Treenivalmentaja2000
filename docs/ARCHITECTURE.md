@@ -4,10 +4,11 @@ This document outlines the architecture for the Treenivalmentaja Android applica
 *(Note: the local half of this architecture — Compose UI, `WorkoutViewModel`, `TrainingEngine`,
 `TrainingRepository`, Room and the AlarmManager reminders — is **implemented**. Everything
 involving Oura — the Retrofit clients, OAuth, WorkManager sync and workout matching — is
-**planned**; the Oura tables exist in the database but nothing writes to them. One network call
-does exist: the update check in `data/update`, a single `HttpURLConnection` GET of the published
-build's metadata. Exercise guides in [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md) are specified but not
-built.)*
+**planned**; the Oura tables exist in the database but nothing writes to them. Network calls do
+exist: the update check in `data/update`, a single `HttpURLConnection` GET of the published
+build's metadata, and the exercise-guide lookups in `data/guide` against ExerciseDB and wger, also
+plain `HttpURLConnection`, made when a movement is tapped and storing nothing —
+[EXERCISE_GUIDE.md](EXERCISE_GUIDE.md).)*
 
 ## System Context
 The application is a standalone Android app that acts as an offline-first training companion. It

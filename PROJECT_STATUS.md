@@ -5,18 +5,23 @@
 Every number below was measured on this commit, not carried over from a previous report.
 
 - Date: 2026-08-09
-- Git commit: `0ac3783` (repository connected to
+- Git commit: working tree on top of `b57a3f5` (repository connected to
   https://github.com/merilainen-star/Treenivalmentaja2000)
 - Toolchain: Temurin JDK 21.0.12, Gradle 9.6.1 via wrapper, Android SDK Platform 36.1,
   Build-Tools 36.1.0. `minSdk` 26, `targetSdk` 36.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 19.6 MB |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 116 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 14 comparisons, no diffs |
+| Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 20,250,270 B (20.3 MB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 174 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 21 comparisons, no diffs |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 40 warnings |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 14 tests, 0 failures, 0 errors |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 18 tests, 0 failures, 0 errors |
+
+The APK grew by 780,613 B (+4.0%) over `b57a3f5`, which was rebuilt from a clean worktree on the
+same machine to measure it: 19,469,657 B. Almost all of that is Coil, `coil-gif` and the OkHttp
+it pulls in, which the exercise guide's animations need — Coil decodes no animated GIF without
+`coil-gif`. The second guide provider added 16,384 B on top.
 
 Instrumented tests run locally only. CI has no device, and the workflow says so rather than
 implying the suite ran.
@@ -55,20 +60,50 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   emptying the database.
 - **Expandable week rows.** Tapping a row in the Week view unrolls the session's content beneath
   it.
-- **Screenshot tests.** 14 Roborazzi baselines over the Today and Week cards, the recovery card
-  and every status badge. They run on the JVM, no device needed. The comparison tolerates 0.5% of
+- **Screenshot tests.** 20 Roborazzi baselines over the Today and Week cards, the recovery card,
+  every status badge and every state of the exercise-guide sheet. They run on the JVM, no device needed. The comparison tolerates 0.5% of
   changed pixels, because Windows and Linux antialias text differently — measured at 0.046%, with
   no pixel differing by more than 32/255. A 2dp shadow change still fails them.
 - **Exercises shown as the plan wrote them.** Each movement displays its prescription —
   `3 × 12 · 17,5 kg`, `10 / puoli`, `30 s` — and a ramp lists every set. Timed movements carry a
   clock driven by `durationSec`, run once per side or per set, so a per-side hold asks for both
   sides instead of leaving the second to be counted in your head.
+- **Exercise guides, from two sources.** Tapping a movement opens a sheet with an animation or
+  picture, numbered instructions, target muscles and equipment. ExerciseDB has an animation for
+  every one of its 1500 movements but no plank, side plank, plain squat, bird dog or cat-cow at
+  all; wger has those, under CC-BY-SA, though only a third of its movements carry a picture. A
+  plan pins each movement to whichever source has it, and a reference is resolved by the provider
+  it names — never by the other one. Nothing either returns is stored:
+  the image loader is given no disk cache at all, nothing goes in Room, and the only cache is a
+  64-entry map that dies with the process. wger's licences would permit more, but one image loader
+  serves both sources and ExerciseDB's terms rule it out, so the stricter rule wins.
+
+  Without a reference the app searches every source at once and offers what comes back as a
+  suggestion that has to be picked, after filtering out everything whose name does not contain
+  each word of the query — ExerciseDB invents rather than misses, answering `cat cow` with "cable
+  squat row", so that filter is what keeps the suggestion honest. One source being down does not
+  hide the other's answer. Every failure state (offline, 429, 5xx, not found, no match) is a
+  normal reading of the sheet and leaves the session fully usable. Credit is carried per guide,
+  because wger's images each name their own author. See
+  [EXERCISE_GUIDE.md](docs/EXERCISE_GUIDE.md).
+
+  Walked on the emulator (`treeni-test`, API 36) against both live services, with a plan imported
+  through the real file picker: an ExerciseDB reference resolved to "barbell bench press" with its
+  animation playing; a wger reference resolved "Sivulankku" to Side Plank, instructions intact and
+  no empty picture box where it has none; another resolved "Bulgarialainen askelkyykky" with its
+  picture and the credit line naming the image's author; "Plank" offered five suggestions, all of
+  them actually planks; picking one kept the `Ehdotus` warning; and a movement hit a real `503`
+  and drew the retry state, which retried. `cacheDir` held nothing but itself afterwards.
+
+  Reachable only for sessions whose plan carries an `exercises` array. The seeded starter week
+  does not — it describes its movements in prose — so a fresh install has nothing to tap until a
+  plan is imported.
 - **Import asks where the plan lands.** Keep the file's dates, or move the whole plan so day one
   is today.
 - **Importing replaces.** The previous plan and its sessions are deleted rather than deactivated,
   so the database does not grow and a replaced programme cannot keep sending its own reminders.
 - **Update check.** Settings says whether the installed build is the one GitHub Actions last
-  published, and offers the download when it is not. The app's only network call.
+  published, and offers the download when it is not.
 - **Test APK distribution from GitHub Actions.** Every push to `main` that touches code builds,
   verifies and republishes one rolling prerelease at a permanent URL, signed with the same
   `debug.keystore` as local builds so it updates the phone in place. Installing a test build needs
@@ -109,14 +144,16 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 ## Recommended next task
 
-1. **Exercise guides.** Tap a movement to see an animation and instructions, so a name you do not
-   recognise does not send you to a search engine. Fully specified in
-   [EXERCISE_GUIDE.md](docs/EXERCISE_GUIDE.md), including the terms-of-use constraints that shape
-   it.
-2. **Split each screen into a stateless `…Content(state, callbacks)` and a thin stateful wrapper.**
+1. **Split each screen into a stateless `…Content(state, callbacks)` and a thin stateful wrapper.**
    `TodayScreen`, `WeekScreen` and `SettingsScreen` each take a `WorkoutViewModel`, so no test can
    render a whole screen and `WorkoutViewModel` has no tests at all. The split closes both gaps
-   and makes every later UI change verifiable.
+   and makes every later UI change verifiable. The exercise-guide sheet already follows this
+   shape — `ExerciseGuideSheetContent` is stateless and every one of its states has a baseline —
+   so it is the pattern to copy.
+2. **Write `guide` references into `sample-data/plan.json`.** The current programme has been
+   mapped — 15 of its 16 movements have a reference, listed in
+   [EXERCISE_GUIDE.md](docs/EXERCISE_GUIDE.md#the-references-this-programme-uses) — but the copy
+   in `sample-data/` is an older revision without them. Data entry, not code.
 3. **Then Oura**, in this order: Retrofit client and DTOs against `MockWebServer`; OAuth2 + PKCE
    per [AUTHENTICATION.md](docs/AUTHENTICATION.md); WorkManager sync; and finally feed readiness
    into the recovery card, which is the first point where any of it becomes visible.

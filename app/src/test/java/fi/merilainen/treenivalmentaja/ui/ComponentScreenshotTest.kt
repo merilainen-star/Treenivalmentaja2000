@@ -1,8 +1,11 @@
 package fi.merilainen.treenivalmentaja.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -12,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
 import fi.merilainen.treenivalmentaja.ImportStartDialog
 import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.RecoveryState
@@ -20,8 +24,11 @@ import fi.merilainen.treenivalmentaja.WorkoutCardToday
 import fi.merilainen.treenivalmentaja.WorkoutCardWeek
 import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
+import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.ExerciseSet
+import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -271,6 +278,139 @@ class ComponentScreenshotTest {
     @Test
     fun importStartDialog() = capture("import_start_dialog") {
         ImportStartDialog(onDismiss = {}, onConfirm = {})
+    }
+
+    // ------------------------------------------------------------------ Exercise guide sheet
+
+    private val benchPress = ExerciseGuide(
+        id = "EIeI8Vf",
+        name = "barbell bench press",
+        imageUrl = "https://static.exercisedb.dev/media/EIeI8Vf.gif",
+        instructions = listOf(
+            "Lie flat on a bench with your feet flat on the ground.",
+            "Grasp the barbell with an overhand grip slightly wider than shoulder-width apart.",
+            "Lower the barbell slowly towards your chest, keeping your elbows tucked in.",
+        ),
+        targetMuscles = listOf("pectorals"),
+        equipment = listOf("barbell"),
+        attribution = "Liiketiedot: ExerciseDB / AscendAPI",
+    )
+
+    /** wger credits each image's author separately, so its line is longer and wraps differently. */
+    private val sidePlank = ExerciseGuide(
+        id = "580",
+        name = "Side Plank",
+        imageUrl = "https://wger.de/media/exercise-images/580/side-plank.png",
+        instructions = listOf(
+            "Lie on your side with your legs straight and your elbow directly below your shoulder.",
+            "Raise your hips until your body forms a straight line from head to feet.",
+        ),
+        targetMuscles = listOf("Obliquus externus abdominis"),
+        equipment = listOf("none (bodyweight exercise)"),
+        attribution = "Liiketiedot: wger.de (CC-BY-SA 4) · kuva: Settebello",
+    )
+
+    /**
+     * The animation is a network GIF, so it can never be part of a baseline. A fixed stand-in of
+     * the real height keeps the rest of the sheet laid out as it will be on the phone, and keeps
+     * the capture from depending on how fast a request failed.
+     */
+    private val stubAnimation: @Composable (String) -> Unit = {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        )
+    }
+
+    private fun guideSheet(name: String, state: ExerciseGuideState) = capture(name) {
+        ExerciseGuideSheetContent(
+            state = state,
+            onRetry = {},
+            onSelectSuggestion = {},
+            animation = stubAnimation,
+        )
+    }
+
+    @Test
+    fun guideSheet_loaded() = guideSheet(
+        "guide_sheet_loaded",
+        ExerciseGuideState.Loaded("Penkkipunnerrus", benchPress),
+    )
+
+    /** A name-search hit has to keep saying it is one; the plan never claimed this movement. */
+    @Test
+    fun guideSheet_loadedFromASuggestion() = guideSheet(
+        "guide_sheet_suggested",
+        ExerciseGuideState.Loaded("Penkkipunnerrus", benchPress, suggested = true),
+    )
+
+    /** A movement wger has and ExerciseDB does not, credited to the image's own author. */
+    @Test
+    fun guideSheet_loadedFromWger() = guideSheet(
+        "guide_sheet_wger",
+        ExerciseGuideState.Loaded("Sivulankku", sidePlank),
+    )
+
+    /** Hits pooled from both sources, so both credit lines have to appear. */
+    @Test
+    fun guideSheet_suggestions() = guideSheet(
+        "guide_sheet_suggestions",
+        ExerciseGuideState.Suggestions(
+            exerciseName = "Lankku",
+            matches = listOf(
+                sidePlank.copy(id = "458", name = "Plank"),
+                benchPress.copy(id = "a", name = "front plank with twist"),
+                benchPress.copy(id = "c", name = "kneeling plank tap shoulder (male)"),
+            ),
+        ),
+    )
+
+    /** Offline is a normal state: the session keeps working, and the guide offers a retry. */
+    @Test
+    fun guideSheet_offline() = guideSheet(
+        "guide_sheet_offline",
+        ExerciseGuideState.Unavailable(
+            exerciseName = "Bird dog",
+            message = "Liiketiedot vaativat verkkoyhteyden.",
+            canRetry = true,
+        ),
+    )
+
+    /** Nothing to retry here, so no button is offered. */
+    @Test
+    fun guideSheet_notFound() = guideSheet(
+        "guide_sheet_not_found",
+        ExerciseGuideState.Unavailable(
+            exerciseName = "Kissa-lehmä",
+            message = "Ei osumaa. Lisää liikkeelle guide-viite suunnitelmaan.",
+            canRetry = false,
+        ),
+    )
+
+    /** The rows the sheet opens from: tappable, and marked as such. */
+    @Test
+    fun todayCard_exercisesAreTappable() = capture("today_card_exercises_tappable") {
+        WorkoutCardToday(
+            strengthWorkout.copy(
+                description = "Liikkuvuus ja keskivartalo.",
+                rounds = 1,
+                exercises = listOf(
+                    Exercise(name = "Kissa-lehmä", reps = 10),
+                    Exercise(
+                        name = "Penkkipunnerrus",
+                        sets = 3,
+                        reps = 8,
+                        weightKg = 40.0,
+                        guide = GuideRef(provider = "exercisedb", id = "EIeI8Vf"),
+                    ),
+                ),
+            ),
+            onStatusChange = {},
+            onMoveToTomorrow = {},
+            onExerciseClick = {},
+        )
     }
 
     // ------------------------------------------------------------------ Status badges

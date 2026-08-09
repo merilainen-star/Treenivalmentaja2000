@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.PaddingValues
+import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
@@ -59,6 +60,7 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorYellow
 fun TodayScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
     val recoveryState by viewModel.recoveryState.collectAsState()
+    val guideState by viewModel.guideState.collectAsState()
 
     // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
     // every launch and rewrote the calendar — see WorkoutViewModel.checkMissedSessions.
@@ -93,7 +95,8 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
                     },
                     onMoveToTomorrow = {
                         viewModel.moveWorkoutToTomorrow(workout.id)
-                    }
+                    },
+                    onExerciseClick = { viewModel.openExerciseGuide(it) }
                 )
             }
         } else {
@@ -109,6 +112,16 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
+        }
+
+        // Renders in its own window, so it costs the scrolling column no layout at all.
+        guideState?.let { state ->
+            ExerciseGuideSheet(
+                state = state,
+                onRetry = { viewModel.retryExerciseGuide() },
+                onSelectSuggestion = { viewModel.selectGuideSuggestion(it) },
+                onDismiss = { viewModel.closeExerciseGuide() },
+            )
         }
     }
 }
@@ -185,7 +198,8 @@ fun RecoveryCard(
 fun WorkoutCardToday(
     workout: Workout,
     onStatusChange: (SessionStatus) -> Unit,
-    onMoveToTomorrow: () -> Unit
+    onMoveToTomorrow: () -> Unit,
+    onExerciseClick: ((Exercise) -> Unit)? = null
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -278,7 +292,7 @@ fun WorkoutCardToday(
                 }
             } else {
                 // Same read-only rendering the expanded Week card uses.
-                WorkoutDetails(workout)
+                WorkoutDetails(workout, onExerciseClick = onExerciseClick)
             }
 
             if (isInteractive && parsedWorkout.exercises.isNotEmpty() && workout.appliedLighterVariant) {

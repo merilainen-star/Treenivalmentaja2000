@@ -463,6 +463,103 @@ class PlanValidatorTest {
     assertEquals(30, exercise.durationSec)
   }
 
+  // ------------------------------------------------------------------ guide reference
+
+  @Test
+  fun `a guide reference is accepted and carried through`() {
+    val outcome = validate(
+      planWithExercise(
+        """
+        { "name": "Penkkipunnerrus", "sets": 3, "reps": 8,
+          "guide": { "provider": "exercisedb", "id": "EIeI8Vf" } }
+        """
+      )
+    )
+
+    val exercise = (outcome as ValidationOutcome.Valid).plan.sessions.single().exercises!!.single()
+    assertEquals("exercisedb", exercise.guide!!.provider)
+    assertEquals("EIeI8Vf", exercise.guide!!.id)
+  }
+
+  /**
+   * A catalogue this build cannot read would mean guides that silently never appear. The writer
+   * should hear about it at import, not discover it mid-session.
+   */
+  @Test
+  fun `an unknown provider is rejected`() {
+    val errors = errorsOf(
+      planWithExercise(
+        """{ "name": "Kyykky", "reps": 10, "guide": { "provider": "fitnessapi", "id": "123" } }"""
+      )
+    )
+
+    assertEquals(listOf("weeks[0].sessions[0].exercises[0].guide.provider"), errors.map { it.path })
+    assertTrue(errors.single().message.contains("fitnessapi"))
+  }
+
+  /** Both sources a plan may name; neither has every movement, so both have to be accepted. */
+  @Test
+  fun `every known provider is accepted`() {
+    for (provider in listOf("exercisedb", "wger")) {
+      val outcome = validate(
+        planWithExercise(
+          """{ "name": "Lankku", "durationSec": 30,
+                "guide": { "provider": "$provider", "id": "458" } }"""
+        )
+      )
+
+      val exercise = (outcome as ValidationOutcome.Valid).plan.sessions.single().exercises!!.single()
+      assertEquals(provider, exercise.guide!!.provider)
+    }
+  }
+
+  @Test
+  fun `a guide without an id is rejected`() {
+    val paths = pathsOf(
+      planWithExercise(
+        """{ "name": "Kyykky", "reps": 10, "guide": { "provider": "exercisedb" } }"""
+      )
+    )
+
+    assertEquals(listOf("weeks[0].sessions[0].exercises[0].guide.id"), paths)
+  }
+
+  @Test
+  fun `a blank guide id is rejected`() {
+    val paths = pathsOf(
+      planWithExercise(
+        """{ "name": "Kyykky", "reps": 10, "guide": { "provider": "exercisedb", "id": "  " } }"""
+      )
+    )
+
+    assertEquals(listOf("weeks[0].sessions[0].exercises[0].guide.id"), paths)
+  }
+
+  /** Both problems in one object are reported together, like every other error in this file. */
+  @Test
+  fun `an empty guide object reports both missing fields`() {
+    val paths = pathsOf(
+      planWithExercise("""{ "name": "Kyykky", "reps": 10, "guide": {} }""")
+    )
+
+    assertEquals(
+      listOf(
+        "weeks[0].sessions[0].exercises[0].guide.provider",
+        "weeks[0].sessions[0].exercises[0].guide.id",
+      ),
+      paths,
+    )
+  }
+
+  /** Plans written before the field existed must keep importing exactly as they did. */
+  @Test
+  fun `an exercise without a guide is unaffected`() {
+    val outcome = validate(planWithExercise("""{ "name": "Lankku", "durationSec": 30 }"""))
+
+    val exercise = (outcome as ValidationOutcome.Valid).plan.sessions.single().exercises!!.single()
+    assertNull(exercise.guide)
+  }
+
   // ------------------------------------------------------------------ content hash
 
   @Test

@@ -51,7 +51,22 @@ data class Exercise(
    * this is present those three must not be, so there is never a second opinion about the load.
    */
   val setPlan: List<ExerciseSet>? = null,
+  /**
+   * Which movement this is in some outside catalogue, so the app can show what it looks like.
+   *
+   * A reference the plan's author wrote, like a URL — never anything fetched from the catalogue.
+   * See [GuideRef] and `docs/EXERCISE_GUIDE.md`.
+   */
+  val guide: GuideRef? = null,
 )
+
+/**
+ * A pointer into an exercise catalogue: which provider, and its own identifier for the movement.
+ *
+ * Nothing about *what to do* comes from here — reps, load and duration are the plan's, and the
+ * catalogue has no such fields. This only settles which animation and instructions to show.
+ */
+data class GuideRef(val provider: String, val id: String)
 
 /** One set of an exercise whose sets differ from each other. */
 data class ExerciseSet(

@@ -3,8 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     
-    <!-- Only use: fetching the rolling test build's metadata so Settings can say whether the
-         installed build is the current one. See data/update/UpdateService.kt. -->
+    <!-- Two uses, both read-only and both user-initiated:
+         1. fetching the rolling test build's metadata so Settings can say whether the installed
+            build is the current one — data/update/UpdateService.kt;
+         2. fetching an exercise guide when a movement is tapped, and nothing is kept afterwards —
+            data/guide/ExerciseDbProvider.kt and docs/EXERCISE_GUIDE.md. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

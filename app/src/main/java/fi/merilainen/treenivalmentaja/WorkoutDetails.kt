@@ -1,16 +1,27 @@
 package fi.merilainen.treenivalmentaja
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 
 /**
@@ -28,9 +39,17 @@ import fi.merilainen.treenivalmentaja.domain.WorkoutType
  *
  * The surrounding prose comes from the description either way, so warm-ups and rest instructions
  * survive.
+ *
+ * @param onExerciseClick opens the exercise guide. `null` leaves the rows inert, which is what
+ *   the screenshot tests and any caller without a ViewModel get: the guide is an extra, and a row
+ *   that cannot open one should not offer to.
  */
 @Composable
-fun WorkoutDetails(workout: Workout, modifier: Modifier = Modifier) {
+fun WorkoutDetails(
+    workout: Workout,
+    modifier: Modifier = Modifier,
+    onExerciseClick: ((Exercise) -> Unit)? = null,
+) {
     val parsed = remember(workout.description) { parseStrengthDescription(workout.description) }
     val fromPlan = workout.exercises.isNotEmpty()
     val fromText = workout.type == WorkoutType.STRENGTH && parsed.exercises.isNotEmpty()
@@ -56,11 +75,38 @@ fun WorkoutDetails(workout: Workout, modifier: Modifier = Modifier) {
                 }
                 if (fromPlan) {
                     workout.exercises.forEach { exercise ->
-                        Column(modifier = Modifier.padding(vertical = 2.dp)) {
-                            Text(
-                                text = "• ${exercise.name}",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .then(
+                                    if (onExerciseClick == null) Modifier
+                                    else Modifier.clickable(
+                                        role = Role.Button,
+                                        onClickLabel = "Näytä liikeohje",
+                                        onClick = { onExerciseClick(exercise) },
+                                    )
+                                )
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = "• ${exercise.name}",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                if (onExerciseClick != null) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        // The row carries the label; naming the icon too would
+                                        // make TalkBack announce the same thing twice.
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
                             val prescription = exercise.prescription()
                             if (prescription.isNotEmpty()) {
                                 Text(

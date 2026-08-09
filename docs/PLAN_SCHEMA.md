@@ -141,6 +141,7 @@ a session with none of them describes no actual work and is rejected.
 | `restSec` | integer | no | ≥ 0 if present. |
 | `notes` | string | no | Free text. |
 | `setPlan` | array of set objects | no | The sets spelled out, when they are not all alike. See below. |
+| `guide` | object | no | Which movement this is in an outside catalogue. See below. |
 
 An exercise must have at least one of `reps` or `durationSec`.
 
@@ -204,6 +205,49 @@ exercise that carries it, and runs that clock once per repetition of the hold:
 This matters because the alternative is counting in your head while holding a side plank. Write
 `"sivulankku"` with `durationSec: 20, perSide: true` and the app asks for both sides; write the
 duration into the name only, as `"sivulankku 20 s/puoli"` with no fields, and it cannot.
+
+#### `guide` — which movement this is
+
+**Added after schema v1 shipped. Optional and backwards compatible: a plan without it is read
+exactly as before.**
+
+A name is enough to recognise a movement you already know and useless for one you do not. Tapping
+an exercise opens an animation and a few lines of instruction, and `guide` is how the plan says
+which movement to fetch:
+
+```json
+{ "name": "Penkkipunnerrus", "sets": 3, "reps": 8,
+  "guide": { "provider": "exercisedb", "id": "EIeI8Vf" } }
+```
+
+| Field | Type | Required | Rules |
+| --- | --- | --- | --- |
+| `provider` | string | **yes** | `exercisedb` or `wger`. Any other value is an import error. |
+| `id` | string | **yes** | Non-blank. The provider's own identifier. |
+
+Two sources because neither has everything. ExerciseDB carries an animation for all 1500 of its
+movements but has no plank, side plank, plain squat, bird dog or cat-cow at all; wger has those,
+but only a third of its movements carry a picture. Pin each movement to whichever one has it.
+
+An unknown `provider` is rejected rather than ignored: a catalogue this build cannot read means
+guides that silently never appear, and the writer should hear about it at import.
+
+This is a reference the plan's author wrote, like a URL — **not** content fetched from the
+catalogue, so storing it is fine. Nothing that comes back from the lookup is ever stored; see
+[EXERCISE_GUIDE.md](EXERCISE_GUIDE.md).
+
+An exercise without `guide` is still tappable: the app searches the catalogue by name and offers
+what it finds as a suggestion. Finnish names almost never match, so writing `guide` is the only
+way to settle the question — and once written, it is settled for good.
+
+**Do not rename movements to English to make them match.** The `name` field is what you read
+mid-session and it stays Finnish; `guide` is what resolves the movement. The references already
+looked up for the current programme are listed in
+[EXERCISE_GUIDE.md](EXERCISE_GUIDE.md#the-references-this-programme-uses), along with the
+movements the catalogue simply does not have.
+
+Nothing changed in the database: exercises live in a single JSON column, so this needs no
+migration and no schema version bump.
 
 ### `lighterAlternative`
 Same optional fields as a session — `durationMin`, `distanceKm`, `intensity`, `rounds`,

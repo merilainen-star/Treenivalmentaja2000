@@ -4,22 +4,26 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 116 unit tests + 14 instrumented tests, all passing.
+**Status:** 174 unit tests + 18 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 116 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 14 screenshot comparisons (a subset of the 116 above)
-- `./gradlew :app:connectedDebugAndroidTest` — 14 tests / 0 failures / 0 errors
+- `./gradlew :app:testDebugUnitTest` — 174 tests / 0 failures / 0 errors
+- `./gradlew :app:verifyRoborazziDebug` — 21 screenshot comparisons (a subset of the 174 above)
+- `./gradlew :app:connectedDebugAndroidTest` — 18 tests / 0 failures / 0 errors
 
 | Suite | Covers |
 | --- | --- |
 | `domain/SessionStatusTest` | The normative transition table: terminal statuses, forbidden moves, no self-transitions. |
 | `domain/TrainingEngineTest` | Illness pause, gradual return after recovery, one missed session moving to the next rest day, several missed sessions shifting the plan. |
 | `domain/ResolveReminderUseCaseTest`, `domain/RescheduleAlarmsUseCaseTest`, `data/alarm/ReminderSchedulerTest` | Reminder resolution from settings, the 7-day alarm window, the REARM alarm. |
-| `data/importer/PlanValidatorTest` | Plan Schema v1: a valid document, unparseable text, missing/invalid fields, sessions with no content, duplicate session ids and week numbers, content hashing, and the `setPlan` rules. |
+| `data/importer/PlanValidatorTest` | Plan Schema v1: a valid document, unparseable text, missing/invalid fields, sessions with no content, duplicate session ids and week numbers, content hashing, and the `setPlan` and `guide` rules. |
+| `data/guide/ExerciseDbProviderTest` | The ExerciseDB responses, parsed from bodies captured off the live service, plus the statuses (404, 429, a Cloudflare 503 whose body is not JSON, an unreachable host) driven by a throwaway JDK `HttpServer`, and the filter that drops the fuzzy matcher's inventions. |
+| `data/guide/WgerProviderTest` | wger's payloads, captured from the live API, including one movement with nine pictures and one with none — two thirds of its movements are the second kind. Also the HTML-to-lines stripping and the per-image credit line, and that `search` makes no request at all. |
+| `domain/LoadExerciseGuideUseCaseTest` | Every state of the guide sheet: a reference resolved by the provider it names and not by the other, a reference not found never falling back to a name search, hits pooled from both sources, one source failing without hiding the other, suggestions, no match, retryable failures not being cached, and the in-memory cache being consulted. |
 | `data/repository/TrainingRepositoryTest` | Real Room schema in memory: import, event-history accumulation, rejected transitions writing nothing, lighter-version payload and fallback, reschedule chain, duplicate/conflict detection, seeding, cascade delete. |
 | `ExercisePrescriptionTest`, `ExerciseTimerRoundsTest` | How a prescription reads (`3 × 10 · 18 kg`, a ramp set by set) and how many times a timed movement's clock runs. |
 | `data/update/UpdateInfoParsingTest`, `domain/CheckForUpdateUseCaseTest` | The published build metadata, parsed through the real Moshi configuration, and the comparison against the installed version. |
-| `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, the recovery card, the update card, the import dialog and every status badge. |
+| `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, tappable exercise rows, every state of the exercise-guide sheet, the recovery card, the update card, the import dialog and every status badge. |
+| `ImageLoaderConfigurationTest` (instrumented) | That the image loader has no disk cache and creates no cache directory. A terms-of-use requirement, and a breach would leave no visible trace in the app — see [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md). |
 | `data/local/MigrationTest` (instrumented) | Room migration 3 → 4 against the KSP-generated schemas. |
 | `data/local/MigrationGuardTest` (instrumented) | That a missing migration throws and leaves the rows on disk, instead of emptying the database quietly. Fails if `fallbackToDestructiveMigration` is ever reintroduced. |
 | `data/alarm/ReminderReceiverTest`, `ReminderReceiverNoPermissionTest`, `BootReceiverTest` (instrumented) | Alarm delivery, the missing-notification-permission path, the BootReceiver action guard, and that a session belonging to a replaced plan is ignored. |

@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
@@ -53,6 +54,7 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorRed
 @Composable
 fun WeekScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
+    val guideState by viewModel.guideState.collectAsState()
 
     Column(
         modifier = Modifier
@@ -105,11 +107,23 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
                         }
                     } else {
                         dayWorkouts.forEach { workout ->
-                            WorkoutCardWeek(workout)
+                            WorkoutCardWeek(
+                                workout = workout,
+                                onExerciseClick = { viewModel.openExerciseGuide(it) },
+                            )
                         }
                     }
                 }
             }
+        }
+
+        guideState?.let { state ->
+            ExerciseGuideSheet(
+                state = state,
+                onRetry = { viewModel.retryExerciseGuide() },
+                onSelectSuggestion = { viewModel.selectGuideSuggestion(it) },
+                onDismiss = { viewModel.closeExerciseGuide() },
+            )
         }
     }
 }
@@ -123,13 +137,23 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
  * which is what the screenshot tests drive.
  */
 @Composable
-fun WorkoutCardWeek(workout: Workout) {
+fun WorkoutCardWeek(workout: Workout, onExerciseClick: ((Exercise) -> Unit)? = null) {
     var expanded by rememberSaveable(workout.id) { mutableStateOf(false) }
-    WorkoutCardWeek(workout = workout, expanded = expanded, onToggle = { expanded = !expanded })
+    WorkoutCardWeek(
+        workout = workout,
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+        onExerciseClick = onExerciseClick,
+    )
 }
 
 @Composable
-fun WorkoutCardWeek(workout: Workout, expanded: Boolean, onToggle: () -> Unit) {
+fun WorkoutCardWeek(
+    workout: Workout,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onExerciseClick: ((Exercise) -> Unit)? = null,
+) {
     val indicatorColor = when (workout.type) {
         WorkoutType.RUNNING -> ColorBlue
         WorkoutType.STRENGTH -> ColorGreen
@@ -236,7 +260,7 @@ fun WorkoutCardWeek(workout: Workout, expanded: Boolean, onToggle: () -> Unit) {
         ) {
             Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
                 HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
-                WorkoutDetails(workout)
+                WorkoutDetails(workout, onExerciseClick = onExerciseClick)
             }
         }
       }

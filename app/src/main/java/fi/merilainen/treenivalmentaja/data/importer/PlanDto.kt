@@ -67,6 +67,15 @@ data class ExerciseDto(
   val notes: String? = null,
   /** Per-set loads, when the sets are not all alike. See `docs/PLAN_SCHEMA.md`. */
   val setPlan: List<ExerciseSetDto?>? = null,
+  /** Which movement this is in an outside catalogue. See `docs/EXERCISE_GUIDE.md`. */
+  val guide: GuideRefDto? = null,
+)
+
+
+/** The plan author's pointer into an exercise catalogue. Both fields are required if present. */
+data class GuideRefDto(
+  val provider: String? = null,
+  val id: String? = null,
 )
 
 
