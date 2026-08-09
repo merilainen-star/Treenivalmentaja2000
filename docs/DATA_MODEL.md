@@ -78,6 +78,11 @@ promoted to their own table with a migration.
 [{ "name": "Kyykky", "sets": 3, "reps": 10, "weightKg": 60.0, "restSec": 90, "notes": null }]
 ```
 
+An exercise whose sets differ from each other carries `setPlan` instead of `sets`/`reps`/
+`weightKg` — see [PLAN_SCHEMA.md](PLAN_SCHEMA.md#setplan--sets-that-differ-from-each-other).
+Because the whole array is one column, fields can be added to it without a Room migration, which
+is why the schema is still at version 4.
+
 
 #### Reminder Resolution (`remindAtUtc`)
 `remindAtUtc` is a derived value, not a frozen snapshot from import. It dictates when the AlarmManager fires and controls the display order in the UI. It is recalculated automatically when:

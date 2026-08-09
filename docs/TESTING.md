@@ -4,23 +4,26 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 68 unit tests + 9 instrumented tests, all passing.
+**Status:** 116 unit tests + 14 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 68 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 8 screenshot comparisons (a subset of the 68 above)
-- `./gradlew :app:connectedDebugAndroidTest` — 9 tests / 0 failures / 0 errors
+- `./gradlew :app:testDebugUnitTest` — 116 tests / 0 failures / 0 errors
+- `./gradlew :app:verifyRoborazziDebug` — 14 screenshot comparisons (a subset of the 116 above)
+- `./gradlew :app:connectedDebugAndroidTest` — 14 tests / 0 failures / 0 errors
 
 | Suite | Covers |
 | --- | --- |
 | `domain/SessionStatusTest` | The normative transition table: terminal statuses, forbidden moves, no self-transitions. |
 | `domain/TrainingEngineTest` | Illness pause, gradual return after recovery, one missed session moving to the next rest day, several missed sessions shifting the plan. |
 | `domain/ResolveReminderUseCaseTest`, `domain/RescheduleAlarmsUseCaseTest`, `data/alarm/ReminderSchedulerTest` | Reminder resolution from settings, the 7-day alarm window, the REARM alarm. |
-| `data/importer/PlanValidatorTest` | Plan Schema v1: a valid document, unparseable text, missing/invalid fields, sessions with no content, duplicate session ids and week numbers, content hashing. |
+| `data/importer/PlanValidatorTest` | Plan Schema v1: a valid document, unparseable text, missing/invalid fields, sessions with no content, duplicate session ids and week numbers, content hashing, and the `setPlan` rules. |
 | `data/repository/TrainingRepositoryTest` | Real Room schema in memory: import, event-history accumulation, rejected transitions writing nothing, lighter-version payload and fallback, reschedule chain, duplicate/conflict detection, seeding, cascade delete. |
-| `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the recovery card and every status badge. |
+| `ExercisePrescriptionTest`, `ExerciseTimerRoundsTest` | How a prescription reads (`3 × 10 · 18 kg`, a ramp set by set) and how many times a timed movement's clock runs. |
+| `data/update/UpdateInfoParsingTest`, `domain/CheckForUpdateUseCaseTest` | The published build metadata, parsed through the real Moshi configuration, and the comparison against the installed version. |
+| `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, the recovery card, the update card, the import dialog and every status badge. |
 | `data/local/MigrationTest` (instrumented) | Room migration 3 → 4 against the KSP-generated schemas. |
 | `data/local/MigrationGuardTest` (instrumented) | That a missing migration throws and leaves the rows on disk, instead of emptying the database quietly. Fails if `fallbackToDestructiveMigration` is ever reintroduced. |
-| `data/alarm/ReminderReceiverTest`, `ReminderReceiverNoPermissionTest`, `BootReceiverTest` (instrumented) | Alarm delivery, the missing-notification-permission path, and the BootReceiver action guard. |
+| `data/alarm/ReminderReceiverTest`, `ReminderReceiverNoPermissionTest`, `BootReceiverTest` (instrumented) | Alarm delivery, the missing-notification-permission path, the BootReceiver action guard, and that a session belonging to a replaced plan is ignored. |
+| `ImportStartDialogTest` (instrumented) | That the import dialog returns the choice the user made. Returning it backwards would put a plan on the wrong dates while looking correct on screen, which no screenshot would catch. |
 
 **Gaps:** no ViewModel tests, and no test renders a whole screen — `TodayScreen`, `WeekScreen` and
 `SettingsScreen` each take a `WorkoutViewModel`, so screenshot cover stops at the stateless cards

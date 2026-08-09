@@ -26,24 +26,37 @@ the numbers behind them.
 - Main layout scaffold with Bottom Navigation.
 - `TodayScreen`, `WeekScreen` and `SettingsScreen`.
 
+## Completed (after Phase 3)
+- Test APK distribution: every push to `main` that touches code builds, verifies and republishes a
+  rolling GitHub prerelease, and Settings says whether the installed build is the current one.
+- Import asks where a plan lands — the file's dates, or starting today — and replaces the previous
+  plan rather than leaving it behind.
+- Exercises are shown as the plan wrote them: prescriptions (`3 × 12 · 17,5 kg`), per-set ramps,
+  and clocks for timed movements that run once per side or per set.
+
 ## In Progress
-- Nothing. The app is being used for a few days in real training before the next milestone
-  starts, so that whatever Oura eventually feeds has a working app underneath it.
+- Nothing. The app is being used in real training between milestones.
 
 ## Next Milestone
-1. **Screen state hoisting.** Split each screen into a stateless `…Content(state, callbacks)` and
+1. **Exercise guides** — tap a movement, see an animation and instructions. Fully specified in
+   [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md), including the ExerciseDB terms that constrain it: free
+   personal use is permitted with attribution, persistent caching is not.
+2. **Screen state hoisting.** Split each screen into a stateless `…Content(state, callbacks)` and
    a thin stateful wrapper. Today the screens take a `WorkoutViewModel` directly, so nothing can
    render one in a test and `WorkoutViewModel` has no tests at all.
-2. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
+3. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
    credentials until the end.
-3. **In-app OAuth2 token exchange with PKCE**
+4. **In-app OAuth2 token exchange with PKCE**
    ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend), tokens in
    `EncryptedSharedPreferences`.
-4. **WorkManager** for background biometric syncing.
-5. **Feed readiness into the recovery card**, which is a fixed placeholder today and is the first
+5. **WorkManager** for background biometric syncing.
+6. **Feed readiness into the recovery card**, which is a fixed placeholder today and is the first
    point at which the Oura work becomes visible to the user.
 
 ## Later (Phase 4 & Beyond)
+- Logging what was actually lifted, so a strength session can be compared with the last time it
+  was done. Oura holds completed workouts but not per-set loads, so the "history lives in Oura"
+  reasoning does not cover this one.
 - Remote AI advisor integration (sending prompt, parsing JSON, user approval flow).
 - Strava API integration for richer workout telemetry.
 

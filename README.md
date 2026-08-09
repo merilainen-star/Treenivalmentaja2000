@@ -16,9 +16,12 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 - Deterministic training engine: missed sessions, plan shifting, illness pause and the graduated
   return
 - AlarmManager reminders with a 7-day window, restored after reboot, reinstall and timezone change
+- Exercises shown as the plan wrote them, with loads, per-set ramps and clocks for timed movements
+- Rolling test APK built by GitHub Actions, with an in-app check for whether the build is current
 - App icon and splash screen
 
 **Planned / Missing:**
+- Exercise guides — animation and instructions per movement ([plan](docs/EXERCISE_GUIDE.md))
 - Oura API V2 integration (OAuth exchange happens in-app; no backend — see ADR-006)
 - WorkManager integration (background sync)
 - Remote AI advisor
@@ -91,6 +94,7 @@ backend to set up ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-th
 - [API Integrations](docs/API_INTEGRATIONS.md)
 - [Authentication](docs/AUTHENTICATION.md)
 - [Training Engine](docs/TRAINING_ENGINE.md)
+- [Exercise Guide (planned)](docs/EXERCISE_GUIDE.md)
 - [Notifications](docs/NOTIFICATIONS.md)
 - [Security](docs/SECURITY.md)
 - [Testing](docs/TESTING.md)

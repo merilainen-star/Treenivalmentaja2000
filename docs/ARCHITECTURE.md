@@ -4,7 +4,10 @@ This document outlines the architecture for the Treenivalmentaja Android applica
 *(Note: the local half of this architecture — Compose UI, `WorkoutViewModel`, `TrainingEngine`,
 `TrainingRepository`, Room and the AlarmManager reminders — is **implemented**. Everything
 involving Oura — the Retrofit clients, OAuth, WorkManager sync and workout matching — is
-**planned**; the Oura tables exist in the database but nothing writes to them.)*
+**planned**; the Oura tables exist in the database but nothing writes to them. One network call
+does exist: the update check in `data/update`, a single `HttpURLConnection` GET of the published
+build's metadata. Exercise guides in [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md) are specified but not
+built.)*
 
 ## System Context
 The application is a standalone Android app that acts as an offline-first training companion. It
@@ -72,7 +75,9 @@ immutable `SessionEvent`. The session table holds current state; the event table
 append-only history. See [DATA_MODEL.md](DATA_MODEL.md) and [TRAINING_ENGINE.md](TRAINING_ENGINE.md).
 
 ### Notification Scheduling Flow
-When the training plan in Room changes, a Use Case calculates upcoming alarms and updates Android's `AlarmManager` with exact alarms for training reminders.
+When the training plan in Room changes, a use case calculates upcoming alarms and updates
+Android's `AlarmManager`. The alarms are **inexact** (`setAndAllowWhileIdle`), which keeps the app
+clear of the exact-alarm permission, and only sessions belonging to the active plan are scheduled.
 
 ### Plan Import & Rescheduling Flow
 - Plans are imported as JSON in the [Treenivalmentaja Training Plan Schema v1](PLAN_SCHEMA.md),
@@ -80,8 +85,11 @@ When the training plan in Room changes, a Use Case calculates upcoming alarms an
 - The importer parses, then **validates before writing**: nothing reaches Room unless the whole
   document is valid. Errors are returned as a list of human-readable Finnish messages with a JSON
   path, and duplicate plans/sessions are detected up front.
-- The Local Deterministic Rule Engine checks completed vs. planned sessions and automatically
-  shifts or adjusts the schedule if sessions are missed.
+- The deterministic engine can shift the schedule when sessions are missed, but **never on its
+  own**. It used to run at every launch, which meant installing a build rewrote the calendar; it
+  now needs an explicit trigger. See `WorkoutViewModel.checkMissedSessions`.
+- Importing a plan **replaces** the previous one: the old plan and its sessions are deleted, not
+  deactivated. See [DATA_MODEL.md](DATA_MODEL.md#replacing-a-plan).
 
 ### Workout Matching Flow
 Oura workouts (potentially imported from Strava/Suunto) are synced and matched against the planned sessions in Room based on time, duration, and type.

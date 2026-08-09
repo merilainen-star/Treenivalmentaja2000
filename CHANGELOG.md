@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-09
+
+### Added
+- Exercises are shown as the plan wrote them: the prescription under each name
+  (`3 × 12 · 17,5 kg`, `10 / puoli`, `30 s`), and a clock for timed movements that runs once per
+  side or per set. Previously the screens printed only the name, and decided a movement was timed
+  by looking for "lankku" in it.
+- `setPlan` on an exercise, for sets that differ from each other — a ramp such as 25/35/45/55 kg,
+  or reps that fall as the load climbs. Optional and backwards compatible; no Room migration.
+- Import asks where a plan should land: on the file's own dates, or shifted so day one is today.
+- Settings says whether the installed build is the one GitHub Actions last published, and offers
+  the download when it is not.
+- [docs/EXERCISE_GUIDE.md](docs/EXERCISE_GUIDE.md) — the plan for per-movement animations and
+  instructions, including the ExerciseDB terms that constrain it.
+
+### Fixed
+- App startup rewrote the training calendar. With a plan whose dates had passed, the engine
+  counted every past session as missed and shifted the whole programme so week 1 landed on today,
+  restarting an eight-week plan from the beginning on every launch — including the one after an
+  app update.
+- A replaced plan kept sending its own reminders: alarm scheduling had no active-plan filter, so a
+  superseded programme notified beside the current one.
+- Importing now deletes the plan it replaces instead of deactivating it, so the database stops
+  growing and dead sessions cannot hold alarms.
+- The week row's press ripple grew to the height of the expanded card, sweeping a grey circle
+  across the exercise list.
+- `tools/backup-db.ps1` did not work in either direction; every step of the copy path was wrong.
+
 ## [Unreleased] - 2026-08-08
 
 ### Added
