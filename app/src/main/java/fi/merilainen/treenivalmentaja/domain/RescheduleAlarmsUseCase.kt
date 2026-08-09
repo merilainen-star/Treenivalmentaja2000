@@ -29,7 +29,10 @@ class RescheduleAlarmsUseCase(
 
     val settings = settingsStore.settingsFlow.first()
 
-    val plannedSessions = sessionDao.getByStatus(SessionStatus.PLANNED)
+    // Active plan only. A replaced plan keeps its rows — importing deactivates the old plan
+    // rather than deleting it — and scheduling from every PLANNED row made a superseded
+    // programme carry on notifying beside the current one.
+    val plannedSessions = sessionDao.getByStatusInActivePlan(SessionStatus.PLANNED)
 
     if (plannedSessions.isEmpty()) {
         settingsStore.updateAlarmCount(0)

@@ -62,6 +62,22 @@ interface WorkoutSessionDao {
   @Query("SELECT * FROM workout_sessions WHERE status = :status")
   suspend fun getByStatus(status: SessionStatus): List<WorkoutSessionEntity>
 
+  /**
+   * The same, restricted to the plan currently in use.
+   *
+   * Importing a plan deactivates the previous one but leaves its rows in place, so [getByStatus]
+   * still returns sessions belonging to plans the user has replaced. Scheduling alarms from that
+   * list makes a superseded programme keep sending reminders alongside the current one.
+   */
+  @Query(
+    """
+    SELECT s.* FROM workout_sessions s
+    INNER JOIN training_plans p ON p.id = s.planId
+    WHERE p.isActive = 1 AND s.status = :status
+    """
+  )
+  suspend fun getByStatusInActivePlan(status: SessionStatus): List<WorkoutSessionEntity>
+
   @Query("SELECT * FROM workout_sessions WHERE planId = :planId ORDER BY remindAtUtc ASC")
   suspend fun getByPlan(planId: String): List<WorkoutSessionEntity>
 

@@ -68,6 +68,15 @@ class TrainingRepository(
 
   suspend fun getSession(id: String): TrainingSession? = sessionDao.getById(id)?.toDomain()
 
+  /**
+   * True when [session] belongs to the plan currently in use.
+   *
+   * Importing a plan deactivates the previous one instead of deleting it, so a session can be
+   * perfectly valid and still belong to a programme the user has replaced.
+   */
+  suspend fun isInActivePlan(session: TrainingSession): Boolean =
+    planDao.getActivePlanId() == session.planId
+
   suspend fun activePlanTimeZone(): ZoneId =
     planDao.getActivePlan()?.let { runCatching { ZoneId.of(it.timeZone) }.getOrNull() }
       ?: clock.zone

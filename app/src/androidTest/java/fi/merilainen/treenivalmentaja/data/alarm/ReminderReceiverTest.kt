@@ -77,6 +77,36 @@ class ReminderReceiverTest {
         assertEquals(EventSource.ALARM, lastEvent.source)
     }
 
+    /**
+     * An alarm outlives the plan it was set for: replacing a plan deactivates the old one but
+     * leaves its sessions, and anything already in AlarmManager still fires. The receiver is the
+     * last place that can stop it, and the only one that helps for alarms set before the fix.
+     */
+    @Test
+    fun receiverIgnoresASessionFromAReplacedPlan() = runBlocking {
+        app.db.trainingPlanDao().insert(
+            fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity(
+                id = "plan-old", name = "Replaced", schemaVersion = 1,
+                timeZone = "Europe/Helsinki", startDate = "2026-07-01",
+                description = null, createdAt = 1000, contentHash = "old", isActive = false
+            )
+        )
+        app.db.workoutSessionDao().insert(
+            fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity(
+                id = "s-old", planId = "plan-old", type = WorkoutType.STRENGTH, weekNumber = 1,
+                scheduledDate = "2026-07-01", scheduledTime = "18:00",
+                remindAtUtc = 1690902000000, durationMin = 60, description = "Viikko 1/8",
+                status = SessionStatus.PLANNED, updatedAt = 1000
+            )
+        )
+
+        receiver.onReceive(app, Intent().apply { putExtra("SESSION_ID", "s-old") })
+        Thread.sleep(1000)
+
+        // Still PLANNED: no transition, and therefore no notification either.
+        assertEquals(SessionStatus.PLANNED, app.repository.getSession("s-old")?.status)
+    }
+
     @Test
     fun receiverDoesNothingIfSessionIsCompleted() = runBlocking {
         app.db.workoutSessionDao().insert(

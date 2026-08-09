@@ -34,6 +34,12 @@ class ReminderReceiver : BroadcastReceiver() {
 
                 val session = app.repository.getSession(sessionId) ?: return@launch
                 if (session.status != SessionStatus.PLANNED) return@launch
+                // An alarm outlives the plan it was set for. Replacing a plan deactivates the old
+                // one but leaves its sessions in the database, and any alarm already sitting in
+                // AlarmManager still fires — which is how a replaced programme announced week 1
+                // beside the current week 4. Checked here as well as at scheduling time, because
+                // this is the only thing that can stop an alarm that was set before the fix.
+                if (!app.repository.isInActivePlan(session)) return@launch
                 if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     return@launch
                 }

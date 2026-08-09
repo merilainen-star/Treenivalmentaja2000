@@ -84,6 +84,40 @@ class RescheduleAlarmsUseCaseTest {
         db.close()
     }
 
+    /**
+     * Importing a plan deactivates the previous one but leaves its rows in the database, so a
+     * replaced programme used to keep its alarms: one morning arrived with a reminder for week
+     * 4/8 of the current plan and another for week 1/8 of the plan it had replaced.
+     */
+    @Test
+    fun ignoresSessionsBelongingToAReplacedPlan() = runTest {
+        val day = 24L * 60 * 60 * 1000
+        val oldPlan = fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity(
+            id = "p0", name = "Vanha ohjelma", description = null, timeZone = "Europe/Helsinki",
+            isActive = false, schemaVersion = 1, startDate = "2026-01-01", contentHash = "old",
+            createdAt = testNow
+        )
+        db.trainingPlanDao().insert(oldPlan)
+        db.workoutSessionDao().insert(
+            fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity(
+                id = "s-ghost", planId = "p0", originalSessionId = null,
+                scheduledDate = java.time.LocalDate.now().plusDays(2).toString(),
+                scheduledTime = null, durationMin = 1,
+                type = fi.merilainen.treenivalmentaja.domain.WorkoutType.STRENGTH,
+                timeIsFixed = false, intensity = null, weekNumber = 1, distanceKm = null,
+                description = null, reminderOverride = null,
+                status = fi.merilainen.treenivalmentaja.domain.SessionStatus.PLANNED,
+                remindAtUtc = testNow + 2 * day, updatedAt = testNow
+            )
+        )
+
+        useCase.execute()
+
+        val scheduledIds = scheduler.scheduled.map { it.first }
+        assertTrue("the replaced plan must not be scheduled", !scheduledIds.contains("s-ghost"))
+        assertTrue("the active plan must still be scheduled", scheduledIds.contains("s-3"))
+    }
+
     @Test
     fun schedulesSessionWithin7Days() = runTest {
         useCase.execute()
