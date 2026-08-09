@@ -96,7 +96,10 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   them actually planks; picking one kept the `Ehdotus` warning; and a movement hit a real `503`
   and drew the retry state, which retried. `cacheDir` held nothing but itself afterwards.
 
-  Reachable from the read-only list and from a started workout's checklist alike — the two draw
+  A started workout runs the list in order: the clock belongs to the movement you are on, its
+  last round ticks that movement off, and the rest stay locked until you get there. Walking back
+  is one step at a time. Reachable from the read-only list and from a started workout's checklist
+  alike — the two draw
   the same movements from the same place, so nothing the plan knows is lost the moment you tap
   "Aloita ohjattu treeni".
 

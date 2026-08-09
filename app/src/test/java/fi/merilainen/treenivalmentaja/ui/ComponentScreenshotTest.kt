@@ -417,8 +417,13 @@ class ComponentScreenshotTest {
     /**
      * A started workout, drawn from the plan's own movements rather than from its description.
      *
-     * The two things that were missing before: every movement is tappable for its guide, and a
-     * per-side hold gets a clock that knows it runs twice — "Vasen 1/2" is the whole point.
+     * Three things at once, all of which were wrong or missing before: every movement is tappable
+     * for its guide, the movement you are on carries a clock that knows a per-side hold runs
+     * twice ("Vasen 1/2"), and the ones below it are locked until it is done — a workout is a
+     * sequence, and the checkboxes now say so.
+     *
+     * The timed movement is first on purpose: the clock belongs to the current row alone, so a
+     * capture of the opening state only shows one if the first movement has one.
      */
     @Test
     fun todayCard_startedFromThePlan() = capture("today_card_started_from_plan") {
@@ -428,18 +433,18 @@ class ComponentScreenshotTest {
                 description = "Palauttava core ja liikkuvuus. Tauko 30 s liikkeiden välissä.",
                 rounds = 1,
                 exercises = listOf(
+                    Exercise(
+                        name = "Sivulankku",
+                        durationSec = 20,
+                        perSide = true,
+                        guide = GuideRef("wger", "580"),
+                    ),
                     Exercise(name = "Kissanlehmä", reps = 10, guide = GuideRef("wger", "1938")),
                     Exercise(
                         name = "Bird dog",
                         reps = 10,
                         perSide = true,
                         guide = GuideRef("wger", "1572"),
-                    ),
-                    Exercise(
-                        name = "Sivulankku",
-                        durationSec = 20,
-                        perSide = true,
-                        guide = GuideRef("wger", "580"),
                     ),
                 ),
             ),

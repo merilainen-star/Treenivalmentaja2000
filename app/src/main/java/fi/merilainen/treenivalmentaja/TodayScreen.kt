@@ -32,21 +32,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Checkbox
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.delay
-import androidx.compose.foundation.layout.PaddingValues
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -236,6 +226,22 @@ fun WorkoutCardToday(
                 }
 
                 val rounds = if (fromPlan) workout.rounds else parsedWorkout.rounds
+                val perRound =
+                    if (fromPlan) workout.exercises.size else parsedWorkout.exercises.size
+                val total = rounds * perRound
+
+                // How far down the list the session has got, as one number.
+                //
+                // A workout is a sequence, not a set of independent boxes: the third round of an
+                // exercise cannot be done before the second, and a movement ticked off by mistake
+                // is undone by walking back, not by reaching into the middle. One counter says
+                // all of that — a row is done below it, current at it, and not yet reachable
+                // above it — and there is no way to represent an order that never happened.
+                var completed by rememberSaveable(workout.id) { mutableIntStateOf(0) }
+                // The plan can change under a started session ("Kevyempi versio" swaps the list),
+                // so the counter is read through a clamp rather than trusted blindly.
+                val done = completed.coerceIn(0, total)
+
                 for (round in 1..rounds) {
                     if (rounds > 1) {
                         Text(
@@ -245,38 +251,23 @@ fun WorkoutCardToday(
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    if (fromPlan) {
-                        workout.exercises.forEachIndexed { index, exercise ->
-                            // Keyed by round so each round gets its own checkbox and its own
-                            // clock, rather than inheriting the previous round's finished ones.
-                            key(round, index, exercise.name) {
-                                GuidedExerciseRow(
-                                    exercise = exercise,
-                                    onExerciseClick = onExerciseClick,
-                                )
-                            }
-                        }
-                    } else {
-                        parsedWorkout.exercises.forEachIndexed { index, exercise ->
-                            key(round, index, exercise.name) {
-                                var checked by remember { mutableStateOf(false) }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Checkbox(
-                                        checked = checked,
-                                        onCheckedChange = { checked = it }
-                                    )
-                                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                                        Text(text = exercise.name, style = MaterialTheme.typography.bodyLarge)
-                                        if (exercise.isPlank && exercise.plankDurationSeconds != null && !checked) {
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            PlankTimer(durationSeconds = exercise.plankDurationSeconds)
-                                        }
-                                    }
-                                }
-                            }
+                    for (position in 0 until perRound) {
+                        val index = (round - 1) * perRound + position
+                        // Keyed by its place in the sequence so each round gets its own row and
+                        // its own clock, rather than inheriting the previous round's finished one.
+                        key(round, position) {
+                            GuidedExerciseRow(
+                                exercise =
+                                    if (fromPlan) workout.exercises[position]
+                                    else parsedWorkout.exercises[position].asExercise(),
+                                checked = index < done,
+                                // Only the next movement can be ticked, and only the last ticked
+                                // one can be unticked.
+                                enabled = index == done || index == done - 1,
+                                isCurrent = index == done,
+                                onCheckedChange = { completed = if (it) index + 1 else index },
+                                onExerciseClick = onExerciseClick.takeIf { fromPlan },
+                            )
                         }
                     }
                 }
@@ -368,19 +359,26 @@ fun WorkoutCardToday(
  * One movement of a started workout: tick it off, see what it asks for, open its guide, and run
  * its clock as many times as the movement actually needs.
  *
- * The clock is [ExerciseTimer], the same one the read-only list uses, so a hold done per side asks
- * for both sides and only calls itself done when both have run. The old checklist used a
- * single-shot timer that decided a movement was timed by looking for "lankku" in its name, which
- * is why a side plank offered one clock for two sides.
+ * The clock only appears on the movement you are actually on. That is what makes the sequence
+ * real rather than advisory — and it is also why there is no "Valmis / Alusta" left to read: the
+ * last round ticks the row, the row stops being current, and the clock goes with it. Untick the
+ * row and it comes back at the first side, because the clock's state lives only as long as it is
+ * on screen.
  */
 @Composable
-private fun GuidedExerciseRow(exercise: Exercise, onExerciseClick: ((Exercise) -> Unit)?) {
-    var checked by remember { mutableStateOf(false) }
+private fun GuidedExerciseRow(
+    exercise: Exercise,
+    checked: Boolean,
+    enabled: Boolean,
+    isCurrent: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onExerciseClick: ((Exercise) -> Unit)?,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Checkbox(checked = checked, onCheckedChange = { checked = it })
+        Checkbox(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
         Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
             ExerciseNameRow(
                 text = exercise.name,
@@ -394,14 +392,28 @@ private fun GuidedExerciseRow(exercise: Exercise, onExerciseClick: ((Exercise) -
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            // Ticked off means done, so the clock goes rather than inviting another run.
-            if (exercise.durationSec != null && !checked) {
+            if (isCurrent && exercise.durationSec != null) {
                 Spacer(modifier = Modifier.height(4.dp))
-                ExerciseTimer(exercise = exercise)
+                // The last round ticks the movement off, so finishing the clock and marking it
+                // done are the same act rather than two things to remember.
+                ExerciseTimer(
+                    exercise = exercise,
+                    onAllRoundsCompleted = { onCheckedChange(true) },
+                )
             }
         }
     }
 }
+
+/**
+ * A movement read out of the description, dressed as one the plan wrote.
+ *
+ * Only the duration survives the guess — `parseStrengthDescription` decides a movement is timed by
+ * finding "lankku" in its name — but it is enough to hand the same clock to plans written before
+ * the `exercises` array existed, instead of keeping a second timer alive for them.
+ */
+private fun ParsedExercise.asExercise(): Exercise =
+    Exercise(name = name, durationSec = plankDurationSeconds?.takeIf { isPlank })
 
 @Composable
 fun WorkoutStatusBadge(status: SessionStatus) {
@@ -481,110 +493,4 @@ fun parseStrengthDescription(desc: String): ParsedWorkout {
     }
     
     return ParsedWorkout(intro, exercises, outro, rounds)
-}
-
-
-@Composable
-fun PlankTimer(durationSeconds: Int) {
-    var timeLeft by remember { mutableIntStateOf(durationSeconds) }
-    var isRunning by remember { mutableStateOf(false) }
-    var showDialog by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    
-    LaunchedEffect(isRunning, showDialog) {
-        if (isRunning && showDialog) {
-            while (timeLeft > 0) {
-                delay(1000)
-                timeLeft--
-            }
-            isRunning = false
-            try {
-                val notification = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-                val r = android.media.RingtoneManager.getRingtone(context, notification)
-                r.play()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            showDialog = false
-        }
-    }
-    
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (timeLeft > 0) {
-            Text(
-                text = "${timeLeft} s",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Button(
-                onClick = { 
-                    showDialog = true
-                    isRunning = true 
-                },
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text("Aloita")
-            }
-        } else {
-            Text("Aika täysi!", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        }
-    }
-    
-    if (showDialog) {
-        Dialog(onDismissRequest = { 
-            showDialog = false
-            isRunning = false 
-        }) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "Lankku",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    val progress by animateFloatAsState(
-                        targetValue = timeLeft.toFloat() / durationSeconds.toFloat(),
-                        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
-                        label = "progress"
-                    )
-                    Box(contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.size(240.dp),
-                            strokeWidth = 16.dp,
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                        )
-                        Text(
-                            text = "$timeLeft",
-                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(32.dp))
-                    Button(
-                        onClick = { 
-                            showDialog = false
-                            isRunning = false 
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Keskeytä")
-                    }
-                }
-            }
-        }
-    }
 }

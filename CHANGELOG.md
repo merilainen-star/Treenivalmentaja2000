@@ -41,6 +41,17 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   instructions, including the ExerciseDB terms that constrain it.
 
 ### Fixed
+- The countdown lost its face. Moving timed movements onto the plan's own fields replaced the
+  full-screen clock — a 240dp ring emptying around a 72pt number — with a line of small text, and
+  dropped the notification sound at zero. A hold is done with your eyes shut or your face at the
+  floor, so both are back, now for every timed movement rather than only the ones with "lankku"
+  in their name.
+- A started workout is a sequence again, and behaves like one. You could tick movements off in
+  any order, including skipping ahead, and a finished clock left a "Valmis / Alusta" line to read
+  and dismiss. Now the last round of a movement's clock ticks it off by itself, only the movement
+  you are on can be ticked, and only the last one ticked can be unticked — which walks the
+  session back one step at a time and resets that movement's clock. Everything below the current
+  movement is visibly locked.
 - A started workout lost half of what the plan knows about it. "Aloita ohjattu treeni" rendered
   its checklist from the session's free-text description rather than the plan's `exercises`
   array, so mid-session there were no guide links, no prescriptions, and the movement names came
@@ -49,7 +60,8 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   per-side hold offered one clock for two sides, and there was no way to time the second. It now
   draws from the same movements the read-only list does, so a side plank asks for Vasen and then
   Oikea, and every movement is still tappable for its guide while the workout is running. Plans
-  with no `exercises` array keep the old description-parsing path. With a plan whose dates had passed, the engine
+  with no `exercises` array keep the old description-parsing path.
+- App startup rewrote the training calendar. With a plan whose dates had passed, the engine
   counted every past session as missed and shifted the whole programme so week 1 landed on today,
   restarting an eight-week plan from the beginning on every launch — including the one after an
   app update.

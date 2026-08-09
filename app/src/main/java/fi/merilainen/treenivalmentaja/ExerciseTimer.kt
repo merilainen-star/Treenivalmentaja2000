@@ -1,10 +1,25 @@
 package fi.merilainen.treenivalmentaja
 
+import android.content.Context
+import android.media.RingtoneManager
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -17,8 +32,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import kotlinx.coroutines.delay
 
@@ -81,31 +99,48 @@ private fun formatKg(kg: Double): String {
 }
 
 /**
+ * The device's notification sound, for the moment a hold ends.
+ *
+ * A hold is done with your eyes shut or your face at the floor, so the clock reaching zero has to
+ * be audible. Failing to ring is not worth crashing over: a silenced phone, a missing default
+ * tone or a locked audio focus all end up here.
+ */
+internal fun playTimerFinishedSound(context: Context) {
+    runCatching {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        RingtoneManager.getRingtone(context, uri)?.play()
+    }
+}
+
+/**
  * The clock for one timed exercise, run once per entry in [timedRounds].
+ *
+ * The countdown happens in a dialog with a ring that empties as it goes: a hold is done looking at
+ * the floor, so the number has to be readable at arm's length and the end has to be audible.
+ * Running it as a line of small text was a regression — it looked fine on a screenshot and was
+ * useless in a plank.
  *
  * Each round is ticked off as it finishes, so the exercise is only done when they all are and
  * there is never a question of which side is still owed.
+ *
+ * @param onAllRoundsCompleted called when the last round ends. The guided checklist uses it to
+ *   mark the movement done, which is also what removes this clock from the screen — so there is
+ *   no "Valmis / Alusta" state to read and dismiss. Where nothing is listening (the read-only
+ *   list) the clock says it is finished and offers to start over.
  */
 @Composable
-fun ExerciseTimer(exercise: Exercise, modifier: Modifier = Modifier) {
+fun ExerciseTimer(
+    exercise: Exercise,
+    modifier: Modifier = Modifier,
+    onAllRoundsCompleted: (() -> Unit)? = null,
+) {
     val seconds = exercise.durationSec ?: return
     val rounds = remember(exercise) { exercise.timedRounds() }
     if (rounds.isEmpty()) return
 
+    val context = LocalContext.current
     var completed by remember(exercise) { mutableIntStateOf(0) }
-    var timeLeft by remember(exercise) { mutableIntStateOf(seconds) }
     var running by remember(exercise) { mutableStateOf(false) }
-
-    LaunchedEffect(running, completed) {
-        if (!running) return@LaunchedEffect
-        while (timeLeft > 0) {
-            delay(1000)
-            timeLeft--
-        }
-        running = false
-        completed++
-        timeLeft = seconds
-    }
 
     val allDone = completed >= rounds.size
 
@@ -120,7 +155,7 @@ fun ExerciseTimer(exercise: Exercise, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary
             )
-            TextButton(onClick = { completed = 0; timeLeft = seconds }) { Text("Alusta") }
+            TextButton(onClick = { completed = 0 }) { Text("Alusta") }
             return@Row
         }
 
@@ -134,16 +169,106 @@ fun ExerciseTimer(exercise: Exercise, modifier: Modifier = Modifier) {
             )
         }
         Text(
-            text = "$timeLeft s",
+            text = "$seconds s",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold
         )
         Button(
-            onClick = { running = !running },
+            onClick = { running = true },
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
             modifier = Modifier.height(32.dp)
         ) {
-            Text(if (running) "Tauko" else "Käynnistä")
+            Text("Käynnistä")
+        }
+    }
+
+    if (running && !allDone) {
+        CountdownDialog(
+            title = exercise.name,
+            round = rounds[completed].takeIf { it.isNotEmpty() }
+                ?.let { "$it ${completed + 1}/${rounds.size}" },
+            seconds = seconds,
+            onCancelled = { running = false },
+            onFinished = {
+                playTimerFinishedSound(context)
+                running = false
+                completed++
+                if (completed >= rounds.size) onAllRoundsCompleted?.invoke()
+            },
+        )
+    }
+}
+
+/**
+ * The countdown itself: one number, one ring, one way out.
+ *
+ * Keyed on nothing but its own composition — it exists only while a round is running, so opening
+ * it again always starts from the top.
+ */
+@Composable
+private fun CountdownDialog(
+    title: String,
+    round: String?,
+    seconds: Int,
+    onCancelled: () -> Unit,
+    onFinished: () -> Unit,
+) {
+    var timeLeft by remember { mutableIntStateOf(seconds) }
+
+    LaunchedEffect(Unit) {
+        while (timeLeft > 0) {
+            delay(1000)
+            timeLeft--
+        }
+        onFinished()
+    }
+
+    Dialog(onDismissRequest = onCancelled) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(text = title, style = MaterialTheme.typography.headlineSmall)
+                if (round != null) {
+                    Text(
+                        text = round,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+                val progress by animateFloatAsState(
+                    targetValue = timeLeft.toFloat() / seconds.toFloat(),
+                    animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
+                    label = "progress"
+                )
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.size(240.dp),
+                        strokeWidth = 16.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    )
+                    Text(
+                        text = "$timeLeft",
+                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 72.sp),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(onClick = onCancelled, modifier = Modifier.fillMaxWidth()) {
+                    Text("Keskeytä")
+                }
+            }
         }
     }
 }
