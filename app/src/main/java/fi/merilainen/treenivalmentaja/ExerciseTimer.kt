@@ -123,16 +123,17 @@ internal fun playTimerFinishedSound(context: Context) {
  * Each round is ticked off as it finishes, so the exercise is only done when they all are and
  * there is never a question of which side is still owed.
  *
- * @param onAllRoundsCompleted called when the last round ends. The guided checklist uses it to
- *   mark the movement done, which is also what removes this clock from the screen — so there is
- *   no "Valmis / Alusta" state to read and dismiss. Where nothing is listening (the read-only
- *   list) the clock says it is finished and offers to start over.
+ * Only the started workout shows one of these, and only on the movement it is on. That is why
+ * there is no finished state to draw: the last round marks the movement done, the movement stops
+ * being current, and the clock goes with it.
+ *
+ * @param onAllRoundsCompleted called when the last round ends, to mark the movement done.
  */
 @Composable
 fun ExerciseTimer(
     exercise: Exercise,
     modifier: Modifier = Modifier,
-    onAllRoundsCompleted: (() -> Unit)? = null,
+    onAllRoundsCompleted: () -> Unit,
 ) {
     val seconds = exercise.durationSec ?: return
     val rounds = remember(exercise) { exercise.timedRounds() }
@@ -142,23 +143,15 @@ fun ExerciseTimer(
     var completed by remember(exercise) { mutableIntStateOf(0) }
     var running by remember(exercise) { mutableStateOf(false) }
 
-    val allDone = completed >= rounds.size
+    // The caller is about to remove this clock; drawing a finished state would be a flash of
+    // something nobody is meant to read.
+    if (completed >= rounds.size) return
 
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (allDone) {
-            Text(
-                text = "Valmis",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            TextButton(onClick = { completed = 0 }) { Text("Alusta") }
-            return@Row
-        }
-
         // A blank label means a single unnamed round, so nothing is announced for "lankku 30 s".
         val label = rounds[completed]
         if (label.isNotEmpty()) {
@@ -182,7 +175,7 @@ fun ExerciseTimer(
         }
     }
 
-    if (running && !allDone) {
+    if (running) {
         CountdownDialog(
             title = exercise.name,
             round = rounds[completed].takeIf { it.isNotEmpty() }
@@ -193,7 +186,7 @@ fun ExerciseTimer(
                 playTimerFinishedSound(context)
                 running = false
                 completed++
-                if (completed >= rounds.size) onAllRoundsCompleted?.invoke()
+                if (completed >= rounds.size) onAllRoundsCompleted()
             },
         )
     }

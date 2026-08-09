@@ -91,16 +91,12 @@ fun WorkoutDetails(
                                     modifier = Modifier.padding(start = 12.dp)
                                 )
                             }
-                            if (exercise.durationSec != null) {
-                                // Keyed by round so each round gets its own clock rather than
-                                // inheriting the previous round's finished one.
-                                key(round, exercise.name) {
-                                    ExerciseTimer(
-                                        exercise = exercise,
-                                        modifier = Modifier.padding(start = 12.dp, top = 2.dp)
-                                    )
-                                }
-                            }
+                            // No clock here, deliberately. This rendering is also the expanded
+                            // Week row, where it offered to start a hold for a session two days
+                            // away — and on the Today card it was a second, unsequenced clock
+                            // beside the one the started workout provides. A hold's duration is
+                            // still on the line above; running it belongs to doing the session,
+                            // which is what "Aloita ohjattu treeni" is for.
                         }
                     }
                 } else {

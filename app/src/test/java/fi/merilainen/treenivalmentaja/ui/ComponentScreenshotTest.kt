@@ -197,7 +197,10 @@ class ComponentScreenshotTest {
 
     /**
      * A session whose movements come from the plan's `exercises` array rather than from parsing
-     * the description: the holds carry clocks, and the per-side ones say which side is running.
+     * the description: every movement shows what it asks for, and a per-side hold says so.
+     *
+     * No clocks. This rendering is also the expanded Week row, where a clock offered to start a
+     * hold for a session days away; running one belongs to the started workout.
      */
     @Test
     fun todayCard_timedExercisesFromThePlan() = capture("today_card_timed_exercises") {

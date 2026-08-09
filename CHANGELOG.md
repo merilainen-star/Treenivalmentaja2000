@@ -41,6 +41,11 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   instructions, including the ExerciseDB terms that constrain it.
 
 ### Fixed
+- The Week view offered to start a hold for a session days away. `WorkoutDetails` is the read-only
+  rendering shared by the expanded Week row and the Today card, and its own description says it
+  shows "what it is, not what to do about it" — a running clock was never that. The clocks are now
+  only in the started workout, where they are sequenced and where finishing one means something.
+  The hold's duration still shows on every list, and the guide is still one tap away from both.
 - The countdown lost its face. Moving timed movements onto the plan's own fields replaced the
   full-screen clock — a 240dp ring emptying around a 72pt number — with a line of small text, and
   dropped the notification sound at zero. A hold is done with your eyes shut or your face at the

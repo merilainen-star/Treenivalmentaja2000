@@ -68,7 +68,9 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 - **Exercises shown as the plan wrote them.** Each movement displays its prescription —
   `3 × 12 · 17,5 kg`, `10 / puoli`, `30 s` — and a ramp lists every set. Timed movements carry a
   clock driven by `durationSec`, run once per side or per set, so a per-side hold asks for both
-  sides instead of leaving the second to be counted in your head.
+  sides instead of leaving the second to be counted in your head. The clock lives in the started
+  workout alone: the read-only lists show what a hold asks for, not a button to start one for a
+  session two days out.
 - **Exercise guides, from two sources.** Tapping a movement opens a sheet with an animation or
   picture, numbered instructions, target muscles and equipment. ExerciseDB has an animation for
   every one of its 1500 movements but no plank, side plank, plain squat, bird dog or cat-cow at
