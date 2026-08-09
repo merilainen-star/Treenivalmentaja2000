@@ -3,6 +3,7 @@ package fi.merilainen.treenivalmentaja.data.repository
 import androidx.room.withTransaction
 import fi.merilainen.treenivalmentaja.data.importer.ImportError
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
+import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.importer.PlanJson
 import fi.merilainen.treenivalmentaja.data.importer.PlanValidator
 import fi.merilainen.treenivalmentaja.data.importer.ValidatedPlan
@@ -10,6 +11,7 @@ import fi.merilainen.treenivalmentaja.data.importer.ValidationOutcome
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 import fi.merilainen.treenivalmentaja.data.toDomain
 import fi.merilainen.treenivalmentaja.data.toEntity
 import fi.merilainen.treenivalmentaja.domain.EventSource
@@ -239,10 +241,16 @@ class TrainingRepository(
    * Validates [rawJson] against the plan schema and writes it only if the whole document is
    * valid and does not collide with stored data.
    */
+  /**
+   * @param confirmed the user has seen what this import would do to the plan already stored and
+   *   said yes. Without it, anything that would change or discard stored rows returns
+   *   [ImportResult.NeedsConfirmation] and writes nothing.
+   */
   suspend fun importPlan(
     rawJson: String,
     activate: Boolean = true,
     startToday: Boolean = false,
+    confirmed: Boolean = false,
   ): ImportResult {
     val document =
       PlanJson.parse(rawJson).getOrElse { error ->
@@ -261,24 +269,31 @@ class TrainingRepository(
     val hash = PlanJson.contentHash(rawJson)
 
     return db.withTransaction {
-      val existingPlan = planDao.getById(validated.id)
-      if (existingPlan != null) {
-        return@withTransaction if (existingPlan.contentHash == hash) {
-          ImportResult.AlreadyImported(existingPlan.id, existingPlan.name)
-        } else {
-          ImportResult.Conflict(planId = validated.id, conflictingSessionIds = emptyList())
-        }
+      val now = clock.millis()
+      val samePlan = planDao.getById(validated.id)
+      if (samePlan != null && samePlan.contentHash == hash) {
+        return@withTransaction ImportResult.AlreadyImported(samePlan.id, samePlan.name)
+      }
+
+      // What would this import do to what is already here? Nothing is written until the user has
+      // been told, because both answers below cost something: one rewrites rows, the other
+      // deletes them.
+      val pending = planFor(validated, samePlan, activate)
+      if (pending != null && !confirmed) {
+        return@withTransaction ImportResult.NeedsConfirmation(validated.name, pending)
+      }
+
+      if (pending is PendingImport.Update) {
+        return@withTransaction updateInPlace(samePlan!!, validated, hash, now)
       }
 
       // Activating a plan replaces the previous one outright: the old rows are deleted, not just
       // marked inactive. They were dead weight in every sense — invisible in the UI, growing the
       // database with each import, and still owning AlarmManager slots, which is how a replaced
-      // programme kept sending its own reminders. Completed sessions go with them; the record of
-      // what was actually trained belongs in Oura, and this app's job is the plan ahead.
+      // programme kept sending its own reminders.
       //
       // Deleting the plan row is enough: workout_sessions cascades from training_plans and
       // session_events cascades from workout_sessions.
-      val now = clock.millis()
       if (activate) planDao.deleteAll()
 
       // Only reachable when a plan was kept — an inactive import, since an active one just
@@ -321,6 +336,136 @@ class TrainingRepository(
       )
       ImportResult.Success(validated.id, validated.name, entities.size)
     }
+  }
+
+  /**
+   * What this import would cost, or `null` when it costs nothing.
+   *
+   * An import into an empty database, or one that is not being activated, takes nothing away and
+   * needs no permission. Everything else does.
+   */
+  private suspend fun planFor(
+    validated: ValidatedPlan,
+    samePlan: TrainingPlanEntity?,
+    activate: Boolean,
+  ): PendingImport? {
+    if (!activate) return null
+
+    if (samePlan != null) {
+      val stored = sessionDao.getByPlan(samePlan.id)
+      // A session the engine moved lives in a row of its own, generated rather than imported. It
+      // is not missing from the document — it hangs off one that is there.
+      val fromDocument = stored.filter { it.originalSessionId == null }
+      val incoming = validated.sessions.associateBy { it.id }
+      val dropped = fromDocument.count { it.id !in incoming }
+      if (dropped > 0) return replacing(samePlan, stored)
+
+      val byId = stored.associateBy { it.id }
+      var changed = 0
+      var added = 0
+      for (session in validated.sessions) {
+        val old = byId[session.id]
+        if (old == null) added++
+        else if (contentDiffers(old, merge(old, session.toEntity(samePlan.id, old.updatedAt)))) changed++
+      }
+      return PendingImport.Update(changed = changed, added = added)
+    }
+
+    if (planDao.count() == 0) return null
+    val current = planDao.getActivePlan()
+    return replacing(current, current?.let { sessionDao.getByPlan(it.id) }.orEmpty())
+  }
+
+  private fun replacing(plan: TrainingPlanEntity?, stored: List<WorkoutSessionEntity>) =
+    PendingImport.Replace(
+      replacedPlanName = plan?.name ?: "aiempi suunnitelma",
+      recordedSessions = stored.count { it.status != SessionStatus.PLANNED },
+    )
+
+  /**
+   * The incoming session as it would be stored, keeping everything the document has no opinion
+   * about.
+   *
+   * A plan file describes the training. It says nothing about whether you did it, whether you
+   * took the lighter version, which session this one was moved from, or what reminder time you
+   * set for it — so a corrected file must not overwrite any of that.
+   */
+  private fun merge(old: WorkoutSessionEntity, fresh: WorkoutSessionEntity) =
+    fresh.copy(
+      status = old.status,
+      appliedLighterVariant = old.appliedLighterVariant,
+      originalSessionId = old.originalSessionId,
+      reminderOverride = old.reminderOverride,
+      updatedAt = old.updatedAt,
+    )
+
+  /**
+   * Whether the document actually says something different about this session.
+   *
+   * `remindAtUtc` is excluded because it is derived, not authored: the validator computes a naive
+   * one from the file's date and time, and `RescheduleAlarmsUseCase` immediately recomputes it
+   * from the user's notification settings. Comparing it would report every session in the plan as
+   * changed on every re-import — 80 of 80 for an eight-week programme in which one description
+   * was corrected — which is not information, it is noise with a number on it. A real change to
+   * the date or the time still shows up, in `scheduledDate` and `scheduledTime`.
+   */
+  private fun contentDiffers(old: WorkoutSessionEntity, merged: WorkoutSessionEntity) =
+    merged.copy(remindAtUtc = old.remindAtUtc) != old
+
+  /**
+   * Corrects a plan without taking it apart.
+   *
+   * Nothing is deleted, so nothing cascades: every session keeps its id, and with it its status
+   * and the whole append-only event log written against it. Reschedule chains still point at rows
+   * that exist.
+   *
+   * No event is written for a content change, deliberately. The log records status transitions
+   * and has neither an update nor a delete by design; a corrected description is not a
+   * transition, and writing a self-transition to stand in for one would put something in the
+   * audit trail that never happened. The plan row's `contentHash` is the record that the document
+   * changed.
+   */
+  private suspend fun updateInPlace(
+    existing: TrainingPlanEntity,
+    validated: ValidatedPlan,
+    hash: String,
+    now: Long,
+  ): ImportResult {
+    planDao.update(
+      existing.copy(
+        name = validated.name,
+        schemaVersion = validated.schemaVersion,
+        timeZone = validated.timeZone,
+        startDate = validated.startDate,
+        description = validated.description,
+        contentHash = hash,
+      )
+    )
+
+    val stored = sessionDao.getByPlan(existing.id).associateBy { it.id }
+    for (session in validated.sessions) {
+      val fresh = session.toEntity(existing.id, now)
+      val old = stored[session.id]
+      if (old == null) {
+        sessionDao.insert(fresh)
+        eventDao.insert(
+          SessionEventEntity(
+            id = idGenerator(),
+            sessionId = fresh.id,
+            timestampUtc = now,
+            fromStatus = null,
+            toStatus = SessionStatus.PLANNED,
+            source = EventSource.IMPORT,
+            note = "Lisätty suunnitelmaan \"${validated.name}\"",
+          )
+        )
+      } else {
+        val merged = merge(old, fresh)
+        if (contentDiffers(old, merged)) sessionDao.update(merged.copy(updatedAt = now))
+      }
+    }
+
+    return ImportResult.Success(validated.id, validated.name, validated.sessions.size)
   }
 
   /**

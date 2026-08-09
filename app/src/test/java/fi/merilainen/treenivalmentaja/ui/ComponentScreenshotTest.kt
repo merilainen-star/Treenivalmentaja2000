@@ -16,6 +16,7 @@ import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
+import fi.merilainen.treenivalmentaja.ImportConfirmDialog
 import fi.merilainen.treenivalmentaja.ImportStartDialog
 import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.Workout
@@ -24,6 +25,7 @@ import fi.merilainen.treenivalmentaja.WorkoutCardWeek
 import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
+import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.ExerciseSet
@@ -454,6 +456,36 @@ class ComponentScreenshotTest {
             onStatusChange = {},
             onMoveToTomorrow = {},
             onExerciseClick = {},
+        )
+    }
+
+    // ------------------------------------------------------------------ Import confirmation
+
+    /** Correcting the programme you are running. It costs nothing, and says so. */
+    @Test
+    fun importConfirm_update() = capture("import_confirm_update") {
+        ImportConfirmDialog(
+            planName = "Mikon voimaharjoittelu",
+            action = PendingImport.Update(changed = 12, added = 0),
+            onConfirm = {},
+            onDismiss = {},
+        )
+    }
+
+    /**
+     * Replacing it. The number is the point: "your history will be lost" means nothing until you
+     * know it is eleven sessions.
+     */
+    @Test
+    fun importConfirm_replace() = capture("import_confirm_replace") {
+        ImportConfirmDialog(
+            planName = "Syksyn ohjelma",
+            action = PendingImport.Replace(
+                replacedPlanName = "Mikon voimaharjoittelu",
+                recordedSessions = 11,
+            ),
+            onConfirm = {},
+            onDismiss = {},
         )
     }
 

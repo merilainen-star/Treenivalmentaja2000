@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 fun SettingsScreen(viewModel: WorkoutViewModel) {
     val settings by viewModel.notificationSettings.collectAsState()
     val importFeedback by viewModel.importFeedback.collectAsState()
+    val pendingConfirmation by viewModel.pendingImport.collectAsState()
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -67,6 +68,17 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                 pendingImportJson = null
                 viewModel.importPlanJson(json, startToday = startToday)
             }
+        )
+    }
+
+    // Asked only when the import would change or discard what is already stored, which is also
+    // the only route by which that can happen.
+    pendingConfirmation?.let { prompt ->
+        ImportConfirmDialog(
+            planName = prompt.planName,
+            action = prompt.action,
+            onConfirm = viewModel::confirmPendingImport,
+            onDismiss = viewModel::cancelPendingImport,
         )
     }
 

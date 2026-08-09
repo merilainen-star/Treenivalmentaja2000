@@ -13,8 +13,8 @@ Every number below was measured on this commit, not carried over from a previous
 | Check | Command | Result |
 | --- | --- | --- |
 | Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 20,250,270 B (20.3 MB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 175 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 22 comparisons, no diffs |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 183 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 24 comparisons, no diffs |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 40 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 18 tests, 0 failures, 0 errors |
 
@@ -111,8 +111,14 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   and is the file to import to see the feature working.
 - **Import asks where the plan lands.** Keep the file's dates, or move the whole plan so day one
   is today.
-- **Importing replaces.** The previous plan and its sessions are deleted rather than deactivated,
-  so the database does not grow and a replaced programme cannot keep sending its own reminders.
+- **Correcting a plan costs nothing; replacing one asks first.** Re-importing the same programme
+  with sessions corrected updates them in place — statuses, the event log and reschedule chains all
+  survive, because nothing is deleted and so nothing cascades. Anything that would genuinely
+  discard stored rows (a different `plan.id`, or the same one with sessions dropped) is offered as
+  a replacement that names what it would destroy. Neither happens without an explicit yes; a new
+  `plan.id` used to wipe the database silently. A replacement still deletes rather than
+  deactivates, so the database does not grow and a superseded programme cannot keep sending its
+  own reminders.
 - **Update check.** Settings says whether the installed build is the one GitHub Actions last
   published, and offers the download when it is not.
 - **Test APK distribution from GitHub Actions.** Every push to `main` that touches code builds,
@@ -165,13 +171,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
    and makes every later UI change verifiable. The exercise-guide sheet already follows this
    shape — `ExerciseGuideSheetContent` is stateless and every one of its states has a baseline —
    so it is the pattern to copy.
-2. **Let a plan be replaced without wiping the database.** Re-importing a corrected version of the
-   programme you are already running is rejected as a conflict, and the only route out is
-   "Palauta esimerkkidata", which deletes every session status and the whole event history along
-   with the plan. Measured on the emulator: fixing a typo mid-programme costs you the record of
-   what you have done. The conflict dialog should offer to replace, and statuses should carry
-   across when session ids and dates match.
-3. **Then Oura**, in this order: Retrofit client and DTOs against `MockWebServer`; OAuth2 + PKCE
+2. **Then Oura**, in this order: Retrofit client and DTOs against `MockWebServer`; OAuth2 + PKCE
    per [AUTHENTICATION.md](docs/AUTHENTICATION.md); WorkManager sync; and finally feed readiness
    into the recovery card, which is the first point where any of it becomes visible.
 

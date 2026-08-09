@@ -3,6 +3,7 @@ package fi.merilainen.treenivalmentaja.data.repository
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
+import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.domain.EventSource
@@ -100,36 +101,131 @@ class TrainingRepositoryTest {
     assertEquals(1, repository.getEvents("s-1").size)
   }
 
+  // ------------------------------------------------------------------ correcting a plan
+
   @Test
-  fun `re-importing the same plan id with different content is a conflict`() = runTest {
+  fun `re-importing the same plan corrected asks first and writes nothing`() = runTest {
     repository.importPlan(PLAN)
 
-    val edited = PLAN.replace("\"durationMin\": 45", "\"durationMin\": 60")
-    val result = repository.importPlan(edited)
+    val result = repository.importPlan(corrected())
 
-    assertTrue(result is ImportResult.Conflict)
-    assertEquals("plan-testi", (result as ImportResult.Conflict).planId)
-    // The stored session keeps its original duration — nothing was overwritten.
-    assertEquals(45, repository.getSession("s-1")?.durationMin)
+    val update = (result as ImportResult.NeedsConfirmation).action as PendingImport.Update
+    assertEquals(1, update.changed)
+    assertEquals(0, update.added)
+    // The stored session keeps its original description — nothing was written.
+    assertEquals("Aamun keskivartalo.", repository.getSession("s-1")?.description)
   }
 
   /**
-   * This used to be a conflict, and the change is deliberate. An activated import now deletes the
-   * plan it replaces, so by the time session ids are checked the old ones are gone and there is
-   * nothing to collide with. Reusing ids across successive plans — the same programme re-exported,
-   * say — is therefore ordinary rather than an error the user has to clear by hand.
+   * The whole point: fixing a typo three weeks into a programme must not cost the three weeks.
    */
   @Test
-  fun `a new plan reusing session ids replaces the old one instead of conflicting`() = runTest {
+  fun `a confirmed correction updates in place and keeps what was done`() = runTest {
     repository.importPlan(PLAN)
+    repository.transition("s-1", SessionStatus.COMPLETED)
+
+    val result = repository.importPlan(corrected(), confirmed = true)
+
+    assertTrue("expected success, was $result", result is ImportResult.Success)
+    assertEquals("Aamun keskivartalo, korjattu.", repository.getSession("s-1")?.description)
+    assertEquals(SessionStatus.COMPLETED, repository.getSession("s-1")?.status)
+    // Creation and the transition: the append-only log survived a rewrite of the same row, which
+    // an `@Insert(onConflict = REPLACE)` would have cascaded away.
+    assertEquals(2, repository.getEvents("s-1").size)
+    assertEquals(1, db.trainingPlanDao().count())
+    assertEquals(2, db.workoutSessionDao().count())
+  }
+
+  /** A session moved to another day hangs off one in the document, so it is not "missing". */
+  @Test
+  fun `a rescheduled session does not turn a correction into a replacement`() = runTest {
+    repository.importPlan(PLAN)
+    repository.reschedule("s-1", LocalDate.parse("2026-08-12"))
+
+    val result = repository.importPlan(corrected())
+
+    val action = (result as ImportResult.NeedsConfirmation).action
+    assertTrue("expected an update, was $action", action is PendingImport.Update)
+  }
+
+  @Test
+  fun `a correction that adds a session inserts it with its own creation event`() = runTest {
+    repository.importPlan(PLAN)
+
+    val result = repository.importPlan(withThirdSession(), confirmed = true)
+
+    assertTrue("expected success, was $result", result is ImportResult.Success)
+    assertEquals(listOf("s-1", "s-2", "s-3"), repository.getSessions().map { it.id }.sorted())
+    assertEquals(1, repository.getEvents("s-3").size)
+  }
+
+  /**
+   * Dropping a session is where correcting in place stops: there is nowhere to put the history of
+   * something the document no longer contains, so it is offered as the loss it is rather than
+   * dressed up as a merge.
+   */
+  @Test
+  fun `dropping a session forces a replacement rather than an update`() = runTest {
+    repository.importPlan(PLAN)
+    repository.transition("s-1", SessionStatus.COMPLETED)
+
+    val result = repository.importPlan(PLAN.replace("\"s-2\"", "\"s-9\""))
+
+    val replace = (result as ImportResult.NeedsConfirmation).action as PendingImport.Replace
+    assertEquals("Testisuunnitelma", replace.replacedPlanName)
+    assertEquals(1, replace.recordedSessions)
+  }
+
+  // ------------------------------------------------------------------ replacing a plan
+
+  /**
+   * This used to happen silently: a different `plan.id` deleted everything without a word, while
+   * the harmless case — the same programme corrected — was refused outright with an instruction
+   * to delete the old plan first, for which there was no button anywhere.
+   */
+  @Test
+  fun `importing a different plan asks before deleting the old one`() = runTest {
+    repository.importPlan(PLAN)
+    repository.transition("s-1", SessionStatus.COMPLETED)
 
     val other = PLAN.replace("\"id\": \"plan-testi\"", "\"id\": \"plan-toinen\"")
     val result = repository.importPlan(other)
 
+    val replace = (result as ImportResult.NeedsConfirmation).action as PendingImport.Replace
+    assertEquals(1, replace.recordedSessions)
+    assertEquals("plan-testi", db.trainingPlanDao().getActivePlan()?.id)
+    assertEquals(SessionStatus.COMPLETED, repository.getSession("s-1")?.status)
+  }
+
+  @Test
+  fun `a confirmed replacement deletes the plan it supersedes`() = runTest {
+    repository.importPlan(PLAN)
+
+    val other = PLAN.replace("\"id\": \"plan-testi\"", "\"id\": \"plan-toinen\"")
+    val result = repository.importPlan(other, confirmed = true)
+
     assertTrue("expected success, was $result", result is ImportResult.Success)
     assertEquals(listOf("s-1", "s-2"), repository.getSessions().map { it.id }.sorted())
     assertEquals(1, db.trainingPlanDao().count())
+    assertEquals("plan-toinen", db.trainingPlanDao().getActivePlan()?.id)
   }
+
+  /** An empty database has nothing to lose, so the first import is never held up. */
+  @Test
+  fun `the first import needs no confirmation`() = runTest {
+    assertTrue(repository.importPlan(PLAN) is ImportResult.Success)
+  }
+
+  private fun corrected() =
+    PLAN.replace("Aamun keskivartalo.", "Aamun keskivartalo, korjattu.")
+
+  private fun withThirdSession() =
+    PLAN.replace(
+      "\"description\": \"Lyhyt palauttava lenkki.\"\n                }\n              }",
+      "\"description\": \"Lyhyt palauttava lenkki.\"\n                }\n              },\n" +
+        "              { \"id\": \"s-3\", \"type\": \"RUNNING\", \"date\": \"2026-08-12\", " +
+        "\"time\": \"17:00\", \"durationMin\": 30 }",
+    )
 
   /** An import that does not activate keeps what is there, so ids must still not clash. */
   @Test
@@ -381,7 +477,8 @@ class TrainingRepositoryTest {
     assertTrue(repository.importPlan(PLAN) is ImportResult.Success)
     assertEquals(2, repository.getSessions().size)
 
-    assertTrue(repository.importPlan(secondPlan) is ImportResult.Success)
+    // Replacing needs the user's word for it now; this test is about what happens after.
+    assertTrue(repository.importPlan(secondPlan, confirmed = true) is ImportResult.Success)
 
     // getSessions only reads the active plan, so the count is checked against the table itself.
     val allIds = db.workoutSessionDao().getByStatus(SessionStatus.PLANNED).map { it.id }
@@ -396,7 +493,7 @@ class TrainingRepositoryTest {
     repository.transition("s-1", SessionStatus.COMPLETED)
     assertTrue(repository.getEvents("s-1").isNotEmpty())
 
-    repository.importPlan(secondPlan)
+    repository.importPlan(secondPlan, confirmed = true)
 
     assertNull(repository.getSession("s-1"))
     assertTrue(repository.getEvents("s-1").isEmpty())

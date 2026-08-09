@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
+import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
@@ -78,6 +79,21 @@ data class Workout(
 /** Result of the last plan import, shown once and then dismissed. */
 data class ImportFeedback(val title: String, val detail: String, val isError: Boolean)
 
+/**
+ * An import held at the door, with the document it would write and what that would cost.
+ *
+ * The raw JSON travels with it because the confirmation happens after the file has been read: the
+ * picker grants one read, and re-opening the same file to answer a dialog is not something the
+ * user should have to do.
+ */
+data class PendingImportPrompt(
+  val rawJson: String,
+  val startToday: Boolean,
+  /** The name the incoming document gives itself. */
+  val planName: String,
+  val action: PendingImport,
+)
+
 class WorkoutViewModel(
   private val repository: TrainingRepository,
   private val engine: TrainingEngine,
@@ -102,6 +118,10 @@ class WorkoutViewModel(
 
   private val _importFeedback = MutableStateFlow<ImportFeedback?>(null)
   val importFeedback: StateFlow<ImportFeedback?> = _importFeedback.asStateFlow()
+
+  /** Non-null while an import is waiting to be told whether it may touch the stored plan. */
+  private val _pendingImport = MutableStateFlow<PendingImportPrompt?>(null)
+  val pendingImport: StateFlow<PendingImportPrompt?> = _pendingImport.asStateFlow()
 
   private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
   val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
@@ -235,13 +255,36 @@ class WorkoutViewModel(
         ImportFeedback("Ei tuotavaa", "Tiedosto tai leikepöytä oli tyhjä.", isError = true)
       return
     }
-    viewModelScope.launch {
-      val result = repository.importPlan(rawJson, startToday = startToday)
-      if (result is ImportResult.Success) {
-        rescheduleAlarmsUseCase.execute()
-      }
-      _importFeedback.value = result.toFeedback()
+    viewModelScope.launch { runImport(rawJson, startToday, confirmed = false) }
+  }
+
+  /**
+   * The user has read what the import would do to the plan already stored and said yes.
+   *
+   * The document is held rather than re-read: the file picker's permission is good for one read,
+   * and asking for the same file twice is not something a confirmation dialog should require.
+   */
+  fun confirmPendingImport() {
+    val pending = _pendingImport.value ?: return
+    _pendingImport.value = null
+    viewModelScope.launch { runImport(pending.rawJson, pending.startToday, confirmed = true) }
+  }
+
+  fun cancelPendingImport() {
+    _pendingImport.value = null
+  }
+
+  private suspend fun runImport(rawJson: String, startToday: Boolean, confirmed: Boolean) {
+    val result = repository.importPlan(rawJson, startToday = startToday, confirmed = confirmed)
+    if (result is ImportResult.NeedsConfirmation) {
+      _pendingImport.value =
+        PendingImportPrompt(rawJson, startToday, result.planName, result.action)
+      return
     }
+    if (result is ImportResult.Success) {
+      rescheduleAlarmsUseCase.execute()
+    }
+    _importFeedback.value = result.toFeedback()
   }
 
   fun resetSampleData() {
@@ -282,6 +325,9 @@ class WorkoutViewModel(
           detail = "Suunnitelma \"$planName\" on jo tuotu sellaisenaan.",
           isError = false,
         )
+      // Never reaches here: runImport turns it into a dialog before feedback is produced.
+      is ImportResult.NeedsConfirmation ->
+        ImportFeedback("Vahvistus tarvitaan", "Tuonti odottaa vahvistusta.", isError = false)
       is ImportResult.Conflict ->
         ImportFeedback(
           title = "Ristiriita olemassa olevien tietojen kanssa",

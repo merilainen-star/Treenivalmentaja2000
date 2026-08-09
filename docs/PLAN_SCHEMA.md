@@ -268,9 +268,18 @@ The importer distinguishes two cases and reports them differently:
 1. **Identical re-import** — `plan.id` already exists **and** the SHA-256 of the normalised source
    JSON equals the stored `contentHash`. Reported as *"Tämä suunnitelma on jo tuotu."* Nothing is
    written.
-2. **Conflicting re-import** — `plan.id` (or any `session.id`) exists but the content differs.
-   Reported as a conflict listing the colliding ids. The user must explicitly choose to replace the
-   existing plan; the importer never overwrites on its own.
+2. **Correction** — the same `plan.id` with different content, where every session already
+   stored still exists in the document. The app offers to **update** it: each session's content is
+   rewritten in place and its status, its event history and any reschedule chain hanging off it
+   are untouched. Sessions the document adds are inserted. This is what correcting a typo or
+   adding `guide` references three weeks into a programme actually is, and it costs nothing.
+3. **Replacement** — anything else that would overwrite stored rows: a different `plan.id`, or the
+   same one with sessions dropped. The app offers to **replace**, and says how many recorded
+   sessions that would destroy, because there is nowhere to put the history of a session the
+   document no longer contains.
+
+Nothing is written in either case until the user says so. That includes importing a plan with a
+brand-new `plan.id`, which used to delete whatever was stored without a word.
 
 ## Validation and error reporting
 Validation collects **all** errors before returning — it does not stop at the first one. Each error

@@ -17,6 +17,15 @@ import kotlinx.coroutines.flow.Flow
 interface TrainingPlanDao {
   @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(plan: TrainingPlanEntity)
 
+  /**
+   * A real UPDATE, deliberately — never `@Insert(onConflict = REPLACE)`.
+   *
+   * Room implements REPLACE as DELETE followed by INSERT, which fires `ON DELETE CASCADE` on the
+   * sessions and their events. Correcting a plan in place would then silently destroy the exact
+   * history it exists to preserve.
+   */
+  @Update suspend fun update(plan: TrainingPlanEntity)
+
   @Query("SELECT * FROM training_plans WHERE isActive = 1 LIMIT 1")
   fun observeActivePlan(): Flow<TrainingPlanEntity?>
 

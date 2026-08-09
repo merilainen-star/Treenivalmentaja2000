@@ -41,6 +41,14 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   instructions, including the ExerciseDB terms that constrain it.
 
 ### Fixed
+- Correcting the programme you are running cost you the record of running it. Re-importing the
+  same `plan.id` with any change was refused outright — "poista vanha suunnitelma ensin", for which
+  there was no button — so the only way through was "Palauta esimerkkidata", which deletes every
+  session status and the whole event log. Meanwhile importing a plan with a *different* id deleted
+  all of that without asking at all: strict about the harmless case, silent about the destructive
+  one. Now a corrected document updates the sessions in place and keeps everything recorded against
+  them, a genuine replacement asks first and says how many marked sessions it would destroy, and
+  neither happens without a yes.
 - The Week view offered to start a hold for a session days away. `WorkoutDetails` is the read-only
   rendering shared by the expanded Week row and the Today card, and its own description says it
   shows "what it is, not what to do about it" — a running clock was never that. The clocks are now
