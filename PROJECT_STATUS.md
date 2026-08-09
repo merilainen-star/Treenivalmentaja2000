@@ -97,7 +97,8 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
   Reachable only for sessions whose plan carries an `exercises` array. The seeded starter week
   does not — it describes its movements in prose — so a fresh install has nothing to tap until a
-  plan is imported.
+  plan is imported. `sample-data/plan.json` carries references for 248 of its 272 exercise rows
+  and is the file to import to see the feature working.
 - **Import asks where the plan lands.** Keep the file's dates, or move the whole plan so day one
   is today.
 - **Importing replaces.** The previous plan and its sessions are deleted rather than deactivated,
@@ -150,10 +151,12 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
    and makes every later UI change verifiable. The exercise-guide sheet already follows this
    shape — `ExerciseGuideSheetContent` is stateless and every one of its states has a baseline —
    so it is the pattern to copy.
-2. **Write `guide` references into `sample-data/plan.json`.** The current programme has been
-   mapped — 15 of its 16 movements have a reference, listed in
-   [EXERCISE_GUIDE.md](docs/EXERCISE_GUIDE.md#the-references-this-programme-uses) — but the copy
-   in `sample-data/` is an older revision without them. Data entry, not code.
+2. **Let a plan be replaced without wiping the database.** Re-importing a corrected version of the
+   programme you are already running is rejected as a conflict, and the only route out is
+   "Palauta esimerkkidata", which deletes every session status and the whole event history along
+   with the plan. Measured on the emulator: fixing a typo mid-programme costs you the record of
+   what you have done. The conflict dialog should offer to replace, and statuses should carry
+   across when session ids and dates match.
 3. **Then Oura**, in this order: Retrofit client and DTOs against `MockWebServer`; OAuth2 + PKCE
    per [AUTHENTICATION.md](docs/AUTHENTICATION.md); WorkManager sync; and finally feed readiness
    into the recovery card, which is the first point where any of it becomes visible.

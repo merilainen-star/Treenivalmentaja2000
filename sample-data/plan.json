@@ -21,32 +21,52 @@
           "description": "Voima B – jalat ja core. Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka, kahvakuulaheilautus 15, vinot vatsarutistukset 10/puoli, timanttipunnerrus 6–8, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 8/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 8,
               "reps": 8,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 15",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 10/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 6–8",
+              "name": "Timanttipunnerrus",
               "repsMin": 6,
               "repsMax": 8,
-              "reps": 6
+              "reps": 6,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 20 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 20,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -63,29 +83,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10, goblet-kyykky 12, vatsarutistus penkillä 12, käsipainosoutu 10/puoli, lankku 30 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "goblet-kyykky 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "vatsarutistus penkillä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "käsipainosoutu 10/puoli",
+              "name": "Punnerrus",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Goblet-kyykky",
+              "repsMin": 12,
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 12,
+              "reps": 12
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -102,23 +138,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 1/8. Lämmittely 2 min. 1–2 kierrosta. Kevyt punnerrus 8, kyykky 10, vatsarutistus 10, lankku 20 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 8",
+              "name": "Kevyt punnerrus",
               "repsMin": 8,
-              "reps": 8
+              "reps": 8,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 10",
+              "name": "Kyykky",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 10",
+              "name": "Vatsarutistus",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 20 s",
-              "durationSec": 20
+              "name": "Lankku",
+              "durationSec": 20,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 1,
@@ -135,29 +187,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 1/8. Lämmittely 2 min. 1 kierros. Kissanlehmä 8, lonkankoukistajan venytys 30 s/puoli, bird dog 8/puoli, lankku 20 s, sivulankku 15 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 8",
-              "repsMin": 8,
-              "reps": 8
-            },
-            {
-              "name": "lonkankoukistajan venytys 30 s/puoli",
-              "durationSec": 30,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 8/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 8,
               "reps": 8,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 20 s",
-              "durationSec": 20
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 30,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 15 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 8,
+              "reps": 8,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 20,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 1,
@@ -174,29 +246,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10, goblet-kyykky 12, vatsarutistus penkillä 12, käsipainosoutu 10/puoli, lankku 30 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "goblet-kyykky 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "vatsarutistus penkillä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "käsipainosoutu 10/puoli",
+              "name": "Punnerrus",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Goblet-kyykky",
+              "repsMin": 12,
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 12,
+              "reps": 12
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -213,32 +301,52 @@
           "description": "Voima B – jalat ja core. Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka, kahvakuulaheilautus 15, vinot vatsarutistukset 10/puoli, timanttipunnerrus 6–8, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 8/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 8,
               "reps": 8,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 15",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 10/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 6–8",
+              "name": "Timanttipunnerrus",
               "repsMin": 6,
               "repsMax": 8,
-              "reps": 6
+              "reps": 6,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 20 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 20,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -255,29 +363,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 1/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10, goblet-kyykky 12, vatsarutistus penkillä 12, käsipainosoutu 10/puoli, lankku 30 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "goblet-kyykky 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "vatsarutistus penkillä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "käsipainosoutu 10/puoli",
+              "name": "Punnerrus",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Goblet-kyykky",
+              "repsMin": 12,
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 12,
+              "reps": 12
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -292,14 +416,7 @@
           "time": "12:00",
           "durationMin": 42,
           "description": "Pitkä rauhallinen juoksu – 7 km. Viikko 1/8. Juokse 7 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 7
         },
         {
           "id": "s-57",
@@ -308,25 +425,8 @@
           "time": "12:00",
           "durationMin": 30,
           "description": "Reippaampi juoksu – 5 km. Viikko 1/8. Yhteensä 5 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 5 km: 1 km rauhallisesti",
-              "repsMin": 5,
-              "reps": 5
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 5
         },
         {
           "id": "s-58",
@@ -335,7 +435,8 @@
           "time": "12:00",
           "durationMin": 30,
           "description": "Kevyt juoksu – 5 km. Viikko 1/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 5
         }
       ]
     },
@@ -351,32 +452,52 @@
           "description": "Voima B – jalat ja core. Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka, kahvakuulaheilautus 15, vinot vatsarutistukset 10/puoli, timanttipunnerrus 6–8, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 8/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 8,
               "reps": 8,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 15",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 10/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 6–8",
+              "name": "Timanttipunnerrus",
               "repsMin": 6,
               "repsMax": 8,
-              "reps": 6
+              "reps": 6,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 20 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 20,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -393,29 +514,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10, goblet-kyykky 12, vatsarutistus penkillä 12, käsipainosoutu 10/puoli, lankku 30 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "goblet-kyykky 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "vatsarutistus penkillä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "käsipainosoutu 10/puoli",
+              "name": "Punnerrus",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Goblet-kyykky",
+              "repsMin": 12,
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 12,
+              "reps": 12
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -432,23 +569,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 2/8. Lämmittely 2 min. 1–2 kierrosta. Kevyt punnerrus 8, kyykky 10, vatsarutistus 10, lankku 20 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 8",
+              "name": "Kevyt punnerrus",
               "repsMin": 8,
-              "reps": 8
+              "reps": 8,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 10",
+              "name": "Kyykky",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 10",
+              "name": "Vatsarutistus",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 20 s",
-              "durationSec": 20
+              "name": "Lankku",
+              "durationSec": 20,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 1,
@@ -465,29 +618,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 2/8. Lämmittely 2 min. 1 kierros. Kissanlehmä 8, lonkankoukistajan venytys 30 s/puoli, bird dog 8/puoli, lankku 20 s, sivulankku 15 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 8",
-              "repsMin": 8,
-              "reps": 8
-            },
-            {
-              "name": "lonkankoukistajan venytys 30 s/puoli",
-              "durationSec": 30,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 8/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 8,
               "reps": 8,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 20 s",
-              "durationSec": 20
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 30,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 15 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 8,
+              "reps": 8,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 20,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 1,
@@ -504,29 +677,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10, goblet-kyykky 12, vatsarutistus penkillä 12, käsipainosoutu 10/puoli, lankku 30 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "goblet-kyykky 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "vatsarutistus penkillä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "käsipainosoutu 10/puoli",
+              "name": "Punnerrus",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Goblet-kyykky",
+              "repsMin": 12,
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 12,
+              "reps": 12
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -543,32 +732,52 @@
           "description": "Voima B – jalat ja core. Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Bulgarialainen askelkyykky 8/jalka, kahvakuulaheilautus 15, vinot vatsarutistukset 10/puoli, timanttipunnerrus 6–8, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 8/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 8,
               "reps": 8,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 15",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 10/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 6–8",
+              "name": "Timanttipunnerrus",
               "repsMin": 6,
               "repsMax": 8,
-              "reps": 6
+              "reps": 6,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 20 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 20,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -585,29 +794,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 2/8. Lämmittely 2 min. 2 kierrosta. Punnerrus 10, goblet-kyykky 12, vatsarutistus penkillä 12, käsipainosoutu 10/puoli, lankku 30 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "goblet-kyykky 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "vatsarutistus penkillä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "käsipainosoutu 10/puoli",
+              "name": "Punnerrus",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Goblet-kyykky",
+              "repsMin": 12,
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 12,
+              "reps": 12
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -622,14 +847,7 @@
           "time": "12:00",
           "durationMin": 42,
           "description": "Pitkä rauhallinen juoksu – 7 km. Viikko 2/8. Juokse 7 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 7
         },
         {
           "id": "s-60",
@@ -638,25 +856,8 @@
           "time": "12:00",
           "durationMin": 30,
           "description": "Reippaampi juoksu – 5 km. Viikko 2/8. Yhteensä 5 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 5 km: 1 km rauhallisesti",
-              "repsMin": 5,
-              "reps": 5
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 5
         },
         {
           "id": "s-61",
@@ -665,7 +866,8 @@
           "time": "12:00",
           "durationMin": 30,
           "description": "Kevyt juoksu – 5 km. Viikko 2/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 5
         }
       ]
     },
@@ -681,32 +883,52 @@
           "description": "Voima B – jalat ja core. Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka, kahvakuulaheilautus 18, vinot vatsarutistukset 12/puoli, timanttipunnerrus 8–10, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 10/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 18",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 12/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 8–10",
+              "name": "Timanttipunnerrus",
               "repsMin": 8,
               "repsMax": 10,
-              "reps": 8
+              "reps": 8,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 30 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 30,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -723,29 +945,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12, goblet-kyykky 15, vatsarutistus penkillä 15, käsipainosoutu 12/puoli, lankku 40 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "goblet-kyykky 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "vatsarutistus penkillä 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "käsipainosoutu 12/puoli",
+              "name": "Punnerrus",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 40 s",
-              "durationSec": 40
+              "name": "Goblet-kyykky",
+              "repsMin": 15,
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 15,
+              "reps": 15
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 40,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -762,23 +1000,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 3/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10, kyykky 12, vatsarutistus 12, lankku 25 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 10",
+              "name": "Kevyt punnerrus",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 12",
+              "name": "Kyykky",
               "repsMin": 12,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 12",
+              "name": "Vatsarutistus",
               "repsMin": 12,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 25 s",
-              "durationSec": 25
+              "name": "Lankku",
+              "durationSec": 25,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -795,29 +1049,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 3/8. Lämmittely 2 min. 1–2 kierrosta. Kissanlehmä 10, lonkankoukistajan venytys 30 s/puoli, bird dog 10/puoli, lankku 25 s, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "lonkankoukistajan venytys 30 s/puoli",
-              "durationSec": 30,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 10/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 25 s",
-              "durationSec": 25
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 30,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 20 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 25,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 20,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 1,
@@ -834,29 +1108,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12, goblet-kyykky 15, vatsarutistus penkillä 15, käsipainosoutu 12/puoli, lankku 40 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "goblet-kyykky 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "vatsarutistus penkillä 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "käsipainosoutu 12/puoli",
+              "name": "Punnerrus",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 40 s",
-              "durationSec": 40
+              "name": "Goblet-kyykky",
+              "repsMin": 15,
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 15,
+              "reps": 15
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 40,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -873,32 +1163,52 @@
           "description": "Voima B – jalat ja core. Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka, kahvakuulaheilautus 18, vinot vatsarutistukset 12/puoli, timanttipunnerrus 8–10, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 10/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 18",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 12/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 8–10",
+              "name": "Timanttipunnerrus",
               "repsMin": 8,
               "repsMax": 10,
-              "reps": 8
+              "reps": 8,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 30 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 30,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -915,29 +1225,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 3/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12, goblet-kyykky 15, vatsarutistus penkillä 15, käsipainosoutu 12/puoli, lankku 40 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "goblet-kyykky 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "vatsarutistus penkillä 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "käsipainosoutu 12/puoli",
+              "name": "Punnerrus",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 40 s",
-              "durationSec": 40
+              "name": "Goblet-kyykky",
+              "repsMin": 15,
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 15,
+              "reps": 15
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 40,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -952,14 +1278,7 @@
           "time": "12:00",
           "durationMin": 48,
           "description": "Pitkä rauhallinen juoksu – 8 km. Viikko 3/8. Juokse 8 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 8
         },
         {
           "id": "s-63",
@@ -968,25 +1287,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Reippaampi juoksu – 6 km. Viikko 3/8. Yhteensä 6 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 6 km: 1 km rauhallisesti",
-              "repsMin": 6,
-              "reps": 6
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 6
         },
         {
           "id": "s-64",
@@ -995,7 +1297,8 @@
           "time": "12:00",
           "durationMin": 30,
           "description": "Kevyt juoksu – 5 km. Viikko 3/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 5
         }
       ]
     },
@@ -1011,32 +1314,52 @@
           "description": "Voima B – jalat ja core. Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka, kahvakuulaheilautus 18, vinot vatsarutistukset 12/puoli, timanttipunnerrus 8–10, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 10/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 18",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 12/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 8–10",
+              "name": "Timanttipunnerrus",
               "repsMin": 8,
               "repsMax": 10,
-              "reps": 8
+              "reps": 8,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 30 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 30,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1053,29 +1376,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12, goblet-kyykky 15, vatsarutistus penkillä 15, käsipainosoutu 12/puoli, lankku 40 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "goblet-kyykky 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "vatsarutistus penkillä 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "käsipainosoutu 12/puoli",
+              "name": "Punnerrus",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 40 s",
-              "durationSec": 40
+              "name": "Goblet-kyykky",
+              "repsMin": 15,
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 15,
+              "reps": 15
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 40,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1092,23 +1431,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 4/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10, kyykky 12, vatsarutistus 12, lankku 25 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 10",
+              "name": "Kevyt punnerrus",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 12",
+              "name": "Kyykky",
               "repsMin": 12,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 12",
+              "name": "Vatsarutistus",
               "repsMin": 12,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 25 s",
-              "durationSec": 25
+              "name": "Lankku",
+              "durationSec": 25,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -1125,29 +1480,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 4/8. Lämmittely 2 min. 1–2 kierrosta. Kissanlehmä 10, lonkankoukistajan venytys 30 s/puoli, bird dog 10/puoli, lankku 25 s, sivulankku 20 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "lonkankoukistajan venytys 30 s/puoli",
-              "durationSec": 30,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 10/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 25 s",
-              "durationSec": 25
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 30,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 20 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 25,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 20,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 1,
@@ -1164,29 +1539,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12, goblet-kyykky 15, vatsarutistus penkillä 15, käsipainosoutu 12/puoli, lankku 40 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "goblet-kyykky 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "vatsarutistus penkillä 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "käsipainosoutu 12/puoli",
+              "name": "Punnerrus",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 40 s",
-              "durationSec": 40
+              "name": "Goblet-kyykky",
+              "repsMin": 15,
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 15,
+              "reps": 15
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 40,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1203,32 +1594,52 @@
           "description": "Voima B – jalat ja core. Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 10/jalka, kahvakuulaheilautus 18, vinot vatsarutistukset 12/puoli, timanttipunnerrus 8–10, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 10/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 18",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 12/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 8–10",
+              "name": "Timanttipunnerrus",
               "repsMin": 8,
               "repsMax": 10,
-              "reps": 8
+              "reps": 8,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 30 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 30,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1245,29 +1656,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 4/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 12, goblet-kyykky 15, vatsarutistus penkillä 15, käsipainosoutu 12/puoli, lankku 40 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "goblet-kyykky 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "vatsarutistus penkillä 15",
-              "repsMin": 15,
-              "reps": 15
-            },
-            {
-              "name": "käsipainosoutu 12/puoli",
+              "name": "Punnerrus",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "lankku 40 s",
-              "durationSec": 40
+              "name": "Goblet-kyykky",
+              "repsMin": 15,
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
+            },
+            {
+              "name": "Vatsarutistus penkillä",
+              "repsMin": 15,
+              "reps": 15
+            },
+            {
+              "name": "Käsipainosoutu",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 40,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1282,14 +1709,7 @@
           "time": "12:00",
           "durationMin": 48,
           "description": "Pitkä rauhallinen juoksu – 8 km. Viikko 4/8. Juokse 8 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 8
         },
         {
           "id": "s-66",
@@ -1298,25 +1718,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Reippaampi juoksu – 6 km. Viikko 4/8. Yhteensä 6 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 6 km: 1 km rauhallisesti",
-              "repsMin": 6,
-              "reps": 6
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 6
         },
         {
           "id": "s-67",
@@ -1325,7 +1728,8 @@
           "time": "12:00",
           "durationMin": 30,
           "description": "Kevyt juoksu – 5 km. Viikko 4/8. Juokse 5 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 5
         }
       ]
     },
@@ -1341,32 +1745,52 @@
           "description": "Voima B – jalat ja core. Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 20, vinot vatsarutistukset 15/puoli, timanttipunnerrus 10–12, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 20",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 20,
-              "reps": 20
+              "reps": 20,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 10–12",
+              "name": "Timanttipunnerrus",
               "repsMin": 10,
               "repsMax": 12,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 40 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 40,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1383,29 +1807,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15, goblet-kyykky 15, vatsarutistus penkillä 18, käsipainosoutu 14/puoli, lankku 50 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15",
+              "name": "Punnerrus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 15",
+              "name": "Goblet-kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 18",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 18,
               "reps": 18
             },
             {
-              "name": "käsipainosoutu 14/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 14,
               "reps": 14,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 50 s",
-              "durationSec": 50
+              "name": "Lankku",
+              "durationSec": 50,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1422,23 +1862,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 5/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10, kyykky 15, vatsarutistus 15, lankku 30 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 10",
+              "name": "Kevyt punnerrus",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 15",
+              "name": "Kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 15",
+              "name": "Vatsarutistus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -1455,29 +1911,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 5/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 10, lonkankoukistajan venytys 40 s/puoli, bird dog 10/puoli, lankku 30 s, sivulankku 25 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "lonkankoukistajan venytys 40 s/puoli",
-              "durationSec": 40,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 10/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 40,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 25 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 25,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -1494,29 +1970,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15, goblet-kyykky 15, vatsarutistus penkillä 18, käsipainosoutu 14/puoli, lankku 50 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15",
+              "name": "Punnerrus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 15",
+              "name": "Goblet-kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 18",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 18,
               "reps": 18
             },
             {
-              "name": "käsipainosoutu 14/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 14,
               "reps": 14,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 50 s",
-              "durationSec": 50
+              "name": "Lankku",
+              "durationSec": 50,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1533,32 +2025,52 @@
           "description": "Voima B – jalat ja core. Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 20, vinot vatsarutistukset 15/puoli, timanttipunnerrus 10–12, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 20",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 20,
-              "reps": 20
+              "reps": 20,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 10–12",
+              "name": "Timanttipunnerrus",
               "repsMin": 10,
               "repsMax": 12,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 40 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 40,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1575,29 +2087,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 5/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15, goblet-kyykky 15, vatsarutistus penkillä 18, käsipainosoutu 14/puoli, lankku 50 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15",
+              "name": "Punnerrus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 15",
+              "name": "Goblet-kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 18",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 18,
               "reps": 18
             },
             {
-              "name": "käsipainosoutu 14/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 14,
               "reps": 14,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 50 s",
-              "durationSec": 50
+              "name": "Lankku",
+              "durationSec": 50,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1612,14 +2140,7 @@
           "time": "12:00",
           "durationMin": 54,
           "description": "Pitkä rauhallinen juoksu – 9 km. Viikko 5/8. Juokse 9 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 9
         },
         {
           "id": "s-69",
@@ -1628,25 +2149,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Reippaampi juoksu – 6 km. Viikko 5/8. Yhteensä 6 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 6 km: 1 km rauhallisesti",
-              "repsMin": 6,
-              "reps": 6
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 6
         },
         {
           "id": "s-70",
@@ -1655,7 +2159,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Kevyt juoksu – 6 km. Viikko 5/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 6
         }
       ]
     },
@@ -1671,32 +2176,52 @@
           "description": "Voima B – jalat ja core. Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 20, vinot vatsarutistukset 15/puoli, timanttipunnerrus 10–12, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 20",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 20,
-              "reps": 20
+              "reps": 20,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 10–12",
+              "name": "Timanttipunnerrus",
               "repsMin": 10,
               "repsMax": 12,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 40 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 40,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1713,29 +2238,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15, goblet-kyykky 15, vatsarutistus penkillä 18, käsipainosoutu 14/puoli, lankku 50 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15",
+              "name": "Punnerrus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 15",
+              "name": "Goblet-kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 18",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 18,
               "reps": 18
             },
             {
-              "name": "käsipainosoutu 14/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 14,
               "reps": 14,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 50 s",
-              "durationSec": 50
+              "name": "Lankku",
+              "durationSec": 50,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1752,23 +2293,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 6/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 10, kyykky 15, vatsarutistus 15, lankku 30 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 10",
+              "name": "Kevyt punnerrus",
               "repsMin": 10,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 15",
+              "name": "Kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 15",
+              "name": "Vatsarutistus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -1785,29 +2342,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 6/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 10, lonkankoukistajan venytys 40 s/puoli, bird dog 10/puoli, lankku 30 s, sivulankku 25 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 10",
-              "repsMin": 10,
-              "reps": 10
-            },
-            {
-              "name": "lonkankoukistajan venytys 40 s/puoli",
-              "durationSec": 40,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 10/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 10,
               "reps": 10,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 30 s",
-              "durationSec": 30
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 40,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 25 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 10,
+              "reps": 10,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 30,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 25,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -1824,29 +2401,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15, goblet-kyykky 15, vatsarutistus penkillä 18, käsipainosoutu 14/puoli, lankku 50 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15",
+              "name": "Punnerrus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 15",
+              "name": "Goblet-kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 18",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 18,
               "reps": 18
             },
             {
-              "name": "käsipainosoutu 14/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 14,
               "reps": 14,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 50 s",
-              "durationSec": 50
+              "name": "Lankku",
+              "durationSec": 50,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1863,32 +2456,52 @@
           "description": "Voima B – jalat ja core. Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 20, vinot vatsarutistukset 15/puoli, timanttipunnerrus 10–12, sivulankku 40 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 20",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 20,
-              "reps": 20
+              "reps": 20,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 10–12",
+              "name": "Timanttipunnerrus",
               "repsMin": 10,
               "repsMax": 12,
-              "reps": 10
+              "reps": 10,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 40 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 40,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1905,29 +2518,45 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 6/8. Lämmittely 2 min. 3 kierrosta. Punnerrus 15, goblet-kyykky 15, vatsarutistus penkillä 18, käsipainosoutu 14/puoli, lankku 50 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15",
+              "name": "Punnerrus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 15",
+              "name": "Goblet-kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 18",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 18,
               "reps": 18
             },
             {
-              "name": "käsipainosoutu 14/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 14,
               "reps": 14,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 50 s",
-              "durationSec": 50
+              "name": "Lankku",
+              "durationSec": 50,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 3,
@@ -1942,14 +2571,7 @@
           "time": "12:00",
           "durationMin": 54,
           "description": "Pitkä rauhallinen juoksu – 9 km. Viikko 6/8. Juokse 9 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 9
         },
         {
           "id": "s-72",
@@ -1958,25 +2580,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Reippaampi juoksu – 6 km. Viikko 6/8. Yhteensä 6 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 6 km: 1 km rauhallisesti",
-              "repsMin": 6,
-              "reps": 6
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 6
         },
         {
           "id": "s-73",
@@ -1985,7 +2590,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Kevyt juoksu – 6 km. Viikko 6/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 6
         }
       ]
     },
@@ -2001,32 +2607,52 @@
           "description": "Voima B – jalat ja core. Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 25, vinot vatsarutistukset 15/puoli, timanttipunnerrus 12–15, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 25",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 25,
-              "reps": 25
+              "reps": 25,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 12–15",
+              "name": "Timanttipunnerrus",
               "repsMin": 12,
               "repsMax": 15,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 45 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 45,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2043,30 +2669,46 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20, goblet-kyykky 18, vatsarutistus penkillä 20, käsipainosoutu 15/puoli, lankku 60 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15–20",
+              "name": "Punnerrus",
               "repsMin": 15,
               "repsMax": 20,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 18",
+              "name": "Goblet-kyykky",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 20",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 20,
               "reps": 20
             },
             {
-              "name": "käsipainosoutu 15/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 60 s",
-              "durationSec": 60
+              "name": "Lankku",
+              "durationSec": 60,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2083,23 +2725,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 7/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 12, kyykky 15, vatsarutistus 15, lankku 35 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 12",
+              "name": "Kevyt punnerrus",
               "repsMin": 12,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 15",
+              "name": "Kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 15",
+              "name": "Vatsarutistus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 35 s",
-              "durationSec": 35
+              "name": "Lankku",
+              "durationSec": 35,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -2116,29 +2774,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 7/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 12, lonkankoukistajan venytys 40 s/puoli, bird dog 12/puoli, lankku 35 s, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "lonkankoukistajan venytys 40 s/puoli",
-              "durationSec": 40,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 12/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 35 s",
-              "durationSec": 35
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 40,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 30 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 35,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 30,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -2155,30 +2833,46 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20, goblet-kyykky 18, vatsarutistus penkillä 20, käsipainosoutu 15/puoli, lankku 60 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15–20",
+              "name": "Punnerrus",
               "repsMin": 15,
               "repsMax": 20,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 18",
+              "name": "Goblet-kyykky",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 20",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 20,
               "reps": 20
             },
             {
-              "name": "käsipainosoutu 15/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 60 s",
-              "durationSec": 60
+              "name": "Lankku",
+              "durationSec": 60,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2195,32 +2889,52 @@
           "description": "Voima B – jalat ja core. Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 25, vinot vatsarutistukset 15/puoli, timanttipunnerrus 12–15, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 25",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 25,
-              "reps": 25
+              "reps": 25,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 12–15",
+              "name": "Timanttipunnerrus",
               "repsMin": 12,
               "repsMax": 15,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 45 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 45,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2237,30 +2951,46 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 7/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20, goblet-kyykky 18, vatsarutistus penkillä 20, käsipainosoutu 15/puoli, lankku 60 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15–20",
+              "name": "Punnerrus",
               "repsMin": 15,
               "repsMax": 20,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 18",
+              "name": "Goblet-kyykky",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 20",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 20,
               "reps": 20
             },
             {
-              "name": "käsipainosoutu 15/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 60 s",
-              "durationSec": 60
+              "name": "Lankku",
+              "durationSec": 60,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2275,14 +3005,7 @@
           "time": "12:00",
           "durationMin": 60,
           "description": "Pitkä rauhallinen juoksu – 10 km. Viikko 7/8. Juokse 10 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 10
         },
         {
           "id": "s-75",
@@ -2291,25 +3014,8 @@
           "time": "12:00",
           "durationMin": 42,
           "description": "Reippaampi juoksu – 7 km. Viikko 7/8. Yhteensä 7 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 7 km: 1 km rauhallisesti",
-              "repsMin": 7,
-              "reps": 7
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 7
         },
         {
           "id": "s-76",
@@ -2318,7 +3024,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Kevyt juoksu – 6 km. Viikko 7/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 6
         }
       ]
     },
@@ -2334,32 +3041,52 @@
           "description": "Voima B – jalat ja core. Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 25, vinot vatsarutistukset 15/puoli, timanttipunnerrus 12–15, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 25",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 25,
-              "reps": 25
+              "reps": 25,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 12–15",
+              "name": "Timanttipunnerrus",
               "repsMin": 12,
               "repsMax": 15,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 45 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 45,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2376,30 +3103,46 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20, goblet-kyykky 18, vatsarutistus penkillä 20, käsipainosoutu 15/puoli, lankku 60 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15–20",
+              "name": "Punnerrus",
               "repsMin": 15,
               "repsMax": 20,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 18",
+              "name": "Goblet-kyykky",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 20",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 20,
               "reps": 20
             },
             {
-              "name": "käsipainosoutu 15/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 60 s",
-              "durationSec": 60
+              "name": "Lankku",
+              "durationSec": 60,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2416,23 +3159,39 @@
           "description": "Kevyt voimaharjoittelu. Viikko 8/8. Lämmittely 2 min. 2 kierrosta. Kevyt punnerrus 12, kyykky 15, vatsarutistus 15, lankku 35 s. Ei loppuun asti. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kevyt punnerrus 12",
+              "name": "Kevyt punnerrus",
               "repsMin": 12,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZOuKWir"
+              }
             },
             {
-              "name": "kyykky 15",
+              "name": "Kyykky",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "wger",
+                "id": "615"
+              }
             },
             {
-              "name": "vatsarutistus 15",
+              "name": "Vatsarutistus",
               "repsMin": 15,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "TFqbd8t"
+              }
             },
             {
-              "name": "lankku 35 s",
-              "durationSec": 35
+              "name": "Lankku",
+              "durationSec": 35,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 2,
@@ -2449,29 +3208,49 @@
           "description": "Palauttava core ja liikkuvuus. Viikko 8/8. Lämmittely 2 min. 2 kierrosta. Kissanlehmä 12, lonkankoukistajan venytys 40 s/puoli, bird dog 12/puoli, lankku 35 s, sivulankku 30 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Kissanlehmä 12",
-              "repsMin": 12,
-              "reps": 12
-            },
-            {
-              "name": "lonkankoukistajan venytys 40 s/puoli",
-              "durationSec": 40,
-              "perSide": true
-            },
-            {
-              "name": "bird dog 12/puoli",
+              "name": "Kissanlehmä",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "guide": {
+                "provider": "wger",
+                "id": "1938"
+              }
             },
             {
-              "name": "lankku 35 s",
-              "durationSec": 35
+              "name": "Lonkankoukistajan venytys",
+              "durationSec": 40,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1867"
+              }
             },
             {
-              "name": "sivulankku 30 s/puoli",
+              "name": "Bird dog",
+              "repsMin": 12,
+              "reps": 12,
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "1572"
+              }
+            },
+            {
+              "name": "Lankku",
+              "durationSec": 35,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
+            },
+            {
+              "name": "Sivulankku",
               "durationSec": 30,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 2,
@@ -2488,30 +3267,46 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20, goblet-kyykky 18, vatsarutistus penkillä 20, käsipainosoutu 15/puoli, lankku 60 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15–20",
+              "name": "Punnerrus",
               "repsMin": 15,
               "repsMax": 20,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 18",
+              "name": "Goblet-kyykky",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 20",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 20,
               "reps": 20
             },
             {
-              "name": "käsipainosoutu 15/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 60 s",
-              "durationSec": 60
+              "name": "Lankku",
+              "durationSec": 60,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2528,32 +3323,52 @@
           "description": "Voima B – jalat ja core. Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Bulgarialainen askelkyykky 12/jalka, kahvakuulaheilautus 25, vinot vatsarutistukset 15/puoli, timanttipunnerrus 12–15, sivulankku 45 s/puoli. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Bulgarialainen askelkyykky 12/jalka",
+              "name": "Bulgarialainen askelkyykky",
               "repsMin": 12,
               "reps": 12,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "988"
+              }
             },
             {
-              "name": "kahvakuulaheilautus 25",
+              "name": "Kahvakuulaheilautus",
               "repsMin": 25,
-              "reps": 25
+              "reps": 25,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "UHJlbu3"
+              }
             },
             {
-              "name": "vinot vatsarutistukset 15/puoli",
+              "name": "Vinot vatsarutistukset",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "QUDd8WS"
+              }
             },
             {
-              "name": "timanttipunnerrus 12–15",
+              "name": "Timanttipunnerrus",
               "repsMin": 12,
               "repsMax": 15,
-              "reps": 12
+              "reps": 12,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "soIB2rj"
+              }
             },
             {
-              "name": "sivulankku 45 s/puoli",
+              "name": "Sivulankku",
               "durationSec": 45,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "wger",
+                "id": "580"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2570,30 +3385,46 @@
           "description": "Voima A – rinta ja keskivartalo. Viikko 8/8. Lämmittely 2 min. 4 kierrosta. Punnerrus 15–20, goblet-kyykky 18, vatsarutistus penkillä 20, käsipainosoutu 15/puoli, lankku 60 s. Tauko 30–45 s liikkeiden välissä.",
           "exercises": [
             {
-              "name": "Punnerrus 15–20",
+              "name": "Punnerrus",
               "repsMin": 15,
               "repsMax": 20,
-              "reps": 15
+              "reps": 15,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "I4hDWkc"
+              }
             },
             {
-              "name": "goblet-kyykky 18",
+              "name": "Goblet-kyykky",
               "repsMin": 18,
-              "reps": 18
+              "reps": 18,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "ZA8b5hc"
+              }
             },
             {
-              "name": "vatsarutistus penkillä 20",
+              "name": "Vatsarutistus penkillä",
               "repsMin": 20,
               "reps": 20
             },
             {
-              "name": "käsipainosoutu 15/puoli",
+              "name": "Käsipainosoutu",
               "repsMin": 15,
               "reps": 15,
-              "perSide": true
+              "perSide": true,
+              "guide": {
+                "provider": "exercisedb",
+                "id": "C0MA9bC"
+              }
             },
             {
-              "name": "lankku 60 s",
-              "durationSec": 60
+              "name": "Lankku",
+              "durationSec": 60,
+              "guide": {
+                "provider": "wger",
+                "id": "458"
+              }
             }
           ],
           "roundsMin": 4,
@@ -2608,14 +3439,7 @@
           "time": "12:00",
           "durationMin": 60,
           "description": "Pitkä rauhallinen juoksu – 10 km. Viikko 8/8. Juokse 10 km kevyellä peruskestävyysvauhdilla. Pidä vauhti sellaisena, että pystyt puhumaan.",
-          "exercises": [
-            {
-              "name": "Pidä vauhti sellaisena"
-            },
-            {
-              "name": "että pystyt puhumaan"
-            }
-          ]
+          "distanceKm": 10
         },
         {
           "id": "s-78",
@@ -2624,25 +3448,8 @@
           "time": "12:00",
           "durationMin": 42,
           "description": "Reippaampi juoksu – 7 km. Viikko 8/8. Yhteensä 7 km: 1 km rauhallisesti, keskiosa noin 5:25–5:35 min/km, viimeinen 1 km rauhallisesti.",
-          "exercises": [
-            {
-              "name": "Yhteensä 7 km: 1 km rauhallisesti",
-              "repsMin": 7,
-              "reps": 7
-            },
-            {
-              "name": "keskiosa noin 5:25–5:35 min/km",
-              "repsMin": 25,
-              "repsMax": 5,
-              "reps": 25
-            },
-            {
-              "name": "viimeinen 1 km rauhallisesti",
-              "repsMin": 1,
-              "reps": 1
-            }
-          ],
-          "targetPace": "5:35"
+          "targetPace": "5:25-5:35",
+          "distanceKm": 7
         },
         {
           "id": "s-79",
@@ -2651,7 +3458,8 @@
           "time": "12:00",
           "durationMin": 36,
           "description": "Kevyt juoksu – 6 km. Viikko 8/8. Juokse 6 km rauhallisesti. Tavoitevauhti noin 5:45–6:05 min/km.",
-          "targetPace": "6:05"
+          "targetPace": "5:45-6:05",
+          "distanceKm": 6
         }
       ]
     }
