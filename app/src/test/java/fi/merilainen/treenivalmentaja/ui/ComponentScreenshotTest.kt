@@ -20,6 +20,7 @@ import fi.merilainen.treenivalmentaja.WorkoutCardToday
 import fi.merilainen.treenivalmentaja.WorkoutCardWeek
 import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
+import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -181,6 +182,31 @@ class ComponentScreenshotTest {
         RecoveryState.entries.forEach { state ->
             RecoveryCard(state, onSickClicked = {}, onRecoveredClicked = {})
         }
+    }
+
+    // ------------------------------------------------------------------ Timed exercises
+
+    /**
+     * A session whose movements come from the plan's `exercises` array rather than from parsing
+     * the description: the holds carry clocks, and the per-side ones say which side is running.
+     */
+    @Test
+    fun todayCard_timedExercisesFromThePlan() = capture("today_card_timed_exercises") {
+        WorkoutCardToday(
+            strengthWorkout.copy(
+                description = "Liikkuvuus ja keskivartalo. Tauko 30 s liikkeiden välissä.",
+                rounds = 1,
+                exercises = listOf(
+                    Exercise(name = "Kissa-lehmä", reps = 10),
+                    Exercise(name = "Lonkankoukistajan venytys", durationSec = 30, perSide = true),
+                    Exercise(name = "Bird dog", reps = 10, perSide = true),
+                    Exercise(name = "Lankku", durationSec = 25),
+                    Exercise(name = "Sivulankku", durationSec = 20, perSide = true),
+                ),
+            ),
+            onStatusChange = {},
+            onMoveToTomorrow = {},
+        )
     }
 
     // ------------------------------------------------------------------ Update card

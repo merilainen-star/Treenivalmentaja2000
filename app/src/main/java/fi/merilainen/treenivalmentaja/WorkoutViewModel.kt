@@ -12,6 +12,7 @@ import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
+import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
@@ -39,6 +40,17 @@ data class Workout(
   val appliedLighterVariant: Boolean = false,
   /** True when this session exists because another one was moved onto this day. */
   val movedHere: Boolean = false,
+  /**
+   * The session's movements as the plan defined them.
+   *
+   * Empty for a plan that supplies none, in which case the screens fall back to reading them out
+   * of [description] with `parseStrengthDescription`. That fallback is a guess — it decides what
+   * is a movement by counting commas — so a plan that carries real exercises should be shown from
+   * these instead.
+   */
+  val exercises: List<Exercise> = emptyList(),
+  /** Circuit rounds the whole exercise list is repeated for, when the plan says so. */
+  val rounds: Int = 1,
 ) {
   val dayString: String
     get() =
@@ -280,6 +292,8 @@ class WorkoutViewModel(
             status = session.status,
             appliedLighterVariant = session.appliedLighterVariant,
             movedHere = session.originalSessionId != null,
+            exercises = session.exercises.orEmpty(),
+            rounds = (session.rounds ?: session.roundsMin ?: 1).coerceAtLeast(1),
           )
         }
   }

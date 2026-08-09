@@ -143,6 +143,23 @@ a session with none of them describes no actual work and is rejected.
 
 An exercise must have at least one of `reps` or `durationSec`.
 
+#### Timed exercises and how often the clock runs
+
+`durationSec` is what makes an exercise timed — not its name. The app shows a clock for any
+exercise that carries it, and runs that clock once per repetition of the hold:
+
+| Fields | Clock |
+| --- | --- |
+| `durationSec: 30` | once |
+| `durationSec: 20`, `perSide: true` | twice, labelled Vasen and Oikea |
+| `durationSec: 45`, `sets: 3` | three times, labelled Sarja 1-3 |
+
+`perSide` takes precedence over `sets` rather than multiplying into a count nobody wrote.
+
+This matters because the alternative is counting in your head while holding a side plank. Write
+`"sivulankku"` with `durationSec: 20, perSide: true` and the app asks for both sides; write the
+duration into the name only, as `"sivulankku 20 s/puoli"` with no fields, and it cannot.
+
 ### `lighterAlternative`
 Same optional fields as a session — `durationMin`, `distanceKm`, `intensity`, `rounds`,
 `description`, `exercises` — and no `id`, `type`, `date`, or `time`: it inherits those from its
