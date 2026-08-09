@@ -18,7 +18,6 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
 import fi.merilainen.treenivalmentaja.ImportStartDialog
 import fi.merilainen.treenivalmentaja.RecoveryCard
-import fi.merilainen.treenivalmentaja.RecoveryState
 import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.WorkoutCardToday
 import fi.merilainen.treenivalmentaja.WorkoutCardWeek
@@ -185,11 +184,13 @@ class ComponentScreenshotTest {
 
     // ------------------------------------------------------------------ Recovery card
 
+    /**
+     * Two buttons and nothing else. The coloured indicator above them used to read the same
+     * verdict every day from a constant, so it is gone until Oura can produce a real one.
+     */
     @Test
-    fun recoveryCard_allStates() = capture("recovery_card_all_states") {
-        RecoveryState.entries.forEach { state ->
-            RecoveryCard(state, onSickClicked = {}, onRecoveredClicked = {})
-        }
+    fun recoveryCard() = capture("recovery_card") {
+        RecoveryCard(onSickClicked = {}, onRecoveredClicked = {})
     }
 
     // ------------------------------------------------------------------ Timed exercises
@@ -404,6 +405,41 @@ class ComponentScreenshotTest {
                         reps = 8,
                         weightKg = 40.0,
                         guide = GuideRef(provider = "exercisedb", id = "EIeI8Vf"),
+                    ),
+                ),
+            ),
+            onStatusChange = {},
+            onMoveToTomorrow = {},
+            onExerciseClick = {},
+        )
+    }
+
+    /**
+     * A started workout, drawn from the plan's own movements rather than from its description.
+     *
+     * The two things that were missing before: every movement is tappable for its guide, and a
+     * per-side hold gets a clock that knows it runs twice — "Vasen 1/2" is the whole point.
+     */
+    @Test
+    fun todayCard_startedFromThePlan() = capture("today_card_started_from_plan") {
+        WorkoutCardToday(
+            strengthWorkout.copy(
+                status = SessionStatus.STARTED,
+                description = "Palauttava core ja liikkuvuus. Tauko 30 s liikkeiden välissä.",
+                rounds = 1,
+                exercises = listOf(
+                    Exercise(name = "Kissanlehmä", reps = 10, guide = GuideRef("wger", "1938")),
+                    Exercise(
+                        name = "Bird dog",
+                        reps = 10,
+                        perSide = true,
+                        guide = GuideRef("wger", "1572"),
+                    ),
+                    Exercise(
+                        name = "Sivulankku",
+                        durationSec = 20,
+                        perSide = true,
+                        guide = GuideRef("wger", "580"),
                     ),
                 ),
             ),

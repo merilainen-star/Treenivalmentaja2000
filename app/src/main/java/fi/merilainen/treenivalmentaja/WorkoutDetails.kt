@@ -76,37 +76,12 @@ fun WorkoutDetails(
                 if (fromPlan) {
                     workout.exercises.forEach { exercise ->
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(
-                                    if (onExerciseClick == null) Modifier
-                                    else Modifier.clickable(
-                                        role = Role.Button,
-                                        onClickLabel = "Näytä liikeohje",
-                                        onClick = { onExerciseClick(exercise) },
-                                    )
-                                )
-                                .padding(vertical = 2.dp)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Text(
-                                    text = "• ${exercise.name}",
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                if (onExerciseClick != null) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Info,
-                                        // The row carries the label; naming the icon too would
-                                        // make TalkBack announce the same thing twice.
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
+                            ExerciseNameRow(
+                                text = "• ${exercise.name}",
+                                onClick = onExerciseClick?.let { open -> { open(exercise) } },
+                            )
                             val prescription = exercise.prescription()
                             if (prescription.isNotEmpty()) {
                                 Text(
@@ -150,6 +125,45 @@ fun WorkoutDetails(
                 text = "Kevennetty versio käytössä.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.secondary
+            )
+        }
+    }
+}
+
+/**
+ * A movement's name, and the way in to its guide.
+ *
+ * Shared by the read-only list and the started workout's checklist so the same movement offers
+ * the same thing in both. Only the name carries the tap: the row below it holds the clock's own
+ * buttons, and a movement should not open a guide because you reached for "Käynnistä".
+ */
+@Composable
+internal fun ExerciseNameRow(
+    text: String,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.then(
+            if (onClick == null) Modifier
+            else Modifier.clickable(
+                role = Role.Button,
+                onClickLabel = "Näytä liikeohje",
+                onClick = onClick,
+            )
+        ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(text = text, style = MaterialTheme.typography.bodyLarge)
+        if (onClick != null) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                // The row carries the label; naming the icon too would make TalkBack announce
+                // the same thing twice.
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
             )
         }
     }

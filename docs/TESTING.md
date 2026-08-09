@@ -4,10 +4,10 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 174 unit tests + 18 instrumented tests, all passing.
+**Status:** 175 unit tests + 18 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 174 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 21 screenshot comparisons (a subset of the 174 above)
+- `./gradlew :app:testDebugUnitTest` — 175 tests / 0 failures / 0 errors
+- `./gradlew :app:verifyRoborazziDebug` — 22 screenshot comparisons (a subset of the 175 above)
 - `./gradlew :app:connectedDebugAndroidTest` — 18 tests / 0 failures / 0 errors
 
 | Suite | Covers |
@@ -22,7 +22,7 @@ The testing strategy ensures the deterministic training engine works flawlessly 
 | `data/repository/TrainingRepositoryTest` | Real Room schema in memory: import, event-history accumulation, rejected transitions writing nothing, lighter-version payload and fallback, reschedule chain, duplicate/conflict detection, seeding, cascade delete. |
 | `ExercisePrescriptionTest`, `ExerciseTimerRoundsTest` | How a prescription reads (`3 × 10 · 18 kg`, a ramp set by set) and how many times a timed movement's clock runs. |
 | `data/update/UpdateInfoParsingTest`, `domain/CheckForUpdateUseCaseTest` | The published build metadata, parsed through the real Moshi configuration, and the comparison against the installed version. |
-| `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, tappable exercise rows, every state of the exercise-guide sheet, the recovery card, the update card, the import dialog and every status badge. |
+| `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, tappable exercise rows, a started workout drawn from the plan, every state of the exercise-guide sheet, the recovery card, the update card, the import dialog and every status badge. |
 | `ImageLoaderConfigurationTest` (instrumented) | That the image loader has no disk cache and creates no cache directory. A terms-of-use requirement, and a breach would leave no visible trace in the app — see [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md). |
 | `data/local/MigrationTest` (instrumented) | Room migration 3 → 4 against the KSP-generated schemas. |
 | `data/local/MigrationGuardTest` (instrumented) | That a missing migration throws and leaves the rows on disk, instead of emptying the database quietly. Fails if `fallbackToDestructiveMigration` is ever reintroduced. |

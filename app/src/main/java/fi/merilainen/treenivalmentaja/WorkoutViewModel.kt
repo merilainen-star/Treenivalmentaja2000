@@ -69,11 +69,10 @@ data class Workout(
       }
 }
 
-enum class RecoveryState(val title: String, val message: String) {
-  GOOD("Palautuminen: Hyvä", "Tee suunnitelman mukaan"),
-  OKAY("Palautuminen: Kohtalainen", "Kevyempi versio voi olla järkevä"),
-  POOR("Palautuminen: Heikko", "Harkitse lepoa"),
-}
+// There was a RecoveryState here, with three readings and their advice. Nothing ever produced
+// anything but the middle one, so the Today screen showed the same verdict every day. It comes
+// back when Oura can decide between them; until then the app says nothing about recovery rather
+// than saying the same wrong-shaped thing daily. See docs/ROADMAP.md.
 
 
 /** Result of the last plan import, shown once and then dismissed. */
@@ -93,9 +92,6 @@ class WorkoutViewModel(
       .observeSessions()
       .map { sessions -> sessions.toWorkouts(LocalDate.now()) }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-  private val _recoveryState = MutableStateFlow(RecoveryState.OKAY)
-  val recoveryState: StateFlow<RecoveryState> = _recoveryState.asStateFlow()
 
   val notificationSettings: StateFlow<NotificationSettings> =
     settingsStore.settingsFlow.stateIn(
@@ -254,7 +250,6 @@ class WorkoutViewModel(
       if (success) {
         rescheduleAlarmsUseCase.execute()
         _importFeedback.value = ImportFeedback("Onnistui", "Esimerkkidata palautettu (aloitus tänään).", isError = false)
-        _recoveryState.value = RecoveryState.OKAY
       } else {
         _importFeedback.value = ImportFeedback("Virhe", "Esimerkkidatan palautus epäonnistui.", isError = true)
       }

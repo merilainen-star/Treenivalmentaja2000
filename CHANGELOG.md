@@ -41,7 +41,15 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   instructions, including the ExerciseDB terms that constrain it.
 
 ### Fixed
-- App startup rewrote the training calendar. With a plan whose dates had passed, the engine
+- A started workout lost half of what the plan knows about it. "Aloita ohjattu treeni" rendered
+  its checklist from the session's free-text description rather than the plan's `exercises`
+  array, so mid-session there were no guide links, no prescriptions, and the movement names came
+  back with their numbers glued on ("sivulankku 20 s/puoli"). Worse, the checklist used a
+  single-shot timer that decided a movement was timed by looking for "lankku" in its name: a
+  per-side hold offered one clock for two sides, and there was no way to time the second. It now
+  draws from the same movements the read-only list does, so a side plank asks for Vasen and then
+  Oikea, and every movement is still tappable for its guide while the workout is running. Plans
+  with no `exercises` array keep the old description-parsing path. With a plan whose dates had passed, the engine
   counted every past session as missed and shifted the whole programme so week 1 landed on today,
   restarting an eight-week plan from the beginning on every launch — including the one after an
   app update.

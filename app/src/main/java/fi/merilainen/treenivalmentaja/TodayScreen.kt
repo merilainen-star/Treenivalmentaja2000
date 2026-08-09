@@ -59,7 +59,6 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorYellow
 @Composable
 fun TodayScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
-    val recoveryState by viewModel.recoveryState.collectAsState()
     val guideState by viewModel.guideState.collectAsState()
 
     // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
@@ -81,7 +80,6 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         )
 
         RecoveryCard(
-            recoveryState = recoveryState,
             onSickClicked = { viewModel.markSick() },
             onRecoveredClicked = { viewModel.markRecovered() }
         )
@@ -126,18 +124,24 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     }
 }
 
+/**
+ * The two things the app can actually be told about your condition.
+ *
+ * It used to sit under a coloured indicator reading "Palautuminen: Kohtalainen" with the advice
+ * "Kevyempi versio voi olla järkevä". Nothing fed either of them: the value was a constant set in
+ * two places, both to the same thing, and the Oura tables it was waiting for have no writer. So
+ * the app repeated the same reading every day and nudged towards a lighter session on all of
+ * them — advice with nothing behind it, wearing the clothes of a measurement.
+ *
+ * The buttons were always real. They drive the training engine's illness pause and its graduated
+ * return, so this is what is left when the part that only looked informative is taken away. A
+ * recovery indicator belongs here again the day Oura can fill one in.
+ */
 @Composable
 fun RecoveryCard(
-    recoveryState: RecoveryState,
     onSickClicked: () -> Unit,
     onRecoveredClicked: () -> Unit
 ) {
-    val indicatorColor = when (recoveryState) {
-        RecoveryState.GOOD -> ColorGreen
-        RecoveryState.OKAY -> ColorYellow
-        RecoveryState.POOR -> ColorRed
-    }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -147,31 +151,6 @@ fun RecoveryCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(indicatorColor)
-                )
-
-                Column {
-                    Text(
-                        text = recoveryState.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = recoveryState.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -241,8 +220,13 @@ fun WorkoutCardToday(
             
             val isInteractive = workout.type == WorkoutType.STRENGTH && workout.status == SessionStatus.STARTED
             val parsedWorkout = remember(workout.description) { parseStrengthDescription(workout.description) }
-            
-            if (isInteractive && parsedWorkout.exercises.isNotEmpty()) {
+            // The plan's own movements when it has them, exactly as the read-only list uses them.
+            // Reading the description instead was what made a started workout lose the guide links
+            // and hand a per-side hold a single clock.
+            val fromPlan = workout.exercises.isNotEmpty()
+            val guided = isInteractive && (fromPlan || parsedWorkout.exercises.isNotEmpty())
+
+            if (guided) {
                 if (parsedWorkout.intro.isNotBlank()) {
                     Text(
                         text = parsedWorkout.intro,
@@ -250,39 +234,53 @@ fun WorkoutCardToday(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
-                
-                for (round in 1..parsedWorkout.rounds) {
-                    if (parsedWorkout.rounds > 1) {
+
+                val rounds = if (fromPlan) workout.rounds else parsedWorkout.rounds
+                for (round in 1..rounds) {
+                    if (rounds > 1) {
                         Text(
-                            text = "Kierros $round", 
-                            style = MaterialTheme.typography.titleMedium, 
+                            text = "Kierros $round",
+                            style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
-                    parsedWorkout.exercises.forEachIndexed { index, exercise ->
-                        key(round, index, exercise.name) {
-                            var checked by remember { mutableStateOf(false) }
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = checked,
-                                    onCheckedChange = { checked = it }
+                    if (fromPlan) {
+                        workout.exercises.forEachIndexed { index, exercise ->
+                            // Keyed by round so each round gets its own checkbox and its own
+                            // clock, rather than inheriting the previous round's finished ones.
+                            key(round, index, exercise.name) {
+                                GuidedExerciseRow(
+                                    exercise = exercise,
+                                    onExerciseClick = onExerciseClick,
                                 )
-                                Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                                    Text(text = exercise.name, style = MaterialTheme.typography.bodyLarge)
-                                    if (exercise.isPlank && exercise.plankDurationSeconds != null && !checked) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        PlankTimer(durationSeconds = exercise.plankDurationSeconds)
+                            }
+                        }
+                    } else {
+                        parsedWorkout.exercises.forEachIndexed { index, exercise ->
+                            key(round, index, exercise.name) {
+                                var checked by remember { mutableStateOf(false) }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = checked,
+                                        onCheckedChange = { checked = it }
+                                    )
+                                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                                        Text(text = exercise.name, style = MaterialTheme.typography.bodyLarge)
+                                        if (exercise.isPlank && exercise.plankDurationSeconds != null && !checked) {
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            PlankTimer(durationSeconds = exercise.plankDurationSeconds)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                
+
                 if (parsedWorkout.outro.isNotBlank()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -295,7 +293,7 @@ fun WorkoutCardToday(
                 WorkoutDetails(workout, onExerciseClick = onExerciseClick)
             }
 
-            if (isInteractive && parsedWorkout.exercises.isNotEmpty() && workout.appliedLighterVariant) {
+            if (guided && workout.appliedLighterVariant) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Kevennetty versio käytössä.",
@@ -361,6 +359,45 @@ fun WorkoutCardToday(
                         Text("Siirrä huomiselle")
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * One movement of a started workout: tick it off, see what it asks for, open its guide, and run
+ * its clock as many times as the movement actually needs.
+ *
+ * The clock is [ExerciseTimer], the same one the read-only list uses, so a hold done per side asks
+ * for both sides and only calls itself done when both have run. The old checklist used a
+ * single-shot timer that decided a movement was timed by looking for "lankku" in its name, which
+ * is why a side plank offered one clock for two sides.
+ */
+@Composable
+private fun GuidedExerciseRow(exercise: Exercise, onExerciseClick: ((Exercise) -> Unit)?) {
+    var checked by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(checked = checked, onCheckedChange = { checked = it })
+        Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+            ExerciseNameRow(
+                text = exercise.name,
+                onClick = onExerciseClick?.let { open -> { open(exercise) } },
+            )
+            val prescription = exercise.prescription()
+            if (prescription.isNotEmpty()) {
+                Text(
+                    text = prescription,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // Ticked off means done, so the clock goes rather than inviting another run.
+            if (exercise.durationSec != null && !checked) {
+                Spacer(modifier = Modifier.height(4.dp))
+                ExerciseTimer(exercise = exercise)
             }
         }
     }

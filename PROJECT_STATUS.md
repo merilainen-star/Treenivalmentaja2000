@@ -5,7 +5,7 @@
 Every number below was measured on this commit, not carried over from a previous report.
 
 - Date: 2026-08-09
-- Git commit: working tree on top of `b57a3f5` (repository connected to
+- Git commit: working tree on top of `9d96635` (repository connected to
   https://github.com/merilainen-star/Treenivalmentaja2000)
 - Toolchain: Temurin JDK 21.0.12, Gradle 9.6.1 via wrapper, Android SDK Platform 36.1,
   Build-Tools 36.1.0. `minSdk` 26, `targetSdk` 36.
@@ -13,8 +13,8 @@ Every number below was measured on this commit, not carried over from a previous
 | Check | Command | Result |
 | --- | --- | --- |
 | Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 20,250,270 B (20.3 MB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 174 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 21 comparisons, no diffs |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 175 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 22 comparisons, no diffs |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 40 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 18 tests, 0 failures, 0 errors |
 
@@ -60,8 +60,9 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   emptying the database.
 - **Expandable week rows.** Tapping a row in the Week view unrolls the session's content beneath
   it.
-- **Screenshot tests.** 20 Roborazzi baselines over the Today and Week cards, the recovery card,
-  every status badge and every state of the exercise-guide sheet. They run on the JVM, no device needed. The comparison tolerates 0.5% of
+- **Screenshot tests.** 22 Roborazzi baselines over the Today and Week cards, a started workout's
+  checklist, the recovery card, every status badge and every state of the exercise-guide sheet.
+  They run on the JVM, no device needed. The comparison tolerates 0.5% of
   changed pixels, because Windows and Linux antialias text differently — measured at 0.046%, with
   no pixel differing by more than 32/255. A 2dp shadow change still fails them.
 - **Exercises shown as the plan wrote them.** Each movement displays its prescription —
@@ -95,6 +96,10 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   them actually planks; picking one kept the `Ehdotus` warning; and a movement hit a real `503`
   and drew the retry state, which retried. `cacheDir` held nothing but itself afterwards.
 
+  Reachable from the read-only list and from a started workout's checklist alike — the two draw
+  the same movements from the same place, so nothing the plan knows is lost the moment you tap
+  "Aloita ohjattu treeni".
+
   Reachable only for sessions whose plan carries an `exercises` array. The seeded starter week
   does not — it describes its movements in prose — so a fresh install has nothing to tap until a
   plan is imported. `sample-data/plan.json` carries references for 248 of its 272 exercise rows
@@ -116,8 +121,12 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 - "Kevyempi versio" applies the plan's lighter payload, or falls back to a 40% reduction. The
   wider rule engine (load balancing, stacking prevention) is not built.
-- The recovery card on the Today screen is a **fixed placeholder** — it always reads
-  "Kohtalainen". Nothing feeds it, and nothing will until Oura data arrives.
+- The Today screen no longer claims to know anything about recovery. The card there used to show
+  a coloured indicator reading "Palautuminen: Kohtalainen" above the advice "Kevyempi versio voi
+  olla järkevä" — a constant, set in two places, both to the same value, so it repeated the same
+  verdict every day and nudged towards a lighter session on all of them. The indicator and the
+  advice are gone; the "Sairastuin" and "Tervehdyin" buttons under them were always real and
+  stay. An indicator belongs there again the day Oura can fill one in.
 
 ## Not implemented
 

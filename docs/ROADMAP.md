@@ -53,8 +53,9 @@ the numbers behind them.
    ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend), tokens in
    `EncryptedSharedPreferences`.
 4. **WorkManager** for background biometric syncing.
-5. **Feed readiness into the recovery card**, which is a fixed placeholder today and is the first
-   point at which the Oura work becomes visible to the user.
+5. **Put a recovery reading back on the Today screen**, this time with a measurement behind it.
+   That card shows only the illness buttons today, because the indicator it used to carry was a
+   constant. This is the first point at which the Oura work becomes visible to the user.
 
 ## Later (Phase 4 & Beyond)
 - Logging what was actually lifted, so a strength session can be compared with the last time it
