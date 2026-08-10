@@ -16,6 +16,8 @@ import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
@@ -101,6 +103,7 @@ class WorkoutViewModel(
   private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase,
   private val checkForUpdateUseCase: CheckForUpdateUseCase,
   private val loadExerciseGuideUseCase: LoadExerciseGuideUseCase,
+  private val ouraConnection: OuraConnection,
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -126,6 +129,19 @@ class WorkoutViewModel(
   private val _updateStatus = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)
   val updateStatus: StateFlow<UpdateStatus> = _updateStatus.asStateFlow()
 
+  /** Whether Oura is connected, being connected, or cannot be. */
+  val ouraState: StateFlow<OuraConnectionState> = ouraConnection.state
+
+  /**
+   * Set when a login is waiting for a browser to be opened, and cleared the moment one is.
+   *
+   * The ViewModel builds the URL — it is the half that knows the PKCE verifier and has to write it
+   * down before the browser sees anything — but opening a browser is something only a real screen
+   * can do, so it is handed over as state rather than performed here.
+   */
+  private val _ouraAuthorizationUrl = MutableStateFlow<String?>(null)
+  val ouraAuthorizationUrl: StateFlow<String?> = _ouraAuthorizationUrl.asStateFlow()
+
   /** `null` means no guide sheet is open. */
   private val _guideState = MutableStateFlow<ExerciseGuideState?>(null)
   val guideState: StateFlow<ExerciseGuideState?> = _guideState.asStateFlow()
@@ -142,6 +158,53 @@ class WorkoutViewModel(
       // imports deleted them are cleaned up without having to import again.
       repository.deleteReplacedPlans()
     }
+  }
+
+  // ------------------------------------------------------------------ Oura
+
+  /** Starts a login. The screen opens whatever lands in [ouraAuthorizationUrl]. */
+  fun connectOura() {
+    viewModelScope.launch { _ouraAuthorizationUrl.value = ouraConnection.beginAuthorization() }
+  }
+
+  /**
+   * The browser is open, so the URL has been used.
+   *
+   * Cleared rather than kept, because it carries a `code_challenge` for one specific attempt —
+   * reopening the same URL later would send a challenge whose verifier has already been spent.
+   */
+  fun ouraAuthorizationOpened() {
+    _ouraAuthorizationUrl.value = null
+  }
+
+  /** Nothing was opened — no browser on the device, or the intent was refused. */
+  fun ouraAuthorizationFailedToOpen() {
+    _ouraAuthorizationUrl.value = null
+    viewModelScope.launch { ouraConnection.cancelAuthorization() }
+  }
+
+  /**
+   * Stores the client id and secret pasted from Oura's developer portal.
+   *
+   * Blank fields are refused by the connection rather than here; the card already disables the
+   * button, and two places deciding the same thing is how they come to disagree.
+   */
+  fun saveOuraCredentials(clientId: String, clientSecret: String) {
+    viewModelScope.launch { ouraConnection.saveCredentials(clientId, clientSecret) }
+  }
+
+  /** The way back to the credential fields, for a client id that was pasted wrong. */
+  fun forgetOuraCredentials() {
+    viewModelScope.launch { ouraConnection.forgetCredentials() }
+  }
+
+  /** Drops the tokens and the cached Oura rows. The training plan is untouched. */
+  fun disconnectOura() {
+    viewModelScope.launch { ouraConnection.disconnect() }
+  }
+
+  fun dismissOuraFailure() {
+    viewModelScope.launch { ouraConnection.dismissFailure() }
   }
 
   /** Cheap enough to run whenever Settings opens: one GET of a few hundred bytes. */
@@ -359,6 +422,7 @@ class WorkoutViewModel(
           application.rescheduleAlarmsUseCase,
           application.checkForUpdateUseCase,
           application.loadExerciseGuideUseCase,
+          application.ouraConnection,
         )
       }
     }

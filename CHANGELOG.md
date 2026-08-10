@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-10
+
+### Added
+- **Oura is set up entirely on the phone.** Settings asks for the Client ID and Client Secret of an
+  application registered in Oura's developer portal, stores them encrypted beside the tokens, and
+  connects from there. Nothing needs a PC, a checkout, an `.env` file or a file copied from a
+  computer — which matters because this app is installed by opening a GitHub release link on the
+  phone, and a build from CI has no `.env`. As written before, the feature could never have
+  connected on the only build its owner actually runs. A side effect worth naming: the published
+  APK now carries **no Oura secret at all**.
+  See [ADR-009](docs/DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it).
+- **"Yhdistä Oura" in Settings**, and the whole OAuth2 flow behind it: the authorization request
+  with PKCE (S256), `state` validation, the code exchange, encrypted token storage, and renewal on
+  `401`. The card tells four situations apart, because what to do about them differs: no credentials
+  yet (the two fields, with instructions), a disconnected one, a login waiting on a browser, and a
+  connected one, which offers only the way out.
+- Tokens and the pending PKCE verifier are encrypted with AES-256-GCM under a key generated inside
+  the Android Keystore, which cannot be extracted from the device. **Not**
+  `EncryptedSharedPreferences`, which the documents specified: that library was deprecated in April
+  2025 and receives no fixes, including for the Keystore crash reported against it. See
+  [ADR-008](docs/DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences).
+  They are excluded from cloud backup and device transfer, because the key does not travel with a
+  backup and restored ciphertext would be unreadable.
+- The verifier survives the browser round trip on disk rather than in memory. Android may kill the
+  process while a browser is in front of it, and a verifier lost that way turns a completed login
+  into a failed exchange.
+- Token renewal as an OkHttp `Authenticator`: a `401` refreshes once and retries the request. Two
+  requests failing at the same moment produce **one** refresh — Oura rotates refresh tokens, so the
+  second would otherwise spend an already-invalidated one and log the user out for being busy.
+- An Oura API V2 client (`data/oura`) — readiness, sleep, activity and workouts between two dates,
+  paged to the end and mapped onto the two Oura tables that have sat empty since they were created.
+  All four collections are the same request and the same `{data, next_token}` envelope in the
+  specification, so they are one generic paged fetch rather than four endpoints.
+- Every documented Oura status code has a type of its own, carrying a Finnish message and a
+  `canRetry` flag. `403` is the one worth naming: it is not a service failure but the user's Oura
+  subscription having expired, so it is a state to show rather than something to retry.
+- A day the ring was not worn survives as a day without a score. Oura answers with a document whose
+  `score` is `null`, not with no document, and it is stored as a row with `null` in it — the
+  recovery card's whole design turns on being able to say "ei tietoa" about a day that exists.
+- 30 unit tests against a local `com.sun.net.httpserver`, covering the bearer header, the date
+  parameters, paging, every error code, an unreachable host and a body that is not JSON. **The
+  fixtures they stand on are derived from the vendored specification, not captured from Oura** —
+  unlike the exercise-guide fixtures next to them, which are real responses. Nothing here has met
+  the live service yet, and nothing in the app calls the client.
+
+### Fixed
+- Disconnecting Oura also deleted the client credentials, so reconnecting would have meant pasting
+  the Client ID and Secret again. The token store emptied its whole preferences file rather than the
+  keys it meant to. Caught by an instrumented test on a device: the in-memory fake the unit tests
+  use kept the credentials, so the unit test asserting they survive a disconnect passed while the
+  real store wiped them.
+- A stray `treenivalmentaja://oauth2callback` deep link aimed at a build with no Oura credentials
+  left Settings offering "Yritä uudelleen" for a connection that cannot be attempted at all. Found
+  by firing a forged redirect at the exported activity on the emulator, not by reading the code.
+  Such a redirect is now ignored, and the card keeps asking for the credentials it still needs.
+- Two things the documents promised that turned out not to exist. `AUTHENTICATION.md` said
+  disconnecting calls Oura's revoke endpoint; the vendored specification declares **no `/oauth`
+  paths at all**, so there is nothing to call and inventing a URL would have been worse than saying
+  so. Disconnecting now deletes everything locally and the card says where to revoke the
+  application itself. And the token storage those documents named has been deprecated since April
+  2025 — see above.
+
+### Changed
+- OkHttp is now a declared dependency instead of one inherited from Coil, and the Oura client is
+  built on it rather than on the Retrofit the roadmap had promised since before this app had any
+  networking at all — see
+  [ADR-007](docs/DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client). It costs no APK
+  bytes, because Coil already put 4.12.0 inside the APK; what it buys is the `Authenticator` that
+  token renewal is specified in terms of. Measured cost of the whole Oura milestone so far:
+  68,021 B — the client 14,801 B, the authentication and its Settings UI 53,220 B, and no new
+  dependency in either.
+
 ## [Unreleased] - 2026-08-09
 
 ### Added

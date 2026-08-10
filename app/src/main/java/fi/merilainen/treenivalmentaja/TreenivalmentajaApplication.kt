@@ -22,8 +22,28 @@ import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 
 import fi.merilainen.treenivalmentaja.data.notification.NotificationChannels
 import fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler
+import fi.merilainen.treenivalmentaja.data.oura.OuraAuthService
+import fi.merilainen.treenivalmentaja.data.oura.OuraAuthenticator
+import fi.merilainen.treenivalmentaja.data.oura.OuraClient
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
+import fi.merilainen.treenivalmentaja.data.oura.OuraCredentials
+import fi.merilainen.treenivalmentaja.data.oura.OuraCredentialsSource
+import fi.merilainen.treenivalmentaja.data.oura.OuraTokenStore
+import fi.merilainen.treenivalmentaja.data.oura.clearCachedOuraData
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 
 class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
+
+  /**
+   * For work that must outlive the screen that started it — currently the OAuth token exchange,
+   * which arrives at an activity that finishes immediately after forwarding it.
+   */
+  val applicationScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
   val db: AppDatabase by lazy { AppDatabase.getInstance(this) }
 
@@ -81,9 +101,67 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     )
   }
 
+  private val ouraTokenStore: OuraTokenStore by lazy { OuraTokenStore(this) }
+
+  /**
+   * What the user typed into Settings, and only failing that what the build was compiled with.
+   *
+   * That order is the point. Oura withdrew personal access tokens, so an application registered in
+   * their developer portal is the only way in, and requiring its secret to be compiled in would
+   * mean a PC, a checkout and a local build — none of which this app is installed by. Typed
+   * credentials therefore win; `BuildConfig` remains so that a local `.env` build keeps working
+   * without anyone typing anything. See ADR-009 in `docs/DECISIONS.md`.
+   */
+  private val ouraCredentials: OuraCredentialsSource = OuraCredentialsSource {
+    ouraTokenStore.credentials()
+      ?: OuraCredentials(
+        clientId = BuildConfig.OURA_CLIENT_ID,
+        clientSecret = BuildConfig.OURA_CLIENT_SECRET,
+      )
+  }
+
+  private val ouraAuthService: OuraAuthService by lazy { OuraAuthService(ouraCredentials) }
+
+  /** One for the whole process: the state Settings observes has to be the state that changes. */
+  val ouraConnection: OuraConnection by lazy {
+    OuraConnection(
+      store = ouraTokenStore,
+      authService = ouraAuthService,
+      credentials = ouraCredentials,
+      onDisconnected = { db.ouraDao().clearCachedOuraData() },
+    )
+  }
+
+  /**
+   * The Oura API client, with token renewal installed.
+   *
+   * The `Authenticator` goes on this client and not on the one inside [OuraAuthService]: the
+   * refresh call must never be able to trigger a refresh of its own.
+   */
+  internal val ouraClient: OuraClient by lazy {
+    OuraClient(
+      tokens = ouraConnection.tokenSource(),
+      calls =
+        OkHttpClient.Builder()
+          .connectTimeout(10, TimeUnit.SECONDS)
+          .readTimeout(10, TimeUnit.SECONDS)
+          .authenticator(
+            OuraAuthenticator(
+              store = ouraTokenStore,
+              service = ouraAuthService,
+              onRefreshFailed = { applicationScope.launch { ouraConnection.refreshState() } },
+            )
+          )
+          .build(),
+    )
+  }
+
   override fun onCreate() {
     super.onCreate()
     NotificationChannels.createChannels(this)
+    // Settings must be able to say whether Oura is connected the moment it is opened, and the
+    // answer is on disk behind a Keystore decryption rather than in memory.
+    applicationScope.launch { ouraConnection.refreshState() }
   }
 
   /**

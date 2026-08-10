@@ -136,7 +136,10 @@ dependencies {
   // implementation(libs.logging.interceptor)
   // Moshi parses the training plan JSON import format (docs/PLAN_SCHEMA.md).
   implementation(libs.moshi.kotlin)
-  // implementation(libs.okhttp)
+  // OkHttp is the Oura client's transport (data/oura/). It is not a new dependency: Coil already
+  // puts 4.12.0 on the classpath, so declaring it directly costs no APK bytes and buys the
+  // Authenticator that docs/AUTHENTICATION.md's 401 -> refresh -> retry rests on.
+  implementation(libs.okhttp)
   // implementation(libs.play.services.location)
   // implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)

@@ -1,7 +1,12 @@
 # API Integrations
 
-*(Note: the Oura integration is **planned**. Nothing in the app calls it yet. Everything below
-about the API itself was read out of the vendored specification, not from memory.)*
+*(Note: the client that speaks this API is built —
+`app/src/main/java/fi/merilainen/treenivalmentaja/data/oura/`, on OkHttp per
+[ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client). **Nothing calls it yet**:
+the authentication that would give it a token, the sync that would schedule it and the card that
+would show the result are all still planned. Everything below about the API itself was read out of
+the vendored specification, not from memory, and the client has never been run against the live
+service.)*
 
 ## Oura API V2
 
@@ -101,6 +106,24 @@ Every collection endpoint declares the same set. They are not all the same kind 
 
 The spec documents no rate-limit numbers and no `Retry-After` header, so the backoff has to be
 chosen rather than read.
+
+### What the client makes of all that
+
+`OuraClient` turns each of them into a type carrying an already-Finnish message and a `canRetry`
+flag, so a caller decides what to do without re-reading status codes:
+
+| Status | Type | `canRetry` |
+| --- | --- | --- |
+| no token stored | `OuraNotConnectedException` | no — connect Oura |
+| `401` | `OuraAuthException` | no — refresh, once there is a refresh token to use |
+| `403` | `OuraSubscriptionExpiredException` | no — a state to show |
+| `429` | `OuraRateLimitException` | yes |
+| `400`, `422` | `OuraRequestException` | no — our bug |
+| network failure, `5xx`, unreadable body | `OuraUnavailableException` | yes |
+
+Paging is followed to the end rather than capped, with one exception: a service that never stops
+returning a `next_token` ends the run with `OuraUnavailableException` after 50 pages. Returning part
+of an answer as though it were all of it is the one outcome that is not allowed.
 
 ### Timestamps, timezones and units
 

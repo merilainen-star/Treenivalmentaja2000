@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.OuraCard
 import fi.merilainen.treenivalmentaja.SettingsScreenContent
 import fi.merilainen.treenivalmentaja.TodayScreenContent
 import fi.merilainen.treenivalmentaja.WeekScreenContent
 import fi.merilainen.treenivalmentaja.Workout
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuideRef
@@ -143,6 +145,64 @@ class ScreenScreenshotTest {
             settings = NotificationSettings(),
             updateStatus = UpdateStatus.LocalBuild,
             hasNotificationPermission = false,
+        )
+    }
+
+    /**
+     * Settings with Oura connected — the state a build with an `.env` and a finished login reaches,
+     * and one that cannot be produced on this machine at all: it needs credentials only the owner's
+     * Oura account can issue. Captured from the state rather than from a phone, which is the whole
+     * reason the screens were made functions of their state.
+     */
+    @Test
+    fun settings_ouraConnected() = capture("screen_settings_oura_connected") {
+        SettingsScreenContent(
+            settings = NotificationSettings(),
+            updateStatus = UpdateStatus.UpToDate("1.0-6b24a69"),
+            ouraState = OuraConnectionState.Connected,
+        )
+    }
+
+    // ------------------------------------------------------------------ the Oura card
+
+    /** The ordinary starting point once a build has credentials. */
+    @Test
+    fun oura_disconnected() = capture("card_oura_disconnected") {
+        OuraCard(state = OuraConnectionState.Disconnected)
+    }
+
+    /**
+     * The one-off setup, and the state a fresh install opens on. Everything here is done on the
+     * phone: Oura withdrew personal access tokens, so an application registered in their developer
+     * portal is the only way in, and its client id and secret are typed rather than compiled in.
+     */
+    @Test
+    fun oura_credentialsNeeded() = capture("card_oura_not_configured") {
+        OuraCard(state = OuraConnectionState.NotConfigured)
+    }
+
+    /** Waiting on a browser that is covering this screen. */
+    @Test
+    fun oura_connecting() = capture("card_oura_connecting") {
+        OuraCard(state = OuraConnectionState.Connecting)
+    }
+
+    @Test
+    fun oura_connected() = capture("card_oura_connected") {
+        OuraCard(state = OuraConnectionState.Connected)
+    }
+
+    /**
+     * A redirect whose `state` did not match — the one failure that is a refusal rather than a
+     * fault, and the hardest of all these to reach by hand.
+     */
+    @Test
+    fun oura_failed() = capture("card_oura_failed") {
+        OuraCard(
+            state =
+                OuraConnectionState.Failed(
+                    "Vastaus ei vastannut lähetettyä pyyntöä, joten sitä ei käytetty."
+                )
         )
     }
 }

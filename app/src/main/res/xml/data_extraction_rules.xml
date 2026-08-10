@@ -4,16 +4,13 @@
    for details.
 -->
 <data-extraction-rules>
+    <!-- Excluded from both, for the same reason and not only from the cloud: the Keystore key the
+         Oura tokens are encrypted with does not travel to the new device either, so transferred
+         ciphertext would be unreadable there too. See data/oura/OuraTokenStore.kt. -->
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="sharedpref" path="oura_tokens.xml"/>
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="oura_tokens.xml"/>
     </device-transfer>
-    -->
 </data-extraction-rules>

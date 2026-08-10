@@ -59,16 +59,33 @@ None required. Per [ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp
 server-side component: no Firebase project, no Cloud Functions, no `google-services.json`.
 
 ## 4. Oura Developer Application Setup
-1. Go to the Oura Developer portal.
+
+**No PC required.** Every step below works in a phone browser, and the credentials are typed into
+the app rather than compiled into it
+([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)).
+That is deliberate: a build from CI has no `.env`, so an app that needed one could never connect
+Oura on the phone it is actually installed on.
+
+1. Sign in to the Oura developer portal (<https://developer.ouraring.com>).
 2. Create a new Application.
-3. Set the Redirect URI to `treenivalmentaja://oauth2callback`.
-4. Put **both** the Client ID and the Client Secret in your local `.env`:
-   ```properties
-   OURA_CLIENT_ID=your-client-id
-   OURA_CLIENT_SECRET=your-client-secret
-   ```
-   They are injected into `BuildConfig` at build time by the Secrets Gradle Plugin. `.env` must
-   never be committed.
+3. Set the Redirect URI to exactly `treenivalmentaja://oauth2callback`.
+4. Open **Asetukset → Oura** in the app, paste the Client ID and Client Secret, and tap
+   "Tallenna tunnukset". They are stored encrypted on the device and never leave it except to
+   Oura's own token endpoint.
+5. Tap "Yhdistä Oura". The login opens in the browser and returns to the app.
+
+Note: Oura **personal access tokens were withdrawn in December 2025**, so there is no single-token
+shortcut, even though the vendored `docs/api/oura-openapi-1.37.json` still declares a `BearerAuth`
+scheme.
+
+### Optional: credentials at build time instead
+A local build may still supply them through a git-ignored `.env` at the repository root:
+```properties
+OURA_CLIENT_ID=your-client-id
+OURA_CLIENT_SECRET=your-client-secret
+```
+They are injected into `BuildConfig` by the Secrets Gradle Plugin, and are used only when nothing
+has been entered in the app. `.env` must never be committed.
 
 ## 5. Android Studio Setup
 1. Open Android Studio.
@@ -79,7 +96,8 @@ server-side component: no Firebase project, no Cloud Functions, no `google-servi
 - **Build and install:** `./gradlew assembleDebug`, or click "Run" in Android Studio.
 - **Unit tests:** `./gradlew :app:testDebugUnitTest`
 - **Without Oura credentials:** the app builds and runs fine — the plan, import, and scheduling
-  features are fully local. Only the Oura connection is unavailable.
+  features are fully local. The Oura card in Settings asks for a Client ID and Client Secret, which
+  is where a fresh install starts; see section 4.
 
 ## 7. Installing a Test Build on the Phone
 

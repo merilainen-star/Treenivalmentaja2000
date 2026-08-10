@@ -2,10 +2,11 @@
 
 This document outlines the architecture for the Treenivalmentaja Android application. 
 *(Note: the local half of this architecture — Compose UI, `WorkoutViewModel`, `TrainingEngine`,
-`TrainingRepository`, Room and the AlarmManager reminders — is **implemented**. Everything
-involving Oura — the Retrofit clients, OAuth, WorkManager sync and workout matching — is
-**planned**; the Oura tables exist in the database but nothing writes to them. Network calls do
-exist: the update check in `data/update`, a single `HttpURLConnection` GET of the published
+`TrainingRepository`, Room and the AlarmManager reminders — is **implemented**. Of the Oura half,
+the API client and the whole OAuth flow in `data/oura` exist, are tested, and are reachable from
+Settings; the background sync and workout matching are **planned**, so nothing yet writes to the
+Oura tables and no login has been completed against the live service. Network calls
+do exist: the update check in `data/update`, a single `HttpURLConnection` GET of the published
 build's metadata, and the exercise-guide lookups in `data/guide` against ExerciseDB and wger, also
 plain `HttpURLConnection`, made when a movement is tapped and storing nothing —
 [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md).)*
@@ -33,7 +34,8 @@ All source lives under the package `fi.merilainen.treenivalmentaja`.
 - **Presentation Layer:** `WorkoutViewModel`
 - **Domain Layer:** models and status transition rules (`domain/`); use cases for scheduling and
   matching are still planned
-- **Data Layer:** Room database, DAOs and repositories (`data/`); Retrofit API clients planned
+- **Data Layer:** Room database, DAOs and repositories (`data/`); the Oura API client in
+  `data/oura`, built on OkHttp ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client))
 
 ```mermaid
 graph TD
@@ -41,7 +43,7 @@ graph TD
     VM --> UC[Use Cases]
     UC --> Repo[Repositories]
     Repo --> DB[(Room Database)]
-    Repo --> Net[Retrofit / Network]
+    Repo --> Net[OkHttp / Network]
 ```
 
 ## Backend Components

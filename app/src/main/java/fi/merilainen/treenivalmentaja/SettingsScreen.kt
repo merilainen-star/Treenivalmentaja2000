@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val importFeedback by viewModel.importFeedback.collectAsState()
     val pendingConfirmation by viewModel.pendingImport.collectAsState()
     val updateStatus by viewModel.updateStatus.collectAsState()
+    val ouraState by viewModel.ouraState.collectAsState()
+    val ouraAuthorizationUrl by viewModel.ouraAuthorizationUrl.collectAsState()
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -114,9 +118,33 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         )
     }
 
+    /**
+     * Opening a browser is the third thing only a real screen can do, alongside the file picker
+     * and the notification permission.
+     *
+     * An external browser rather than a WebView, deliberately: a WebView would let this app read
+     * the Oura password as it is typed, which is exactly what the authorization-code flow exists to
+     * avoid. It is also keyed on the URL, so a login started twice does not open two tabs.
+     */
+    LaunchedEffect(ouraAuthorizationUrl) {
+        val url = ouraAuthorizationUrl ?: return@LaunchedEffect
+        val opened =
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+            }.isSuccess
+        if (opened) viewModel.ouraAuthorizationOpened()
+        else viewModel.ouraAuthorizationFailedToOpen()
+    }
+
     SettingsScreenContent(
         settings = settings,
         updateStatus = updateStatus,
+        ouraState = ouraState,
+        onConnectOura = viewModel::connectOura,
+        onDisconnectOura = viewModel::disconnectOura,
+        onDismissOuraFailure = viewModel::dismissOuraFailure,
+        onSaveOuraCredentials = viewModel::saveOuraCredentials,
+        onForgetOuraCredentials = viewModel::forgetOuraCredentials,
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -145,8 +173,14 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
 fun SettingsScreenContent(
     settings: NotificationSettings,
     updateStatus: UpdateStatus = UpdateStatus.Idle,
+    ouraState: OuraConnectionState = OuraConnectionState.NotConfigured,
     hasNotificationPermission: Boolean = true,
     onRequestNotificationPermission: () -> Unit = {},
+    onConnectOura: () -> Unit = {},
+    onDisconnectOura: () -> Unit = {},
+    onDismissOuraFailure: () -> Unit = {},
+    onSaveOuraCredentials: (String, String) -> Unit = { _, _ -> },
+    onForgetOuraCredentials: () -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -235,6 +269,15 @@ fun SettingsScreenContent(
                 )
             }
         }
+
+        OuraCard(
+            state = ouraState,
+            onConnect = onConnectOura,
+            onDisconnect = onDisconnectOura,
+            onDismissFailure = onDismissOuraFailure,
+            onSaveCredentials = onSaveOuraCredentials,
+            onForgetCredentials = onForgetOuraCredentials,
+        )
 
         Card(
             modifier = Modifier.fillMaxWidth(),

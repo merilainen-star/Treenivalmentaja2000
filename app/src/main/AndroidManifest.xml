@@ -34,7 +34,24 @@
             </intent-filter>
         </activity>
 
-    
+        <!-- Exported because a browser has to be able to start it, which is what makes it the one
+             component in this app that an arbitrary caller can reach. It acts on nothing it is
+             given: the URI is handed to OuraConnection, which discards anything whose `state` is
+             not the value this device generated. See docs/SECURITY.md. -->
+        <activity
+            android:name=".OuraCallbackActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="treenivalmentaja" android:host="oauth2callback" />
+            </intent-filter>
+        </activity>
+
         <receiver android:name=".data.alarm.ReminderReceiver" android:exported="false" />
         <receiver android:name=".data.alarm.ActionReceiver" android:exported="false" />
         <receiver android:name=".data.alarm.BootReceiver" android:exported="false">

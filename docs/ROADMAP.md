@@ -46,13 +46,26 @@ the numbers behind them.
 - Nothing. The app is being used in real training between milestones.
 
 ## Next Milestone
-1. **Oura API V2 integration**, developed against a local server so it needs no credentials until
-   the end. The specification is vendored at `docs/api/oura-openapi-1.37.json` and what it says is
-   summarised in [API_INTEGRATIONS.md](API_INTEGRATIONS.md) — including that its own `servers.url`
-   is a broken placeholder, and that the sandbox namespace still requires a token.
-2. **In-app OAuth2 token exchange with PKCE**
-   ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend), tokens in
-   `EncryptedSharedPreferences`.
+1. ~~**Oura API V2 client**~~ — built. `data/oura` reads readiness, sleep, activity and workouts
+   between two dates, follows `next_token` to the last page, maps the five documented status codes
+   to typed already-Finnish failures, and turns what comes back into `oura_daily_summaries` and
+   `oura_workouts` rows. Written against the vendored `docs/api/oura-openapi-1.37.json` and a local
+   `com.sun.net.httpserver`, so it needed no credentials; on OkHttp rather than Retrofit
+   ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client)). **Nothing calls it
+   yet, and it has never met the live service** — the fixtures behind its tests are derived from
+   the specification, not captured from Oura, and only step 2's credentials can close that gap.
+2. ~~**In-app OAuth2 token exchange with PKCE**~~ — built, and reachable from Settings. The
+   authorization request, `state` validation, the code exchange, encrypted token storage, and the
+   OkHttp `Authenticator` that renews on `401` without spending a rotated refresh token twice.
+   Tokens are under an Android Keystore key rather than in `EncryptedSharedPreferences`, whose
+   library is deprecated
+   ([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
+   The client id and secret are **typed into Settings**, not compiled in, so the whole setup happens
+   on the phone — the previous design needed a local `.env` and therefore a PC, which is not how
+   this app is installed
+   ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)).
+   **No login has ever been completed**: that still needs an Oura developer application, which only
+   the owner's account can create.
 3. **WorkManager** for background biometric syncing.
 4. **Put a recovery reading back on the Today screen**, this time with a measurement behind it.
    That card shows only the illness buttons today, because the indicator it used to carry was a

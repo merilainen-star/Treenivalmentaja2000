@@ -6,8 +6,10 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- The Oura tokens are encrypted with a key that lives in the Android Keystore and cannot
+         leave the device. Backing up the ciphertext would restore bytes onto a phone whose Keystore
+         has no matching key, so the app would hold tokens it can never read. Excluded instead: a
+         restored install simply asks to connect Oura again.
+         See data/oura/OuraTokenStore.kt. -->
+    <exclude domain="sharedpref" path="oura_tokens.xml"/>
 </full-backup-content>

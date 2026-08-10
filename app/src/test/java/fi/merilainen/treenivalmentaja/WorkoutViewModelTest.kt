@@ -9,6 +9,11 @@ import fi.merilainen.treenivalmentaja.data.guide.GuideProviders
 import fi.merilainen.treenivalmentaja.data.guide.GuideUnavailableException
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
+import fi.merilainen.treenivalmentaja.data.oura.FakeOuraTokenStorage
+import fi.merilainen.treenivalmentaja.data.oura.OuraAuthService
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.data.oura.OuraCredentials
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.data.update.UpdateInfo
@@ -135,6 +140,16 @@ class WorkoutViewModelTest {
           installedVersionName = "1.0",
         ),
       loadExerciseGuideUseCase = LoadExerciseGuideUseCase(provider),
+      // A build with no `.env` — which is what a test run is — cannot connect Oura at all, so this
+      // never reaches a Keystore or a network. The connection's own behaviour is covered by
+      // OuraConnectionTest.
+      ouraConnection =
+        OuraConnection(
+          store = FakeOuraTokenStorage(),
+          authService = OuraAuthService({ PLACEHOLDER_CREDENTIALS }),
+          credentials = { PLACEHOLDER_CREDENTIALS },
+          onDisconnected = {},
+        ),
     )
   }
 
@@ -294,7 +309,27 @@ class WorkoutViewModelTest {
       guide = GuideRef(GuideProviders.EXERCISEDB, "EIeI8Vf"),
     )
 
+  /**
+   * The Oura card has to be able to say "no credentials in this build", because that is what a
+   * clone without an `.env` is — and tapping connect there must not open a browser at an empty
+   * `client_id`.
+   */
+  @Test
+  fun `a build without Oura credentials offers no login`() = runTest {
+    val viewModel = viewModel()
+    advanceUntilIdle()
+
+    viewModel.connectOura()
+    advanceUntilIdle()
+
+    assertEquals(OuraConnectionState.NotConfigured, viewModel.ouraState.value)
+    assertNull(viewModel.ouraAuthorizationUrl.value)
+  }
+
   private companion object {
+    val PLACEHOLDER_CREDENTIALS =
+      OuraCredentials(clientId = "placeholder_client_id", clientSecret = "placeholder_client_secret")
+
     fun guide(id: String, name: String) =
       ExerciseGuide(
         id = id,

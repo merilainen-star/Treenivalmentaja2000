@@ -1,0 +1,43 @@
+{
+  "data": [
+    {
+      "id": "1a2b3c4d-0000-4000-8000-000000000001",
+      "contributors": {
+        "activity_balance": 56,
+        "body_temperature": 98,
+        "hrv_balance": 75,
+        "previous_day_activity": null,
+        "previous_night": 35,
+        "recovery_index": 47,
+        "resting_heart_rate": 94,
+        "sleep_balance": 73,
+        "sleep_regularity": 61
+      },
+      "day": "2026-08-07",
+      "score": 66,
+      "temperature_deviation": -0.2,
+      "temperature_trend_deviation": 0.1,
+      "timestamp": "2026-08-07T00:00:00+03:00"
+    },
+    {
+      "id": "1a2b3c4d-0000-4000-8000-000000000002",
+      "contributors": {
+        "activity_balance": null,
+        "body_temperature": null,
+        "hrv_balance": null,
+        "previous_day_activity": null,
+        "previous_night": null,
+        "recovery_index": null,
+        "resting_heart_rate": null,
+        "sleep_balance": null,
+        "sleep_regularity": null
+      },
+      "day": "2026-08-08",
+      "score": null,
+      "temperature_deviation": null,
+      "temperature_trend_deviation": null,
+      "timestamp": "2026-08-08T00:00:00+03:00"
+    }
+  ],
+  "next_token": "MjAyNi0wOC0wOFQwMDowMDowMA=="
+}
