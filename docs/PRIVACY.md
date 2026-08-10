@@ -1,6 +1,7 @@
 # Privacy Policy — Treenivalmentaja
 
-**Last updated: 10 August 2026**
+**Last updated: 10 August 2026** *(revised the same day: the app now also requests the `heartrate`
+scope — see "What the app requests from Oura" below.)*
 
 Treenivalmentaja is a private, single-user Android training-companion app. It is built and installed
 by its author for their own use and is not distributed through any app store. This policy describes
@@ -44,14 +45,21 @@ no disk cache for it, and the in-memory cache is discarded when the app closes.
 
 ## What the app requests from Oura, and what it does not
 
-The app asks Oura for two permission scopes only:
+The app asks Oura for three permission scopes:
 
 - **Daily** — readiness, sleep and activity scores.
 - **Workout** — completed workouts, so they can be matched against planned sessions.
+- **Heartrate** — the heart-rate time series, used **only** to compute an average and a maximum for
+  a workout you actually did. Oura provides no heart rate on a workout itself, so there is no other
+  way to show one. Samples are reduced to those two numbers, stored against that workout, and the
+  series itself is not kept.
 
 It does **not** request your email address, personal information (gender, age, height, weight),
-heart-rate time series, tags, sessions, SpO2, ring configuration, stress, or heart-health data, even
-though the Oura API offers them. Data that is not needed for scheduling training is not requested.
+tags, sessions, SpO2, ring configuration, stress, or heart-health data, even though the Oura API
+offers them. Data that is not needed for scheduling training is not requested.
+
+Adding a scope requires you to authorise it again: an existing connection keeps the permissions it
+was granted with until you disconnect and reconnect.
 
 ## What the app does not do
 

@@ -159,6 +159,23 @@ interface OuraDao {
   @Query("SELECT * FROM oura_workouts WHERE startTimeUtc BETWEEN :fromUtc AND :toUtc")
   suspend fun getWorkoutsBetween(fromUtc: Long, toUtc: Long): List<OuraWorkoutEntity>
 
+  /**
+   * Ties a completed Oura workout to the session it answers.
+   *
+   * A `@Query` rather than an update of the whole row: matching runs after a sync has already
+   * written the row, and re-writing it here would risk putting back a stale copy of everything
+   * else it holds.
+   */
+  @Query("UPDATE oura_workouts SET matchedSessionId = :sessionId WHERE id = :workoutId")
+  suspend fun setMatchedSession(workoutId: String, sessionId: String?)
+
+  @Query("SELECT * FROM oura_workouts WHERE matchedSessionId = :sessionId ORDER BY startTimeUtc ASC")
+  fun observeWorkoutsForSession(sessionId: String): Flow<List<OuraWorkoutEntity>>
+
+  /** Every workout tied to any session, for the screens that draw a list of them. */
+  @Query("SELECT * FROM oura_workouts WHERE matchedSessionId IS NOT NULL")
+  fun observeMatchedWorkouts(): Flow<List<OuraWorkoutEntity>>
+
   @Query("DELETE FROM oura_daily_summaries") suspend fun clearDailySummaries()
 
   @Query("DELETE FROM oura_workouts") suspend fun clearWorkouts()

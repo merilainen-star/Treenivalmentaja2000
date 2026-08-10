@@ -73,15 +73,22 @@ class OuraOAuthTest {
     assertTrue(url, url.contains("state=state-xyz"))
   }
 
-  /** Only the two scopes the app reads. Asking for more is data it would then be holding. */
+  /**
+   * Only the three scopes the app reads. Asking for more is data it would then be holding.
+   *
+   * `heartrate` is here because Oura puts no heart rate on a workout — the average and maximum
+   * shown on a finished session come from the time series and cannot come from anywhere else. The
+   * five that are absent are absent on purpose, and the privacy policy says so in public.
+   */
   @Test
-  fun `only daily and workout scopes are requested`() {
+  fun `only daily, workout and heartrate scopes are requested`() {
     val url = OuraOAuth.authorizationUrl("c", "ch", "s")
 
-    assertTrue(url, url.contains("scope=daily+workout"))
+    assertTrue(url, url.contains("scope=daily+workout+heartrate"))
     assertFalse(url, url.contains("personal"))
-    assertFalse(url, url.contains("heartrate"))
     assertFalse(url, url.contains("email"))
+    assertFalse(url, url.contains("spo2"))
+    assertFalse(url, url.contains("tag"))
   }
 
   @Test

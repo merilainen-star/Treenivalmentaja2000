@@ -7,7 +7,9 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.io.IOException
+import java.time.Instant
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,10 +34,6 @@ import okhttp3.Request
  *
  * `internal` because its DTOs are: nothing outside the data layer should see Oura's field names,
  * and what leaves this package are Room rows built by [OuraMappers].
- *
- * That `Authenticator` is deliberately **not** installed yet: it needs the refresh token and the
- * client secret, which arrive with the OAuth flow in the next milestone step. Until then a `401` is
- * reported as [OuraAuthException] rather than silently retried.
  *
  * Nothing here decides *when* to sync or what to do with the result. It answers "what does Oura say
  * about these days", and fails with a typed, already-Finnish [OuraException] when it cannot.
@@ -68,6 +66,43 @@ internal class OuraClient(
     fetch(OuraCollection.WORKOUT, from, to, workoutAdapter)
 
   /**
+   * Heart-rate samples between two instants.
+   *
+   * The one collection that does not take dates: `start_datetime` and `end_datetime`, because a
+   * time series asked for by day would return a day. Everything else about it — the envelope, the
+   * paging, the error codes — is the same as the rest.
+   *
+   * Requires the `heartrate` scope. Without it Oura answers `401`, which surfaces as
+   * [OuraAuthException] and, for a connection granted before the scope was added, means exactly
+   * what it says: this token was not given permission for this.
+   */
+  suspend fun heartRate(from: Instant, to: Instant): List<OuraHeartRateDto> {
+    val token = tokens.accessToken()?.takeIf { it.isNotBlank() } ?: throw OuraNotConnectedException()
+    val items = mutableListOf<OuraHeartRateDto>()
+    var nextToken: String? = null
+    var page = 0
+    do {
+      if (++page > MAX_PAGES) {
+        throw OuraUnavailableException(
+          "Oura palautti yli $MAX_PAGES sivua tietoja. Hakua ei viety loppuun."
+        )
+      }
+      val url =
+        "$baseUrl${if (useSandbox) SANDBOX_PATH else LIVE_PATH}/heartrate"
+          .toHttpUrl()
+          .newBuilder()
+          .addQueryParameter("start_datetime", ISO.format(from))
+          .addQueryParameter("end_datetime", ISO.format(to))
+          .apply { nextToken?.let { addQueryParameter("next_token", it) } }
+          .build()
+      val decoded = decode(get(url, token), heartRateAdapter)
+      decoded.data.orEmpty().filterNotNullTo(items)
+      nextToken = decoded.nextToken?.takeIf { it.isNotBlank() }
+    } while (nextToken != null)
+    return items
+  }
+
+  /**
    * One collection, every page of it.
    *
    * Follows `next_token` until the response stops carrying one. The page cap is not a silent
@@ -90,23 +125,25 @@ internal class OuraClient(
           "Oura palautti yli $MAX_PAGES sivua tietoja. Hakua ei viety loppuun."
         )
       }
-      val body = get(url(collection, from, to, nextToken), token)
-      val decoded =
-        try {
-          adapter.fromJson(body)
-        } catch (e: JsonEncodingException) {
-          // What a non-JSON body — a proxy's error page, say — lands on.
-          throw OuraUnavailableException(UNREADABLE)
-        } catch (e: JsonDataException) {
-          throw OuraUnavailableException(UNREADABLE)
-        } catch (e: IOException) {
-          throw OuraUnavailableException(UNREADABLE)
-        } ?: throw OuraUnavailableException(UNREADABLE)
+      val decoded = decode(get(url(collection, from, to, nextToken), token), adapter)
       decoded.data.orEmpty().filterNotNullTo(items)
       nextToken = decoded.nextToken?.takeIf { it.isNotBlank() }
     } while (nextToken != null)
     return items
   }
+
+  /** Every page of every collection lands here, so an unreadable body reads the same way once. */
+  private fun <T : Any> decode(body: String, adapter: JsonAdapter<OuraPageDto<T>>): OuraPageDto<T> =
+    try {
+      adapter.fromJson(body)
+    } catch (e: JsonEncodingException) {
+      // What a non-JSON body — a proxy's error page, say — lands on.
+      throw OuraUnavailableException(UNREADABLE)
+    } catch (e: JsonDataException) {
+      throw OuraUnavailableException(UNREADABLE)
+    } catch (e: IOException) {
+      throw OuraUnavailableException(UNREADABLE)
+    } ?: throw OuraUnavailableException(UNREADABLE)
 
   private fun url(
     collection: OuraCollection,
@@ -195,6 +232,15 @@ internal class OuraClient(
 
     private val workoutAdapter: JsonAdapter<OuraPageDto<OuraWorkoutDto>> =
       moshi.adapter(Types.newParameterizedType(OuraPageDto::class.java, OuraWorkoutDto::class.java))
+
+    private val heartRateAdapter: JsonAdapter<OuraPageDto<OuraHeartRateDto>> =
+      moshi.adapter(
+        Types.newParameterizedType(OuraPageDto::class.java, OuraHeartRateDto::class.java)
+      )
+
+    /** `2026-08-10T15:00:00Z` — what the time-series endpoint's `date-time` parameters expect. */
+    private val ISO: DateTimeFormatter =
+      DateTimeFormatter.ISO_INSTANT.withZone(java.time.ZoneOffset.UTC)
 
     /**
      * Timeouts matched to [fi.merilainen.treenivalmentaja.data.guide.GuideHttp]: the app asks for a

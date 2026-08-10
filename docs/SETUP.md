@@ -68,11 +68,17 @@ Oura on the phone it is actually installed on.
 
 1. Sign in to the Oura developer portal (<https://developer.ouraring.com>).
 2. Create a new Application.
-3. Set the Redirect URI to exactly `treenivalmentaja://oauth2callback`.
+3. Set the Redirect URI to exactly `treenivalmentaja://oauth2callback`, and allow the scopes
+   **Daily**, **Workout** and **Heartrate**. Heartrate is what the average and maximum on a finished
+   session are computed from — Oura puts no heart rate on a workout itself.
 4. Open **Asetukset → Oura** in the app, paste the Client ID and Client Secret, and tap
    "Tallenna tunnukset". They are stored encrypted on the device and never leave it except to
    Oura's own token endpoint.
 5. Tap "Yhdistä Oura". The login opens in the browser and returns to the app.
+
+**If the scopes change, reconnect.** An authorization carries the permissions it was granted with,
+so a connection made before a scope was added keeps working without it — heart rate simply stays
+empty. "Katkaise Oura-yhteys" and then "Yhdistä Oura" is what grants the new one.
 
 Note: Oura **personal access tokens were withdrawn in December 2025**, so there is no single-token
 shortcut, even though the vendored `docs/api/oura-openapi-1.37.json` still declares a `BearerAuth`

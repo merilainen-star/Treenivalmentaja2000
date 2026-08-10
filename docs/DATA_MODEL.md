@@ -135,12 +135,18 @@ The order of priority is:
 - **Table:** `oura_workouts`
 - **Purpose:** Represents a completed workout imported from Oura.
 - **Primary Key:** `id` (String — Oura API ID)
-- **Relationships:** Matches to `WorkoutSession` via `matchedSessionId` (String?, indexed).
+- **Relationships:** Matches to `WorkoutSession` via `matchedSessionId` (String?, indexed). Filled by
+  `MatchOuraWorkoutsUseCase` after a sync — same day, nearest in time, one-to-one — not by Oura.
 - **Fields:**
-  - `activityType` (String)
+  - `activityType` (String — Oura's own free-form word, e.g. `running`)
   - `startTimeUtc` (Long)
   - `endTimeUtc` (Long)
   - `calories` (Float?)
+  - `distanceMeters` (Double?) — metres, as Oura reports them
+  - `avgHeartRate` (Int?), `maxHeartRate` (Int?) — **not fields Oura returns on a workout.** Oura
+    provides no heart rate there at all; these are reduced from the `heartrate` time series over the
+    workout's own window, and stay `null` when the `heartrate` scope was not granted or nothing was
+    recorded. Added in schema version 5 by an auto migration.
 - **Lifecycle:** Synced via WorkManager. Immutable once fetched. Cleared on Oura disconnect.
 
 ## Rescheduling and the session chain

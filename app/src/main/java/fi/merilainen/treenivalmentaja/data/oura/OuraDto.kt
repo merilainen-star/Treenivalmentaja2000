@@ -42,6 +42,21 @@ internal data class OuraDailyScoreDto(
 )
 
 /**
+ * One heart-rate sample, `PublicHeartRateRow`.
+ *
+ * A separate collection from everything else, and a different request shape: it is a time series
+ * asked for with `start_datetime`/`end_datetime` rather than dates. [source] says what the ring was
+ * doing — `workout`, `sleep`, `rest`, `awake`, `session`, `live` — which is what makes it possible
+ * to keep only the samples that belong to a workout.
+ */
+internal data class OuraHeartRateDto(
+  /** An offset date-time. */
+  val timestamp: String? = null,
+  val bpm: Int? = null,
+  val source: String? = null,
+)
+
+/**
  * One completed workout, `PublicWorkout`.
  *
  * The field names are `activity` and `calories`. An earlier revision of `docs/API_INTEGRATIONS.md`

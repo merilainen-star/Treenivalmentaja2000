@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.CompletedMetricsRow
 import fi.merilainen.treenivalmentaja.OuraCard
 import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.SettingsScreenContent
@@ -16,6 +17,7 @@ import fi.merilainen.treenivalmentaja.WeekScreenContent
 import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
+import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuideRef
@@ -121,6 +123,47 @@ class ScreenScreenshotTest {
             workouts = listOf(strength(0, "s-24")),
             recovery = DailyRecovery(date = "2026-08-10", readiness = 82, sleep = 76, activity = 91),
             ouraConnected = true,
+        )
+    }
+
+    /**
+     * A session Oura recorded: what the plan asked for above, what actually happened below.
+     *
+     * Needs a connected Oura account, a ring worn through the session, and Oura to have processed
+     * it — which is why it is a baseline rather than something to go and look at.
+     */
+    @Test
+    fun today_completedWithOuraMetrics() = capture("screen_today_completed_metrics") {
+        TodayScreenContent(
+            workouts = listOf(run(0, "s-66", status = SessionStatus.COMPLETED)),
+            recovery = DailyRecovery(date = "2026-08-10", readiness = 82, sleep = 76),
+            ouraConnected = true,
+            completedMetrics = mapOf(
+                "s-66" to CompletedSessionMetrics(
+                    ouraWorkoutId = "w1",
+                    activityType = "running",
+                    startTimeUtc = 1_754_845_200_000L,
+                    durationMin = 38,
+                    calories = 431,
+                    distanceKm = 6.2,
+                    avgHeartRate = 142,
+                    maxHeartRate = 168,
+                )
+            ),
+        )
+    }
+
+    /** A strength session: no distance at all, and the line simply does not mention one. */
+    @Test
+    fun completedMetrics_withoutDistanceOrHeartRate() = capture("card_completed_metrics_partial") {
+        CompletedMetricsRow(
+            CompletedSessionMetrics(
+                ouraWorkoutId = "w2",
+                activityType = "strength_training",
+                startTimeUtc = 1_754_845_200_000L,
+                durationMin = 45,
+                calories = 260,
+            )
         )
     }
 

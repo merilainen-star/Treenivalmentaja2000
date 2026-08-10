@@ -8,6 +8,22 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-08-10
 
 ### Added
+- **What actually happened, under what was planned.** A session Oura recorded now shows its real
+  duration, distance, calories and heart rate beneath the plan's own line — "38 min · 6,2 km ·
+  431 kcal · syke 142 (max 168)". Only the measurements that exist are drawn: a strength session has
+  no distance, and a ring that was charging has no heart rate.
+- Completed Oura workouts are tied to planned sessions automatically: **same day, nearest in time**,
+  one-to-one. Deliberately not by Oura's `activity` word, which is a free-form string this app has
+  never seen real values of — a wrong pairing is visible and correctable, while a missing one looks
+  like Oura never recorded the session at all.
+- **Heart rate**, which took a new permission. Oura puts none on a workout object, so the average
+  and maximum are reduced from the `heartrate` time series over the workout's own window. That
+  required adding the `heartrate` scope, which means **reconnecting Oura** — an authorization keeps
+  the permissions it was granted with — and a revision to the published privacy policy, which
+  previously said the app did not request heart-rate data.
+- Room schema version 5: `distanceMeters`, `avgHeartRate` and `maxHeartRate` on `oura_workouts`, by
+  auto migration, with an instrumented test that runs it against a version-4 database with a row in
+  it. A workout stored before the columns existed keeps its values and gets nulls, not a reset.
 - **A recovery reading on the Today screen, with a measurement behind it.** The indicator that was
   removed for being a constant is back, now showing today's Oura readiness score and a word for it.
   It tells four situations apart, because what they mean differs: Oura not connected shows no
@@ -90,9 +106,9 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   [ADR-007](docs/DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client). It costs no APK
   bytes, because Coil already put 4.12.0 inside the APK; what it buys is the `Authenticator` that
   token renewal is specified in terms of. Measured cost of the whole Oura milestone so far:
-  132,160 B — the client 14,801 B, the authentication and its Settings UI 53,220 B, and the sync
-  and recovery card 64,139 B. Only the last of those added a dependency: WorkManager, which is most
-  of its size.
+  148,544 B over the last build before the milestone, of which WorkManager — its only new
+  dependency — is most. Measured with `clean` on both sides: an incremental build of the same source
+  came out 260,082 B larger, so per-stage figures taken that way earlier were noise.
 
 ## [Unreleased] - 2026-08-09
 

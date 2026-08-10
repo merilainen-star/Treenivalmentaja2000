@@ -12,37 +12,30 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 20,630,075 B (19.67 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 318 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 41 comparisons, 0 changed |
+| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,646,459 B (19.69 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 336 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 43 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 35 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 36 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
-The whole Oura milestone cost **132,160 B (+0.64%)**, measured by stashing the work and rebuilding
-`assembleDebug` on this machine at each stage: 20,497,915 B without any of it, 20,512,716 B with the
-API client, 20,565,936 B with the authentication as well, 20,630,075 B with the sync and the
-recovery card.
+The whole Oura milestone cost **148,544 B (+0.72%)** over the last build before it: 20,497,915 B
+without any of it, 20,646,459 B with all of it. Its one new dependency is WorkManager, which is most
+of that; the API client, the authentication and the token store added none, because OkHttp was
+already inside the APK via Coil and the store uses platform crypto rather than a library.
 
-Three of those four stages added no dependency at all — OkHttp was already inside the APK via Coil,
-and the token store uses platform crypto rather than a library. The last one added **WorkManager**,
-which is most of its 64,139 B and the only new dependency in the milestone. It buys a background
-sync that survives reboots and retries with a backoff, which AlarmManager does not do.
+**Measure APK size with `clean`, or do not measure it.** This entry previously blamed a 231,261 B
+discrepancy on "the two machines or toolchains that produced the two numbers". That was probably
+wrong. Measured here on one machine, the *same source* built incrementally and cleanly differs by
+**260,082 B** — an incremental build produced 20,890,157 B where a clean one produced 20,630,075 B.
+Incremental dexing is the likelier explanation for the old gap too. Every figure in this section now
+comes from `./gradlew clean :app:assembleDebug`, and the last stage's own cost, measured that way on
+both sides, is 16,384 B rather than the 267,138 B an incremental comparison first suggested.
 
-The comparison is worth spelling out, because the obvious subtraction gives the wrong answer. The
-line above used to record 20,266,654 B for the previous commit, which would make this change look
-like +246,062 B. It is not: rebuilt here, that same source measures 20,497,915 B. The 231,261 B
-difference is between the two machines or toolchains that produced the two numbers, not between the
-two commits. **An APK delta is only meaningful when both sides were built on the same machine** —
-which is why the earlier entry rebuilt `b57a3f5` from a clean worktree rather than quoting its old
-figure, and why this one stashed rather than subtracting.
-
-OkHttp adds nothing to that, and the claim was checked rather than assumed: the *baseline* APK's
-DEX already contains `okhttp3/OkHttpClient`, extracted and searched after decompressing it — a
-string search over the zipped APK finds nothing either way and proves nothing. Coil pulls OkHttp
-4.12.0 in; `app/build.gradle.kts` now names the same version directly.
+`clean` needs the daemon stopped first (`./gradlew --stop`): lint holds jars open under
+`app/build/intermediates/lint-cache` and the delete fails otherwise.
 
 Instrumented tests ran on the `treeni-test` AVD (Android 16), and had to: the token store encrypts
-with an Android Keystore key, and there is no Keystore on the JVM. Seventeen of the thirty-five
+with an Android Keystore key, and there is no Keystore on the JVM. Seventeen of the thirty-six
 cover it — that a round trip returns what went in, that what lands in `SharedPreferences` is not the
 token, that the same token encrypts differently each time (a reused GCM nonce would break it
 completely), that a tampered ciphertext fails to decrypt rather than decrypting to something else,
@@ -61,7 +54,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 - **UI shell.** Bottom navigation, splash screen, Today, Week and Settings.
 - **Room persistence.** `TrainingPlan`, `WorkoutSession`, `SessionEvent`, `OuraDailySummary`,
-  `OuraWorkout` entities, DAOs and `AppDatabase` at schema version 4. `WorkoutViewModel` observes
+  `OuraWorkout` entities, DAOs and `AppDatabase` at schema version 5. `WorkoutViewModel` observes
   a Room `Flow`.
 - **Session state machine.** All nine statuses with a validated transition table; a forbidden
   transition is rejected and writes nothing.
@@ -78,8 +71,8 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 - **Reminders.** AlarmManager with a 7-day sliding window and a re-arm alarm, restored on
   `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` and `TIMEZONE_CHANGED`, with a notification-permission
   check in Settings.
-- **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`,
-  `MIGRATION_3_4` covered by an instrumented test. There is deliberately **no**
+- **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`, and both
+  `MIGRATION_3_4` (hand-written) and the 4 → 5 auto migration covered by instrumented tests. There is deliberately **no**
   `fallbackToDestructiveMigration`: a missing migration now fails loudly instead of silently
   emptying the database.
 - **Expandable week rows.** Tapping a row in the Week view unrolls the session's content beneath
@@ -89,11 +82,11 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   only a real screen can do — the file picker, the clipboard, the notification permission. That is
   what makes a whole screen capturable, and states that are awkward to reach by hand — a rest day,
   a missing notification permission — are now baselines rather than something to remember.
-- **Screenshot tests.** 41 Roborazzi baselines: all three screens whole, plus the Today and Week
+- **Screenshot tests.** 43 Roborazzi baselines: all three screens whole, plus the Today and Week
   cards, a started workout's checklist, the recovery card, every status badge, both import
-  dialogs, every state of the exercise-guide sheet, and every state of the Oura card — including
-  the connected one, which cannot be produced on this machine at all because it needs credentials
-  only the owner's Oura account can issue.
+  dialogs, every state of the exercise-guide sheet, every state of the Oura card, and a session
+  showing what Oura recorded for it — several of which cannot be produced on this machine at all,
+  needing a connected account, a ring worn through a session, and Oura to have processed it.
   They run on the JVM, no device needed. The comparison tolerates 0.5% of
   changed pixels, because Windows and Linux antialias text differently — measured at 0.046%, with
   no pixel differing by more than 32/255. A 2dp shadow change still fails them.
@@ -240,6 +233,23 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   score** says "ei tietoa"; and a reading shows the number. The third is what the whole thing turns
   on — the ring was not worn, and a zero would read as a verdict rather than as an absence. The word
   describes the score and never what to do about it.
+- **What actually happened, under what was planned.** A session Oura recorded shows its real
+  duration, distance, calories and heart rate beneath the plan's own line. Only what exists is drawn:
+  a strength session has no distance, a ring on the charger has no heart rate, and a row of dashes
+  standing in for them would be worse than their absence.
+
+  **The pairing is same day, nearest in time, one-to-one** (`MatchOuraWorkoutsUseCase`), with a
+  twelve-hour limit so a midnight walk cannot claim a morning session. Deliberately *not* matched on
+  Oura's `activity` word: it is free-form and this app has never seen real values of it, and a rule
+  that silently drops a workout because the word was unexpected is worse than one that occasionally
+  pairs the wrong two things — a wrong pair is visible, a missing one looks like Oura recorded
+  nothing.
+
+  **Heart rate is not a field Oura returns on a workout.** There is none on the object at all, so the
+  average and maximum are reduced from the `heartrate` time series over the workout's own window,
+  which is why the app now requests that scope. One request spans every workout in a sync rather
+  than one per workout, and a failure to get it — the commonest being a connection granted before the
+  scope existed — leaves the workouts stored without a heart rate instead of failing the sync.
 - **The Oura tables have a writer.** `OuraRepository` fetches a date range, maps it and writes it;
   nothing else touches those tables. The screens observe Room and never the network, so a failed
   sync leaves the last known reading on screen rather than an error. A daily WorkManager job and a
@@ -294,9 +304,9 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
    Connecting it to "kevyempi versio" or to the training engine is a training decision, not a
    parsing one — and the card this replaced was removed for giving advice with nothing behind it,
    so the rule wants writing down before it is coded.
-3. **Match Oura workouts to planned sessions.** `oura_workouts` fills up and
-   `matchedSessionId` is still always `null`; nothing yet notices that the run Oura recorded at
-   18:00 is the session the plan asked for.
+3. **Check the pairing against a real week.** Workouts are matched to sessions by time alone, and
+   the rule has never met a week with two sessions in a day, a session done far from its planned
+   hour, or an Oura workout that was not a planned session at all.
 
 ## Files most relevant to the next task
 

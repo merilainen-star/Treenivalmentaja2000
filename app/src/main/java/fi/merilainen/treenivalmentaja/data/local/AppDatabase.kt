@@ -2,6 +2,7 @@ package fi.merilainen.treenivalmentaja.data.local
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -27,8 +28,12 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       OuraDailySummaryEntity::class,
       OuraWorkoutEntity::class,
     ],
-  version = 4,
+  version = 5,
   exportSchema = true,
+  // Purely additive — three nullable columns on `oura_workouts` — which is exactly the case the
+  // note on `build` says to use an auto migration for. Room writes the SQL by diffing the exported
+  // schemas, and `MigrationTest.migrate4To5` runs it against a version-4 database with rows in it.
+  autoMigrations = [AutoMigration(from = 4, to = 5)],
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {

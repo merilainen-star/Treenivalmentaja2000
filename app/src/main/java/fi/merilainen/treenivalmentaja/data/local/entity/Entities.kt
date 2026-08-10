@@ -128,4 +128,16 @@ data class OuraWorkoutEntity(
   val endTimeUtc: Long,
   val calories: Float? = null,
   val matchedSessionId: String? = null,
+  /** Metres, as Oura reports it. `null` for a workout with no distance. */
+  val distanceMeters: Double? = null,
+  /**
+   * Beats per minute, averaged over the workout's own window.
+   *
+   * Not a field Oura returns on a workout — it has none. These are computed from the `heartrate`
+   * time series between the workout's start and end, and stay `null` when that series is empty:
+   * the `heartrate` scope was not granted, the ring is not one Oura serves it for, or it simply
+   * recorded nothing. Missing is missing, never zero.
+   */
+  val avgHeartRate: Int? = null,
+  val maxHeartRate: Int? = null,
 )

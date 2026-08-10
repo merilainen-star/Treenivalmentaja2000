@@ -26,11 +26,20 @@ internal object OuraOAuth {
   /**
    * Only what the app actually reads.
    *
-   * `daily` covers readiness, sleep and activity; `workout` covers completed workouts. `personal`
-   * is not requested — nothing shows the profile, and asking for a scope in order to have it is
-   * how an app ends up holding data it has no use for.
+   * `daily` covers readiness, sleep and activity; `workout` covers completed workouts; `heartrate`
+   * is the time series the average and maximum shown on a finished session are computed from —
+   * Oura puts no heart rate on the workout object itself, so there is no other way to get it.
+   *
+   * `personal`, `email`, `tag`, `session` and `spo2Daily` are not requested. Nothing shows a
+   * profile, and asking for a scope in order to have it is how an app ends up holding data it has
+   * no use for.
+   *
+   * **Changing this string is not enough on its own.** A granted authorization carries the scopes
+   * it was granted with, so an existing connection keeps the old ones until the user disconnects
+   * and connects again — and the application's own registration in Oura's developer portal has to
+   * allow the scope in the first place.
    */
-  const val SCOPES = "daily workout"
+  const val SCOPES = "daily workout heartrate"
 
   /**
    * 32 random bytes, base64url — 43 characters, inside the 43..128 the RFC allows.

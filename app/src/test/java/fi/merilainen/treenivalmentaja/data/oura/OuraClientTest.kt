@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
 import java.net.URLDecoder
+import java.time.Instant
 import java.time.LocalDate
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -19,13 +20,13 @@ import org.junit.Test
  *
  * **The fixtures under `src/test/resources/oura/` are derived from the vendored specification, not
  * captured from the live service.** That is a real difference from the guide fixtures next door,
- * which are recorded responses, and it is stated here rather than left to be discovered: nobody has
- * run this against Oura yet, because doing so needs a developer application and an `.env` that only
- * the owner's account can produce. `docs/api/oura-openapi-1.37.json` contains no response examples
- * at all — checked, it has zero `example` keys — so every field name, every optional marker and
- * every enum value in them was read out of the schemas instead. What these tests prove is that the
- * client honours the specification. Whether the specification matches the service is the one thing
- * only a token can answer.
+ * which are recorded responses. `docs/api/oura-openapi-1.37.json` contains no response examples at
+ * all — checked, it has zero `example` keys — so every field name, every optional marker and every
+ * enum value in them was read out of the schemas instead.
+ *
+ * The client does now run against a real account, and the readiness and sleep scores it shows have
+ * been checked by hand against Oura's own app and matched. What these tests prove remains narrower
+ * than that: that the client honours the specification.
  *
  * `com.sun.net.httpserver` rather than MockWebServer, matching `ExerciseDbProviderTest`: the JDK
  * already ships a server, and this needs a handful of handlers.
@@ -263,6 +264,58 @@ class OuraClientTest {
     assertNull(workouts[1].calories)
   }
 
+  // ------------------------------------------------------------------ heart rate
+
+  /**
+   * The one collection that takes instants rather than dates. A day-shaped request here would
+   * return a day of samples for a forty-minute workout.
+   */
+  @Test
+  fun `heart rate is asked for by instant, not by date`() = runTest {
+    routes = mapOf("/v2/usercollection/heartrate" to (200 to HEART_RATE_PAGE))
+
+    client()
+      .heartRate(
+        from = Instant.parse("2026-08-08T15:00:00Z"),
+        to = Instant.parse("2026-08-08T15:40:00Z"),
+      )
+
+    val query = URLDecoder.decode(received.single().query!!, "UTF-8")
+    assertTrue(query, query.contains("start_datetime=2026-08-08T15:00:00Z"))
+    assertTrue(query, query.contains("end_datetime=2026-08-08T15:40:00Z"))
+    assertFalse(query, query.contains("start_date="))
+  }
+
+  @Test
+  fun `heart rate samples come back with their beats`() = runTest {
+    routes = mapOf("/v2/usercollection/heartrate" to (200 to HEART_RATE_PAGE))
+
+    val samples =
+      client().heartRate(Instant.parse("2026-08-08T15:00:00Z"), Instant.parse("2026-08-08T15:40:00Z"))
+
+    assertEquals(2, samples.size)
+    assertEquals(140, samples.first().bpm)
+    assertEquals("workout", samples.first().source)
+  }
+
+  /**
+   * A connection granted before the `heartrate` scope existed gets a `401` here and nothing else.
+   * It has to surface as an auth failure so the caller can carry on without heart rate rather than
+   * treat the whole sync as broken.
+   */
+  @Test
+  fun `heart rate without the scope is an auth failure`() = runTest {
+    routes = mapOf("/v2/usercollection/heartrate" to (401 to """{"detail":"missing scope"}"""))
+
+    val failure =
+      runCatching {
+          client().heartRate(Instant.parse("2026-08-08T15:00:00Z"), Instant.parse("2026-08-08T15:40:00Z"))
+        }
+        .exceptionOrNull()
+
+    assertTrue(failure is OuraAuthException)
+  }
+
   // ------------------------------------------------------------------ failures
 
   @Test
@@ -350,5 +403,8 @@ class OuraClientTest {
 
     /** Always another page. */
     const val ENDLESS_PAGE = """{"data":[],"next_token":"more"}"""
+
+    const val HEART_RATE_PAGE =
+      """{"data":[{"timestamp":"2026-08-08T15:10:00+00:00","bpm":140,"source":"workout"},{"timestamp":"2026-08-08T15:20:00+00:00","bpm":152,"source":"workout"}],"next_token":null}"""
   }
 }

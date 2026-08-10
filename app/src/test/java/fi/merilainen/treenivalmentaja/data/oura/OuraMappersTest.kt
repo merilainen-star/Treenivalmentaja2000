@@ -185,6 +185,92 @@ class OuraMappersTest {
     assertEquals("unknown", entities.single().activityType)
   }
 
+  // ------------------------------------------------------------------ heart rate
+
+  /**
+   * Oura puts no heart rate on a workout, so it is computed from the samples inside the workout's
+   * own window. Samples outside it belong to the rest of the day and must not move the average.
+   */
+  @Test
+  fun `only the samples inside the workout count`() {
+    val entities =
+      OuraMappers.withHeartRate(
+        OuraMappers.toWorkouts(
+          listOf(
+            workout(
+              id = "w1",
+              start = "2026-08-08T18:00:00+03:00",
+              end = "2026-08-08T18:40:00+03:00",
+            )
+          )
+        ),
+        listOf(
+          beat("2026-08-08T17:50:00+03:00", 60), // before it started
+          beat("2026-08-08T18:10:00+03:00", 140),
+          beat("2026-08-08T18:30:00+03:00", 160),
+          beat("2026-08-08T19:00:00+03:00", 70), // after it ended
+        ),
+      )
+
+    val entity = entities.single()
+    assertEquals(150, entity.avgHeartRate)
+    assertEquals(160, entity.maxHeartRate)
+  }
+
+  /**
+   * The `heartrate` scope was never granted, the ring does not report it, or nothing was recorded.
+   * All three read the same way, and none of them is a heart rate of zero.
+   */
+  @Test
+  fun `no samples leaves the heart rate unknown`() {
+    val entities =
+      OuraMappers.withHeartRate(OuraMappers.toWorkouts(listOf(workout(id = "w1"))), emptyList())
+
+    assertNull(entities.single().avgHeartRate)
+    assertNull(entities.single().maxHeartRate)
+  }
+
+  @Test
+  fun `samples that fall outside every workout leave it unknown`() {
+    val entities =
+      OuraMappers.withHeartRate(
+        OuraMappers.toWorkouts(
+          listOf(workout(id = "w1", start = "2026-08-08T18:00:00+03:00", end = "2026-08-08T18:40:00+03:00"))
+        ),
+        listOf(beat("2026-08-08T09:00:00+03:00", 55)),
+      )
+
+    assertNull(entities.single().avgHeartRate)
+  }
+
+  /** A sample with no reading is not a reading of zero, and would drag any average down. */
+  @Test
+  fun `samples with no bpm are ignored rather than counted as zero`() {
+    val entities =
+      OuraMappers.withHeartRate(
+        OuraMappers.toWorkouts(
+          listOf(workout(id = "w1", start = "2026-08-08T18:00:00+03:00", end = "2026-08-08T18:40:00+03:00"))
+        ),
+        listOf(
+          beat("2026-08-08T18:10:00+03:00", null),
+          beat("2026-08-08T18:20:00+03:00", 0),
+          beat("2026-08-08T18:30:00+03:00", 150),
+        ),
+      )
+
+    assertEquals(150, entities.single().avgHeartRate)
+  }
+
+  @Test
+  fun `a workout keeps its distance in metres as Oura reports it`() {
+    val entities = OuraMappers.toWorkouts(listOf(workout(id = "w1")))
+
+    assertEquals(7412.3, entities.single().distanceMeters!!, 0.001)
+  }
+
+  private fun beat(timestamp: String?, bpm: Int?) =
+    OuraHeartRateDto(timestamp = timestamp, bpm = bpm, source = "workout")
+
   private fun day(day: String?, score: Int?) =
     OuraDailyScoreDto(id = "id-$day", day = day, score = score, timestamp = "${day}T00:00:00+03:00")
 

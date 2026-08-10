@@ -4,6 +4,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import java.time.OffsetDateTime
 import java.time.format.DateTimeParseException
+import kotlin.math.roundToInt
 
 /**
  * Oura's documents as this app's rows.
@@ -82,7 +83,43 @@ internal object OuraMappers {
       endTimeUtc = end,
       calories = calories?.toFloat(),
       matchedSessionId = null,
+      distanceMeters = distance,
     )
+  }
+
+  /**
+   * Fills each workout's average and maximum heart rate from a series of samples.
+   *
+   * Oura puts no heart rate on a workout, so this is the only way to have one: take the samples
+   * that fall inside the workout's own window and reduce them. Samples are matched **by time
+   * alone**, not by their `source` field — a treadmill hour the ring logged as `awake` is still
+   * that hour's heart rate, and filtering on a label the app does not control would silently drop
+   * it.
+   *
+   * A workout with no samples in its window keeps `null` on both, which is the honest answer when
+   * the `heartrate` scope was never granted, the ring does not report it, or nothing was recorded.
+   */
+  fun withHeartRate(
+    workouts: List<OuraWorkoutEntity>,
+    samples: List<OuraHeartRateDto>,
+  ): List<OuraWorkoutEntity> {
+    if (workouts.isEmpty() || samples.isEmpty()) return workouts
+    val beats =
+      samples.mapNotNull { sample ->
+        val at = epochMillis(sample.timestamp) ?: return@mapNotNull null
+        val bpm = sample.bpm?.takeIf { it > 0 } ?: return@mapNotNull null
+        at to bpm
+      }
+    if (beats.isEmpty()) return workouts
+    return workouts.map { workout ->
+      val inside = beats.filter { (at, _) -> at in workout.startTimeUtc..workout.endTimeUtc }
+      if (inside.isEmpty()) workout
+      else
+        workout.copy(
+          avgHeartRate = inside.sumOf { it.second }.toDouble().div(inside.size).roundToInt(),
+          maxHeartRate = inside.maxOf { it.second },
+        )
+    }
   }
 
   /**

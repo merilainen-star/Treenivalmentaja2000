@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.util.Locale
 import androidx.compose.material3.Checkbox
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -41,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
@@ -67,6 +69,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val recovery by viewModel.todayRecovery.collectAsState()
     val syncing by viewModel.ouraSyncing.collectAsState()
     val syncFailure by viewModel.lastSyncFailure.collectAsState()
+    val completedMetrics by viewModel.completedMetrics.collectAsState()
 
     // Once per visit to this screen, not on a timer: the reading is what you came here to see, and
     // the fetch is four requests of a few kilobytes. A disconnected Oura makes it a no-op.
@@ -90,6 +93,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         ouraConnected = ouraState == OuraConnectionState.Connected,
         syncing = syncing,
         syncFailure = syncFailure,
+        completedMetrics = completedMetrics,
     )
 }
 
@@ -111,6 +115,7 @@ fun TodayScreenContent(
     ouraConnected: Boolean = false,
     syncing: Boolean = false,
     syncFailure: String? = null,
+    completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
 ) {
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
@@ -142,7 +147,8 @@ fun TodayScreenContent(
                     workout = workout,
                     onStatusChange = { newStatus -> onStatusChange(workout.id, newStatus) },
                     onMoveToTomorrow = { onMoveToTomorrow(workout.id) },
-                    onExerciseClick = onExerciseClick
+                    onExerciseClick = onExerciseClick,
+                    completed = completedMetrics[workout.id],
                 )
             }
         } else {
@@ -312,12 +318,39 @@ private fun RecoveryReading(recovery: DailyRecovery?, syncing: Boolean, syncFail
     }
 }
 
+/**
+ * What Oura recorded for a session that was done, under the session it belongs to.
+ *
+ * Only the measurements that exist are drawn. A strength session has no distance, a ring that was
+ * charging has no heart rate, and a row of dashes standing in for them would be worse than their
+ * absence — the plan already says what was asked for, and this line is only here to say what
+ * actually happened.
+ */
+@Composable
+fun CompletedMetricsRow(metrics: CompletedSessionMetrics) {
+    val parts = buildList {
+        add("${metrics.durationMin} min")
+        metrics.distanceKm?.let { add(String.format(Locale("fi", "FI"), "%.1f km", it)) }
+        metrics.calories?.let { add("$it kcal") }
+        metrics.avgHeartRate?.let { avg ->
+            val max = metrics.maxHeartRate
+            add(if (max != null) "syke $avg (max $max)" else "syke $avg")
+        }
+    }
+    Text(
+        text = parts.joinToString(" · "),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
 @Composable
 fun WorkoutCardToday(
     workout: Workout,
     onStatusChange: (SessionStatus) -> Unit,
     onMoveToTomorrow: () -> Unit,
-    onExerciseClick: ((Exercise) -> Unit)? = null
+    onExerciseClick: ((Exercise) -> Unit)? = null,
+    completed: CompletedSessionMetrics? = null,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -354,7 +387,14 @@ fun WorkoutCardToday(
                     color = MaterialTheme.colorScheme.secondary
                 )
             }
-            
+
+            // Under the plan's own line, so the two read as "asked for" above and "actually done"
+            // below rather than competing for the same meaning.
+            completed?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+                CompletedMetricsRow(it)
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
             
             val isInteractive = workout.type == WorkoutType.STRENGTH && workout.status == SessionStatus.STARTED

@@ -20,13 +20,16 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
+import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
+import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -149,6 +152,18 @@ class WorkoutViewModel(
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
   /**
+   * What Oura recorded for each session that was actually done, keyed by session id.
+   *
+   * The plan says what was asked for; this is what happened. A session with no entry here simply
+   * has nothing from Oura — which is the ordinary state of a session done without the ring, or one
+   * Oura has not processed yet.
+   */
+  val completedMetrics: StateFlow<Map<String, CompletedSessionMetrics>> =
+    ouraRepository
+      .observeMatchedMetrics()
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+  /**
    * Set when a login is waiting for a browser to be opened, and cleared the moment one is.
    *
    * The ViewModel builds the URL — it is the half that knows the PKCE verifier and has to write it
@@ -233,8 +248,31 @@ class WorkoutViewModel(
           is OuraSyncResult.Success -> null
           is OuraSyncResult.Failure -> result.message
         }
+      matchCompletedWorkouts(today)
       _ouraSyncing.value = false
     }
+  }
+
+  /**
+   * Ties what Oura recorded to what the plan asked for, over the same days the sync covered.
+   *
+   * Runs after every sync rather than once: a session moved to another day, or completed late,
+   * changes which workout belongs to it, and the pairing is cheap to recompute from what is
+   * already stored.
+   */
+  private suspend fun matchCompletedWorkouts(today: LocalDate) {
+    val from = today.minusDays(SYNC_DAYS).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    val to = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    val earliest = today.minusDays(SYNC_DAYS)
+    val sessions =
+      repository
+        .getSessions()
+        .filter {
+          val date = runCatching { LocalDate.parse(it.scheduledDate) }.getOrNull()
+          date != null && !date.isBefore(earliest) && !date.isAfter(today)
+        }
+        .map { PlannedSession(id = it.id, scheduledAtUtc = it.remindAtUtc) }
+    ouraRepository.matchWorkouts(sessions, from.toEpochMilli(), to.toEpochMilli())
   }
 
   private val _ouraSyncing = MutableStateFlow(false)

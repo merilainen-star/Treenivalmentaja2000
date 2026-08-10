@@ -84,7 +84,43 @@ class MigrationTest {
     }
     assertTrue("Index index_workout_sessions_remindAtUtc should exist", hasIndex)
     indexCursor.close()
-    
+
+    cursor.close()
+  }
+
+  /**
+   * Version 5 adds distance and the two heart-rate columns to `oura_workouts`.
+   *
+   * An auto migration, so what is being tested is really Room's diff of the exported schemas — and
+   * that is worth running rather than trusting, because the failure mode of a wrong one is an app
+   * that will not open. The row inserted first is what proves it: an existing workout must survive
+   * with its old values intact and the new columns null, not be recreated empty.
+   */
+  @Test
+  fun migrate4To5() {
+    var db = helper.createDatabase(TEST_DB, 4)
+
+    db.execSQL(
+      """
+      INSERT INTO `oura_workouts` (`id`, `activityType`, `startTimeUtc`, `endTimeUtc`, `calories`, `matchedSessionId`)
+      VALUES ('w1', 'running', 1754755200000, 1754757600000, 431.0, 'session1')
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 5, true)
+
+    val cursor = db.query("SELECT * FROM oura_workouts")
+    assertTrue(cursor.moveToFirst())
+    assertEquals("w1", cursor.getString(cursor.getColumnIndex("id")))
+    assertEquals("running", cursor.getString(cursor.getColumnIndex("activityType")))
+    assertEquals(1754755200000L, cursor.getLong(cursor.getColumnIndex("startTimeUtc")))
+    assertEquals("session1", cursor.getString(cursor.getColumnIndex("matchedSessionId")))
+    // The point of the new columns: a workout that existed before them has none, and that has to
+    // read as "not known" rather than as a zero heart rate.
+    assertTrue(cursor.isNull(cursor.getColumnIndex("distanceMeters")))
+    assertTrue(cursor.isNull(cursor.getColumnIndex("avgHeartRate")))
+    assertTrue(cursor.isNull(cursor.getColumnIndex("maxHeartRate")))
     cursor.close()
   }
 }
