@@ -4,10 +4,10 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 183 unit tests + 18 instrumented tests, all passing.
+**Status:** 198 unit tests + 18 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 183 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 24 screenshot comparisons (a subset of the 183 above)
+- `./gradlew :app:testDebugUnitTest` — 198 tests / 0 failures / 0 errors
+- `./gradlew :app:verifyRoborazziDebug` — 29 screenshot comparisons (a subset of the 198 above)
 - `./gradlew :app:connectedDebugAndroidTest` — 18 tests / 0 failures / 0 errors
 
 | Suite | Covers |
@@ -22,6 +22,8 @@ The testing strategy ensures the deterministic training engine works flawlessly 
 | `data/repository/TrainingRepositoryTest` | Real Room schema in memory: import, event-history accumulation, rejected transitions writing nothing, lighter-version payload and fallback, reschedule chain, duplicate/conflict detection, seeding, cascade delete. |
 | `ExercisePrescriptionTest`, `ExerciseTimerRoundsTest` | How a prescription reads (`3 × 10 · 18 kg`, a ramp set by set) and how many times a timed movement's clock runs. |
 | `data/update/UpdateInfoParsingTest`, `domain/CheckForUpdateUseCaseTest` | The published build metadata, parsed through the real Moshi configuration, and the comparison against the installed version. |
+| `WorkoutViewModelTest` | The guide sheet's states (loading, loaded, retry after a failure, a picked suggestion, closing) and the import confirmation: that a replacement is offered rather than performed, that confirming carries it out, that cancelling writes nothing, and that a broken or empty document is reported instead of asked about. Runs a real Room database on the test dispatcher so a virtual clock and the writes stay on one timeline. |
+| `ui/ScreenScreenshotTest` | The three screens whole, which the state hoisting made possible: Today with sessions and on a rest day, the week list, and Settings with and without the notification permission. |
 | `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, tappable exercise rows, a started workout drawn from the plan, every state of the exercise-guide sheet, the recovery card, the update card, the import dialog and every status badge. |
 | `ImageLoaderConfigurationTest` (instrumented) | That the image loader has no disk cache and creates no cache directory. A terms-of-use requirement, and a breach would leave no visible trace in the app — see [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md). |
 | `data/local/MigrationTest` (instrumented) | Room migration 3 → 4 against the KSP-generated schemas. |
@@ -29,11 +31,11 @@ The testing strategy ensures the deterministic training engine works flawlessly 
 | `data/alarm/ReminderReceiverTest`, `ReminderReceiverNoPermissionTest`, `BootReceiverTest` (instrumented) | Alarm delivery, the missing-notification-permission path, the BootReceiver action guard, and that a session belonging to a replaced plan is ignored. |
 | `ImportStartDialogTest` (instrumented) | That the import dialog returns the choice the user made. Returning it backwards would put a plan on the wrong dates while looking correct on screen, which no screenshot would catch. |
 
-**Gaps:** no ViewModel tests, and no test renders a whole screen — `TodayScreen`, `WeekScreen` and
-`SettingsScreen` each take a `WorkoutViewModel`, so screenshot cover stops at the stateless cards
-they are built from. Splitting each screen into a stateless `…Content(state, callbacks)` plus a
-thin stateful wrapper would let the screens themselves be captured. Nothing covers the Oura
-layer, which does not exist yet.
+**Gaps:** nothing covers the Oura layer, which does not exist yet. `WorkoutViewModel`'s cover is
+its guide sheet and its import confirmation; the training-engine actions it delegates
+(`markSick`, `checkMissedSessions`) are tested through `TrainingEngineTest` rather than through
+it. No test drives a screen's interactions — the captures are of states, not of tapping through
+them; `ImportStartDialogTest` is the only interaction test and it is instrumented.
 
 ## Test Types (Planned & Implemented)
 
@@ -52,7 +54,7 @@ layer, which does not exist yet.
 
 ### UI & Screenshot Tests
 - Framework: Roborazzi on Robolectric — runs on the JVM, no device or emulator needed.
-- Target: visual regression of the Today and Week cards, the recovery card and the status badges.
+- Target: the three screens whole, and the cards, dialogs and badges they are built from.
 - Baselines live in `app/src/test/screenshots/` and are committed.
 - Run command: `./gradlew :app:verifyRoborazziDebug`
 - Record command: `./gradlew :app:recordRoborazziDebug`

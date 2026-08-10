@@ -108,5 +108,5 @@ backend to set up ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-th
 - No Oura connection yet, so the app says nothing about recovery. The Today screen's card offers
   the "Sairastuin" and "Tervehdyin" buttons and no verdict.
 - No background sync.
-- No screen renders in a test: every screen takes a `WorkoutViewModel` directly, so screenshot
-  cover stops at the individual cards and `WorkoutViewModel` has no tests.
+- No test taps through a screen: the captures pin what each state looks like, not what happens
+  when you use it.

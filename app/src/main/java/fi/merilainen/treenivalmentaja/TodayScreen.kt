@@ -37,7 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
+import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
@@ -46,6 +48,13 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorGreen
 import fi.merilainen.treenivalmentaja.ui.theme.ColorRed
 import fi.merilainen.treenivalmentaja.ui.theme.ColorYellow
 
+/**
+ * The stateful wrapper: reads the ViewModel and hands plain values down.
+ *
+ * Everything below this function takes what it needs as parameters, which is what lets a test
+ * render the whole screen. It used to take the ViewModel all the way down, so screenshot cover
+ * stopped at the individual cards and nothing ever verified how they sit together.
+ */
 @Composable
 fun TodayScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
@@ -54,6 +63,35 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
     // every launch and rewrote the calendar — see WorkoutViewModel.checkMissedSessions.
 
+    TodayScreenContent(
+        workouts = workouts,
+        guideState = guideState,
+        onSickClicked = viewModel::markSick,
+        onRecoveredClicked = viewModel::markRecovered,
+        onStatusChange = viewModel::updateWorkoutStatus,
+        onMoveToTomorrow = viewModel::moveWorkoutToTomorrow,
+        onExerciseClick = viewModel::openExerciseGuide,
+        onGuideRetry = viewModel::retryExerciseGuide,
+        onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
+        onGuideDismiss = viewModel::closeExerciseGuide,
+    )
+}
+
+/** Today, as a function of what it is given. Every callback defaults to nothing so a capture of
+ *  one state does not have to spell out eight of them. */
+@Composable
+fun TodayScreenContent(
+    workouts: List<Workout>,
+    guideState: ExerciseGuideState? = null,
+    onSickClicked: () -> Unit = {},
+    onRecoveredClicked: () -> Unit = {},
+    onStatusChange: (String, SessionStatus) -> Unit = { _, _ -> },
+    onMoveToTomorrow: (String) -> Unit = {},
+    onExerciseClick: (Exercise) -> Unit = {},
+    onGuideRetry: () -> Unit = {},
+    onGuideSuggestionSelected: (ExerciseGuide) -> Unit = {},
+    onGuideDismiss: () -> Unit = {},
+) {
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
     Column(
@@ -70,21 +108,17 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         )
 
         RecoveryCard(
-            onSickClicked = { viewModel.markSick() },
-            onRecoveredClicked = { viewModel.markRecovered() }
+            onSickClicked = onSickClicked,
+            onRecoveredClicked = onRecoveredClicked
         )
 
         if (todayWorkouts.isNotEmpty()) {
             todayWorkouts.forEach { workout ->
                 WorkoutCardToday(
                     workout = workout,
-                    onStatusChange = { newStatus ->
-                        viewModel.updateWorkoutStatus(workout.id, newStatus)
-                    },
-                    onMoveToTomorrow = {
-                        viewModel.moveWorkoutToTomorrow(workout.id)
-                    },
-                    onExerciseClick = { viewModel.openExerciseGuide(it) }
+                    onStatusChange = { newStatus -> onStatusChange(workout.id, newStatus) },
+                    onMoveToTomorrow = { onMoveToTomorrow(workout.id) },
+                    onExerciseClick = onExerciseClick
                 )
             }
         } else {
@@ -106,9 +140,9 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         guideState?.let { state ->
             ExerciseGuideSheet(
                 state = state,
-                onRetry = { viewModel.retryExerciseGuide() },
-                onSelectSuggestion = { viewModel.selectGuideSuggestion(it) },
-                onDismiss = { viewModel.closeExerciseGuide() },
+                onRetry = onGuideRetry,
+                onSelectSuggestion = onGuideSuggestionSelected,
+                onDismiss = onGuideDismiss,
             )
         }
     }

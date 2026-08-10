@@ -40,6 +40,17 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 - [docs/EXERCISE_GUIDE.md](docs/EXERCISE_GUIDE.md) — the plan for per-movement animations and
   instructions, including the ExerciseDB terms that constrain it.
 
+### Changed
+- Each screen is now a stateless `…Content` taking plain values and callbacks, plus a thin wrapper
+  that reads the ViewModel and owns the parts only a real screen can do — the file picker, the
+  clipboard, the notification permission. No behaviour changed and no baseline moved; what changed
+  is that a test can render a whole screen at all. Five now do, including two states that are
+  awkward to reach by hand: a rest day, and Settings without the notification permission.
+- `WorkoutViewModel` has its first tests, ten of them, over the guide sheet's states and the import
+  confirmation — the one place in the app where saying yes destroys data. `RescheduleAlarmsUseCase`
+  became `open` for the same reason `ReminderScheduler` already was: so a test can hand it a no-op
+  instead of driving DataStore from a virtual clock.
+
 ### Fixed
 - Correcting the programme you are running cost you the record of running it. Re-importing the
   same `plan.id` with any change was refused outright — "poista vanha suunnitelma ensin", for which

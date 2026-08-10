@@ -10,7 +10,13 @@ import kotlinx.coroutines.flow.first
 import fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler
 
 
-class RescheduleAlarmsUseCase(
+/**
+ * `open`, like [fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler], so a test can hand
+ * something else a no-op. Rescheduling reads the notification settings out of DataStore, which
+ * runs on its own dispatcher — a ViewModel test driving a virtual clock would otherwise assert on
+ * state that had not been written yet, and pass or fail by timing.
+ */
+open class RescheduleAlarmsUseCase(
   private val database: AppDatabase,
   private val planDao: TrainingPlanDao,
   private val sessionDao: WorkoutSessionDao,
@@ -20,7 +26,7 @@ class RescheduleAlarmsUseCase(
   private val reminderScheduler: ReminderScheduler
 ) {
   
-  suspend fun execute() {
+  open suspend fun execute() {
     val previousCount = settingsStore.alarmCountFlow.first()
     if (previousCount > 0) {
         val requestCodes = (0 until previousCount).toList()

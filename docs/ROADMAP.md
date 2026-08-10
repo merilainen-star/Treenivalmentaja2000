@@ -27,6 +27,8 @@ the numbers behind them.
 - `TodayScreen`, `WeekScreen` and `SettingsScreen`.
 
 ## Completed (after Phase 3)
+- Screen state hoisting: every screen is a stateless `…Content` plus a thin ViewModel wrapper, so
+  whole screens are renderable in a test and `WorkoutViewModel` finally has some.
 - Test APK distribution: every push to `main` that touches code builds, verifies and republishes a
   rolling GitHub prerelease, and Settings says whether the installed build is the current one.
 - Import asks where a plan lands — the file's dates, or starting today — and replaces the previous
@@ -44,16 +46,13 @@ the numbers behind them.
 - Nothing. The app is being used in real training between milestones.
 
 ## Next Milestone
-1. **Screen state hoisting.** Split each screen into a stateless `…Content(state, callbacks)` and
-   a thin stateful wrapper. Today the screens take a `WorkoutViewModel` directly, so nothing can
-   render one in a test and `WorkoutViewModel` has no tests at all.
-2. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
+1. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
    credentials until the end.
-3. **In-app OAuth2 token exchange with PKCE**
+2. **In-app OAuth2 token exchange with PKCE**
    ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend), tokens in
    `EncryptedSharedPreferences`.
-4. **WorkManager** for background biometric syncing.
-5. **Put a recovery reading back on the Today screen**, this time with a measurement behind it.
+3. **WorkManager** for background biometric syncing.
+4. **Put a recovery reading back on the Today screen**, this time with a measurement behind it.
    That card shows only the illness buttons today, because the indicator it used to carry was a
    constant. This is the first point at which the Oura work becomes visible to the user.
 

@@ -24,20 +24,52 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * The stateful wrapper: the ViewModel, and the two things only a real screen can do — read a file
+ * the picker handed back, and ask for the notification permission.
+ *
+ * Everything else is a parameter of [SettingsScreenContent], which is what lets a test render this
+ * screen at all.
+ */
 @Composable
 fun SettingsScreen(viewModel: WorkoutViewModel) {
     val settings by viewModel.notificationSettings.collectAsState()
     val importFeedback by viewModel.importFeedback.collectAsState()
     val pendingConfirmation by viewModel.pendingImport.collectAsState()
+    val updateStatus by viewModel.updateStatus.collectAsState()
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+
+    var hasPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasPermission = isGranted
+        if (!isGranted) {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+            context.startActivity(intent)
+        }
+    }
 
     /** Plan text waiting for the user to say where in the calendar it should land. */
     var pendingImportJson by rememberSaveable { mutableStateOf<String?>(null) }
@@ -82,6 +114,45 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         )
     }
 
+    SettingsScreenContent(
+        settings = settings,
+        updateStatus = updateStatus,
+        hasNotificationPermission = hasPermission,
+        onRequestNotificationPermission = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        },
+        onTimeChange = viewModel::updateNotificationTime,
+        onImportFile = { filePicker.launch(arrayOf("application/json", "text/plain", "*/*")) },
+        onImportClipboard = {
+            // An empty clipboard is reported straight away rather than after asking a question
+            // about a plan that is not there.
+            val text = clipboard.getText()?.text
+            if (text.isNullOrBlank()) viewModel.importPlanJson(text) else pendingImportJson = text
+        },
+        onResetSampleData = viewModel::resetSampleData,
+        onCheckUpdate = viewModel::checkForUpdate,
+    )
+
+    importFeedback?.let { feedback ->
+        ImportFeedbackDialog(feedback, onDismiss = viewModel::dismissImportFeedback)
+    }
+}
+
+/** Settings, as a function of what it is given. */
+@Composable
+fun SettingsScreenContent(
+    settings: NotificationSettings,
+    updateStatus: UpdateStatus = UpdateStatus.Idle,
+    hasNotificationPermission: Boolean = true,
+    onRequestNotificationPermission: () -> Unit = {},
+    onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
+    onImportFile: () -> Unit = {},
+    onImportClipboard: () -> Unit = {},
+    onResetSampleData: () -> Unit = {},
+    onCheckUpdate: () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -117,27 +188,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                var hasPermission by remember { 
-                    mutableStateOf(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                        } else true
-                    )
-                }
-
-                val permissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestPermission()
-                ) { isGranted ->
-                    hasPermission = isGranted
-                    if (!isGranted) {
-                        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                        }
-                        context.startActivity(intent)
-                    }
-                }
-
-                if (!hasPermission) {
+                if (!hasNotificationPermission) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
                     ) {
@@ -153,11 +204,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Button(
-                                onClick = {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    }
-                                },
+                                onClick = onRequestNotificationPermission,
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                             ) {
                                 Text("Anna lupa", color = MaterialTheme.colorScheme.onError)
@@ -172,19 +219,19 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
                 NotificationTimeSetting(
                     title = WorkoutType.RUNNING.title,
                     time = settings.runningTime,
-                    onTimeChange = { viewModel.updateNotificationTime(WorkoutType.RUNNING, it) }
+                    onTimeChange = { onTimeChange(WorkoutType.RUNNING, it) }
                 )
 
                 NotificationTimeSetting(
                     title = WorkoutType.STRENGTH.title,
                     time = settings.strengthTime,
-                    onTimeChange = { viewModel.updateNotificationTime(WorkoutType.STRENGTH, it) }
+                    onTimeChange = { onTimeChange(WorkoutType.STRENGTH, it) }
                 )
 
                 NotificationTimeSetting(
                     title = WorkoutType.SKIING.title,
                     time = settings.skiingTime,
-                    onTimeChange = { viewModel.updateNotificationTime(WorkoutType.SKIING, it) }
+                    onTimeChange = { onTimeChange(WorkoutType.SKIING, it) }
                 )
             }
         }
@@ -214,33 +261,16 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
 
                 HorizontalDivider()
 
-                Button(
-                    onClick = {
-                        filePicker.launch(arrayOf("application/json", "text/plain", "*/*"))
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Button(onClick = onImportFile, modifier = Modifier.fillMaxWidth()) {
                     Text("Tuo tiedostosta")
                 }
 
-                OutlinedButton(
-                    onClick = {
-                        // An empty clipboard is reported straight away rather than after asking
-                        // a question about a plan that is not there.
-                        val text = clipboard.getText()?.text
-                        if (text.isNullOrBlank()) {
-                            viewModel.importPlanJson(text)
-                        } else {
-                            pendingImportJson = text
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                OutlinedButton(onClick = onImportClipboard, modifier = Modifier.fillMaxWidth()) {
                     Text("Tuo leikepöydältä")
                 }
 
                 OutlinedButton(
-                    onClick = { viewModel.resetSampleData() },
+                    onClick = onResetSampleData,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
@@ -249,37 +279,43 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
 
                 HorizontalDivider()
 
-                val updateStatus by viewModel.updateStatus.collectAsState()
                 // Checked once per visit to Settings rather than on a timer: the whole point is
                 // to answer the question you have while looking at this screen.
-                LaunchedEffect(Unit) { viewModel.checkForUpdate() }
-                UpdateCard(status = updateStatus, onCheck = { viewModel.checkForUpdate() })
+                LaunchedEffect(Unit) { onCheckUpdate() }
+                UpdateCard(status = updateStatus, onCheck = onCheckUpdate)
             }
         }
     }
 
-    importFeedback?.let { feedback ->
-        AlertDialog(
-            onDismissRequest = viewModel::dismissImportFeedback,
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissImportFeedback) { Text("Sulje") }
-            },
-            title = { Text(feedback.title) },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(
-                        text = feedback.detail,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (feedback.isError) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                    )
-                }
+}
+
+/**
+ * What the last import did, or refused to do.
+ *
+ * Scrollable because a broken plan reports every problem at once, with a JSON path each — a
+ * document with forty errors is a list of forty lines, and truncating it would hide the one that
+ * mattered.
+ */
+@Composable
+fun ImportFeedbackDialog(feedback: ImportFeedback, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Sulje") } },
+        title = { Text(feedback.title) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    text = feedback.detail,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (feedback.isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
             }
-        )
-    }
+        }
+    )
 }
 
 @Composable

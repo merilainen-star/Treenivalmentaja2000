@@ -44,18 +44,41 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
 import fi.merilainen.treenivalmentaja.ui.theme.ColorGreen
 import fi.merilainen.treenivalmentaja.ui.theme.ColorRed
 
+/** The stateful wrapper: reads the ViewModel and hands plain values down. */
 @Composable
 fun WeekScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
     val guideState by viewModel.guideState.collectAsState()
 
+    WeekScreenContent(
+        workouts = workouts,
+        guideState = guideState,
+        onExerciseClick = viewModel::openExerciseGuide,
+        onGuideRetry = viewModel::retryExerciseGuide,
+        onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
+        onGuideDismiss = viewModel::closeExerciseGuide,
+    )
+}
+
+/** The week, as a function of what it is given. */
+@Composable
+fun WeekScreenContent(
+    workouts: List<Workout>,
+    guideState: ExerciseGuideState? = null,
+    onExerciseClick: (Exercise) -> Unit = {},
+    onGuideRetry: () -> Unit = {},
+    onGuideSuggestionSelected: (ExerciseGuide) -> Unit = {},
+    onGuideDismiss: () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -109,7 +132,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
                         dayWorkouts.forEach { workout ->
                             WorkoutCardWeek(
                                 workout = workout,
-                                onExerciseClick = { viewModel.openExerciseGuide(it) },
+                                onExerciseClick = onExerciseClick,
                             )
                         }
                     }
@@ -120,9 +143,9 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         guideState?.let { state ->
             ExerciseGuideSheet(
                 state = state,
-                onRetry = { viewModel.retryExerciseGuide() },
-                onSelectSuggestion = { viewModel.selectGuideSuggestion(it) },
-                onDismiss = { viewModel.closeExerciseGuide() },
+                onRetry = onGuideRetry,
+                onSelectSuggestion = onGuideSuggestionSelected,
+                onDismiss = onGuideDismiss,
             )
         }
     }
