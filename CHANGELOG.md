@@ -8,6 +8,22 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-08-10
 
 ### Added
+- **A recovery reading on the Today screen, with a measurement behind it.** The indicator that was
+  removed for being a constant is back, now showing today's Oura readiness score and a word for it.
+  It tells four situations apart, because what they mean differs: Oura not connected shows no
+  indicator at all, a day nothing has been fetched for says so, a day Oura answered about with no
+  score says "ei tietoa", and a reading shows the number with sleep and activity beside it. The
+  third one is the whole point — the ring was not worn, and a zero there would read as a verdict.
+  The word describes the score and never what to do about it; advice without a measurement is what
+  the old card was stripped for.
+- **A daily background sync** (WorkManager), and a fetch when the Today screen opens. Both reach
+  back several days rather than one, because Oura revises a day once the night has been processed
+  and a phone that was offline over a weekend would otherwise keep a permanent hole. The worker is
+  scheduled only while Oura is connected — one that woke daily to find no token would be a battery
+  cost with no possible result.
+- The Oura tables finally have a writer. `OuraRepository` is the only thing that writes them, and
+  the screens observe Room rather than the network, so a failed sync leaves the last known reading
+  on screen instead of an error.
 - **Oura is set up entirely on the phone.** Settings asks for the Client ID and Client Secret of an
   application registered in Oura's developer portal, stores them encrypted beside the tokens, and
   connects from there. Nothing needs a PC, a checkout, an `.env` file or a file copied from a
@@ -74,8 +90,9 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   [ADR-007](docs/DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client). It costs no APK
   bytes, because Coil already put 4.12.0 inside the APK; what it buys is the `Authenticator` that
   token renewal is specified in terms of. Measured cost of the whole Oura milestone so far:
-  68,021 B — the client 14,801 B, the authentication and its Settings UI 53,220 B, and no new
-  dependency in either.
+  132,160 B — the client 14,801 B, the authentication and its Settings UI 53,220 B, and the sync
+  and recovery card 64,139 B. Only the last of those added a dependency: WorkManager, which is most
+  of its size.
 
 ## [Unreleased] - 2026-08-09
 

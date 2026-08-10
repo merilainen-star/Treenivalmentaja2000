@@ -113,6 +113,10 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
+  // WorkManager runs the daily Oura sync. Unlike the reminder alarms, this one needs a network and
+  // must survive being deferred, retried and rebooted — which is the one job AlarmManager is a bad
+  // fit for. See data/oura/OuraSyncWorker.kt.
+  implementation(libs.androidx.work.runtime.ktx)
   // Coil loads the exercise-guide animations. coil-gif is not optional: Coil decodes no animated
   // GIF without it, and the guide images are the one thing this feature exists to show.
   // The loader is configured in TreenivalmentajaApplication with its disk cache disabled —

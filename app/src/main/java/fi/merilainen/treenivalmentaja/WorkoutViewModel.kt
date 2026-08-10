@@ -18,6 +18,9 @@ import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
+import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
+import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
@@ -104,6 +107,7 @@ class WorkoutViewModel(
   private val checkForUpdateUseCase: CheckForUpdateUseCase,
   private val loadExerciseGuideUseCase: LoadExerciseGuideUseCase,
   private val ouraConnection: OuraConnection,
+  private val ouraRepository: OuraRepository,
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -131,6 +135,18 @@ class WorkoutViewModel(
 
   /** Whether Oura is connected, being connected, or cannot be. */
   val ouraState: StateFlow<OuraConnectionState> = ouraConnection.state
+
+  /**
+   * Today's Oura reading, straight from Room.
+   *
+   * `null` means Oura has never been asked about today — which the card says differently from a day
+   * Oura answered about with no numbers in it. The screen observes the database, never the network:
+   * a failed sync leaves this showing yesterday's truth rather than an error.
+   */
+  val todayRecovery: StateFlow<DailyRecovery?> =
+    ouraRepository
+      .observeDay(LocalDate.now())
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
   /**
    * Set when a login is waiting for a browser to be opened, and cleared the moment one is.
@@ -197,6 +213,36 @@ class WorkoutViewModel(
   fun forgetOuraCredentials() {
     viewModelScope.launch { ouraConnection.forgetCredentials() }
   }
+
+  /**
+   * Fetches the last few days from Oura now.
+   *
+   * Called when the Today screen appears, and harmless when it is not connected — the client
+   * refuses without a token and the failure is swallowed into the state below. Deliberately quiet:
+   * this runs without anyone asking for it, so a network that is not there must not produce a
+   * dialog.
+   */
+  fun syncOura() {
+    if (ouraState.value != OuraConnectionState.Connected) return
+    if (_ouraSyncing.value) return
+    viewModelScope.launch {
+      _ouraSyncing.value = true
+      val today = LocalDate.now()
+      _lastSyncFailure.value =
+        when (val result = ouraRepository.sync(from = today.minusDays(SYNC_DAYS), to = today)) {
+          is OuraSyncResult.Success -> null
+          is OuraSyncResult.Failure -> result.message
+        }
+      _ouraSyncing.value = false
+    }
+  }
+
+  private val _ouraSyncing = MutableStateFlow(false)
+  val ouraSyncing: StateFlow<Boolean> = _ouraSyncing.asStateFlow()
+
+  /** The last sync's failure, or `null`. Shown on the card as a footnote, never as a dialog. */
+  private val _lastSyncFailure = MutableStateFlow<String?>(null)
+  val lastSyncFailure: StateFlow<String?> = _lastSyncFailure.asStateFlow()
 
   /** Drops the tokens and the cached Oura rows. The training plan is untouched. */
   fun disconnectOura() {
@@ -407,6 +453,14 @@ class WorkoutViewModel(
     }
 
   companion object {
+    /**
+     * How far back a foreground sync reaches.
+     *
+     * More than today, because Oura revises a day after the fact and a phone that was offline over
+     * a weekend would otherwise keep a permanent hole in it.
+     */
+    private const val SYNC_DAYS = 4L
+
     /** Statuses that describe a closed row and are never drawn on the Today/Week screens. */
     private val HIDDEN_STATUSES = setOf(SessionStatus.RESCHEDULED, SessionStatus.CANCELLED)
 
@@ -423,6 +477,7 @@ class WorkoutViewModel(
           application.checkForUpdateUseCase,
           application.loadExerciseGuideUseCase,
           application.ouraConnection,
+          application.ouraRepository,
         )
       }
     }

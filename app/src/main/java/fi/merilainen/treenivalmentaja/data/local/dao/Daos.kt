@@ -140,6 +140,16 @@ interface OuraDao {
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertDailySummary(summary: OuraDailySummaryEntity)
 
+  /**
+   * A whole sync's worth of days at once.
+   *
+   * `REPLACE` is safe here in a way it is not on `training_plans`: nothing references these rows, so
+   * the delete-then-insert Room compiles it into cascades to nothing. A re-fetched day overwrites
+   * the day it re-fetched, which is the intent — Oura revises a score as the night is processed.
+   */
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertDailySummaries(summaries: List<OuraDailySummaryEntity>)
+
   @Query("SELECT * FROM oura_daily_summaries WHERE date = :date")
   fun observeDailySummary(date: String): Flow<OuraDailySummaryEntity?>
 

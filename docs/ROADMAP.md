@@ -51,9 +51,10 @@ the numbers behind them.
    to typed already-Finnish failures, and turns what comes back into `oura_daily_summaries` and
    `oura_workouts` rows. Written against the vendored `docs/api/oura-openapi-1.37.json` and a local
    `com.sun.net.httpserver`, so it needed no credentials; on OkHttp rather than Retrofit
-   ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client)). **Nothing calls it
-   yet, and it has never met the live service** — the fixtures behind its tests are derived from
-   the specification, not captured from Oura, and only step 2's credentials can close that gap.
+   ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client)). It now runs against a
+   real account. **What no one has checked is whether it parses that account correctly** — the
+   fixtures behind its tests are derived from the specification rather than captured from Oura, so
+   the remaining step is comparing a number the app displays with Oura's own app.
 2. ~~**In-app OAuth2 token exchange with PKCE**~~ — built, and reachable from Settings. The
    authorization request, `state` validation, the code exchange, encrypted token storage, and the
    OkHttp `Authenticator` that renews on `401` without spending a rotated refresh token twice.
@@ -64,12 +65,16 @@ the numbers behind them.
    on the phone — the previous design needed a local `.env` and therefore a PC, which is not how
    this app is installed
    ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)).
-   **No login has ever been completed**: that still needs an Oura developer application, which only
-   the owner's account can create.
-3. **WorkManager** for background biometric syncing.
-4. **Put a recovery reading back on the Today screen**, this time with a measurement behind it.
-   That card shows only the illness buttons today, because the indicator it used to carry was a
-   constant. This is the first point at which the Oura work becomes visible to the user.
+   **A real login has been completed** from the phone, against a real Oura account.
+3. ~~**WorkManager** for background biometric syncing.~~ — built. A daily periodic worker fetching
+   the last five days (Oura revises a day after the fact, and an offline weekend would otherwise
+   leave a permanent hole), plus a foreground sync when the Today screen opens. Scheduled only while
+   Oura is connected.
+4. ~~**Put a recovery reading back on the Today screen**~~ — done, and this is the first point where
+   the Oura work is visible at all. The card tells four situations apart: Oura not connected (no
+   indicator, exactly as before), nothing fetched yet, a day Oura answered about with no score, and
+   a reading. The third is the one the whole design turns on — the ring was not worn, so the card
+   says "ei tietoa" about a day that exists rather than drawing a zero.
 
 ## Later (Phase 4 & Beyond)
 - Logging what was actually lifted, so a strength session can be compared with the last time it
@@ -79,8 +84,7 @@ the numbers behind them.
 - Strava API integration for richer workout telemetry.
 
 ## Blocked
-- None. Registering the Oura developer application and creating a local `.env` needs the owner's
-  account; everything else in the Oura milestone can be built and tested without it.
+- None. The Oura milestone is built end to end and a real account is connected.
 
 ## Technical Debt
 - Extract use cases from `TrainingRepository`: it still carries domain logic (lighter-version

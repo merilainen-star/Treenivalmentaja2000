@@ -15,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -22,6 +23,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,6 +40,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -59,6 +63,14 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorYellow
 fun TodayScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
     val guideState by viewModel.guideState.collectAsState()
+    val ouraState by viewModel.ouraState.collectAsState()
+    val recovery by viewModel.todayRecovery.collectAsState()
+    val syncing by viewModel.ouraSyncing.collectAsState()
+    val syncFailure by viewModel.lastSyncFailure.collectAsState()
+
+    // Once per visit to this screen, not on a timer: the reading is what you came here to see, and
+    // the fetch is four requests of a few kilobytes. A disconnected Oura makes it a no-op.
+    LaunchedEffect(ouraState) { viewModel.syncOura() }
 
     // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
     // every launch and rewrote the calendar — see WorkoutViewModel.checkMissedSessions.
@@ -74,6 +86,10 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onGuideRetry = viewModel::retryExerciseGuide,
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
         onGuideDismiss = viewModel::closeExerciseGuide,
+        recovery = recovery,
+        ouraConnected = ouraState == OuraConnectionState.Connected,
+        syncing = syncing,
+        syncFailure = syncFailure,
     )
 }
 
@@ -91,6 +107,10 @@ fun TodayScreenContent(
     onGuideRetry: () -> Unit = {},
     onGuideSuggestionSelected: (ExerciseGuide) -> Unit = {},
     onGuideDismiss: () -> Unit = {},
+    recovery: DailyRecovery? = null,
+    ouraConnected: Boolean = false,
+    syncing: Boolean = false,
+    syncFailure: String? = null,
 ) {
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
@@ -109,7 +129,11 @@ fun TodayScreenContent(
 
         RecoveryCard(
             onSickClicked = onSickClicked,
-            onRecoveredClicked = onRecoveredClicked
+            onRecoveredClicked = onRecoveredClicked,
+            recovery = recovery,
+            ouraConnected = ouraConnected,
+            syncing = syncing,
+            syncFailure = syncFailure,
         )
 
         if (todayWorkouts.isNotEmpty()) {
@@ -149,22 +173,32 @@ fun TodayScreenContent(
 }
 
 /**
- * The two things the app can actually be told about your condition.
+ * Today's recovery, and the two things the app can be told about your condition.
  *
- * It used to sit under a coloured indicator reading "Palautuminen: Kohtalainen" with the advice
- * "Kevyempi versio voi olla järkevä". Nothing fed either of them: the value was a constant set in
- * two places, both to the same thing, and the Oura tables it was waiting for have no writer. So
- * the app repeated the same reading every day and nudged towards a lighter session on all of
- * them — advice with nothing behind it, wearing the clothes of a measurement.
+ * There used to be an indicator here reading "Palautuminen: Kohtalainen" above the advice
+ * "Kevyempi versio voi olla järkevä". Nothing fed either of them — the value was a constant set in
+ * two places, both to the same thing — so the app repeated one verdict every day and nudged towards
+ * a lighter session on all of them: advice with nothing behind it, wearing the clothes of a
+ * measurement. It was removed, and this is it coming back with a number underneath.
  *
- * The buttons were always real. They drive the training engine's illness pause and its graduated
- * return, so this is what is left when the part that only looked informative is taken away. A
- * recovery indicator belongs here again the day Oura can fill one in.
+ * Four states, and telling them apart is the entire design:
+ * - **Oura not connected** — no indicator at all, exactly as before. Silence beats invention.
+ * - **Nothing fetched yet** — says so, rather than showing an empty reading as if it were one.
+ * - **A day with no score** — the ring was not worn, or the night is not processed. Oura answers
+ *   with a document whose `score` is `null`, so this says "ei tietoa" about a day that exists. It
+ *   must never be drawn as a zero, which would read as "you are wrecked".
+ * - **A reading** — the number, and a word for it. The word describes the score, never what to do
+ *   about it; a training instruction with a measurement behind it is a later decision, and one
+ *   without a measurement is what this card was stripped for.
  */
 @Composable
 fun RecoveryCard(
     onSickClicked: () -> Unit,
-    onRecoveredClicked: () -> Unit
+    onRecoveredClicked: () -> Unit,
+    recovery: DailyRecovery? = null,
+    ouraConnected: Boolean = false,
+    syncing: Boolean = false,
+    syncFailure: String? = null,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -175,6 +209,10 @@ fun RecoveryCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (ouraConnected) {
+                RecoveryReading(recovery = recovery, syncing = syncing, syncFailure = syncFailure)
+                HorizontalDivider()
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -193,6 +231,83 @@ fun RecoveryCard(
                     Text("Tervehdyin")
                 }
             }
+        }
+    }
+}
+
+/**
+ * The reading itself.
+ *
+ * Sleep and activity are shown beside readiness only when they exist, because a row of dashes is
+ * noise. A failed sync is a footnote rather than a dialog: the number above it is what the database
+ * holds, and it stays true whether or not the last fetch reached Oura.
+ */
+@Composable
+private fun RecoveryReading(recovery: DailyRecovery?, syncing: Boolean, syncFailure: String?) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Palautuminen",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        when {
+            recovery?.readiness != null ->
+                Row(
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "${recovery.readiness}",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    recovery.readinessLabel?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(bottom = 4.dp),
+                        )
+                    }
+                }
+            recovery != null ->
+                Text(
+                    // The ring was not worn, or the night has not been scored yet. Saying so beats
+                    // a zero, which would read as a verdict.
+                    text = "Ei tietoa tältä päivältä",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            syncing ->
+                Text(
+                    text = "Haetaan Ourasta…",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            else ->
+                Text(
+                    text = "Ei vielä haettu",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+        }
+        val extras = buildList {
+            recovery?.sleep?.let { add("Uni $it") }
+            recovery?.activity?.let { add("Aktiivisuus $it") }
+        }
+        if (extras.isNotEmpty()) {
+            Text(
+                text = extras.joinToString(" · "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        syncFailure?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

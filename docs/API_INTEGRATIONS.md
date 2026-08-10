@@ -2,11 +2,11 @@
 
 *(Note: the client that speaks this API is built —
 `app/src/main/java/fi/merilainen/treenivalmentaja/data/oura/`, on OkHttp per
-[ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client). **Nothing calls it yet**:
-the authentication that would give it a token, the sync that would schedule it and the card that
-would show the result are all still planned. Everything below about the API itself was read out of
-the vendored specification, not from memory, and the client has never been run against the live
-service.)*
+[ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client). Authentication, a daily
+sync and the recovery card on the Today screen are all built on top of it. Everything below about
+the API itself was read out of the vendored specification, not from memory. A real account is now connected and the app fetches
+from it, but no field it parses has been checked against what Oura's own app shows for the same
+day.)*
 
 ## Oura API V2
 

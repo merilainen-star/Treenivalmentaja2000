@@ -12,17 +12,21 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 20,565,936 B (19.61 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 303 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 35 comparisons, 0 changed |
-| Lint | `./gradlew :app:lintDebug` | 0 errors, 40 warnings |
+| Build | `./gradlew :app:assembleDebug` | Success — `app-debug.apk`, 20,630,075 B (19.67 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 318 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 41 comparisons, 0 changed |
+| Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 35 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
-The whole Oura milestone so far cost **68,021 B (+0.33%)** — the client 14,801 B, and the
-authentication, its Settings UI and the in-app credential fields a further 53,220 B. Those come
-from stashing the work, rebuilding `assembleDebug` on this machine and measuring: 20,497,915 B
-without any of it, 20,512,716 B with the client, 20,565,936 B with the authentication as well. Adding no dependency is why: OkHttp was already inside the APK, and the
-token store uses platform crypto rather than a library.
+The whole Oura milestone cost **132,160 B (+0.64%)**, measured by stashing the work and rebuilding
+`assembleDebug` on this machine at each stage: 20,497,915 B without any of it, 20,512,716 B with the
+API client, 20,565,936 B with the authentication as well, 20,630,075 B with the sync and the
+recovery card.
+
+Three of those four stages added no dependency at all — OkHttp was already inside the APK via Coil,
+and the token store uses platform crypto rather than a library. The last one added **WorkManager**,
+which is most of its 64,139 B and the only new dependency in the milestone. It buys a background
+sync that survives reboots and retries with a backoff, which AlarmManager does not do.
 
 The comparison is worth spelling out, because the obvious subtraction gives the wrong answer. The
 line above used to record 20,266,654 B for the previous commit, which would make this change look
@@ -37,16 +41,17 @@ DEX already contains `okhttp3/OkHttpClient`, extracted and searched after decomp
 string search over the zipped APK finds nothing either way and proves nothing. Coil pulls OkHttp
 4.12.0 in; `app/build.gradle.kts` now names the same version directly.
 
-Instrumented tests ran this time, on the `treeni-test` AVD (Android 16), and had to: the token store
-encrypts with an Android Keystore key, and there is no Keystore on the JVM. Seventeen of the
-thirty-five cover it — that a round trip returns what went in, that what lands in `SharedPreferences` is not the
+Instrumented tests ran on the `treeni-test` AVD (Android 16), and had to: the token store encrypts
+with an Android Keystore key, and there is no Keystore on the JVM. Seventeen of the thirty-five
+cover it — that a round trip returns what went in, that what lands in `SharedPreferences` is not the
 token, that the same token encrypts differently each time (a reused GCM nonce would break it
 completely), that a tampered ciphertext fails to decrypt rather than decrypting to something else,
 and that an unreadable store reads as "not connected" instead of crashing. CI still has no device
 and its workflow says so rather than implying the suite ran.
 
-The 40 lint warnings are all non-functional: 38 are dependency-update notices, one is a
-`RedundantLabel`, and one is an `ObsoleteSdkInt` that must stay — see below.
+The 41 lint warnings are all non-functional: 39 are dependency-update notices — one of them for
+the WorkManager added in this change, which is left at 2.10.0 rather than chased to 2.11.2, as the
+other 38 are — one is a `RedundantLabel`, and one is an `ObsoleteSdkInt` that must stay.
 
 Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)).
 `assembleDebug` needs a local `debug.keystore` at the repository root; it is git-ignored, see
@@ -84,7 +89,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   only a real screen can do — the file picker, the clipboard, the notification permission. That is
   what makes a whole screen capturable, and states that are awkward to reach by hand — a rest day,
   a missing notification permission — are now baselines rather than something to remember.
-- **Screenshot tests.** 35 Roborazzi baselines: all three screens whole, plus the Today and Week
+- **Screenshot tests.** 41 Roborazzi baselines: all three screens whole, plus the Today and Week
   cards, a started workout's checklist, the recovery card, every status badge, both import
   dialogs, every state of the exercise-guide sheet, and every state of the Oura card — including
   the connected one, which cannot be produced on this machine at all because it needs credentials
@@ -207,9 +212,11 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   spend an already-invalidated one and log the user out for being busy. A caller that lost that race
   notices and simply retries with the token that is now stored.
 
-  **No login has ever been completed.** Everything above is tested against a local server; a real
-  round trip needs a registered Oura application and a local `.env`, and that is the one step that
-  cannot be done without the owner's account.
+  **A real login has now been completed**, against a real Oura account, from the phone. That is
+  what proves the client id and secret, the redirect URI, the PKCE exchange and the encrypted store
+  all work together — none of which a local server can establish. What is still unproven is the
+  *data*: no number the app displays has been compared with what Oura's own app shows for the same
+  day.
 
   The instrumented tests found a fault the unit tests could not. `OuraTokenStore.clear()` emptied
   the whole preferences file, so disconnecting silently took the client credentials with it — while
@@ -226,16 +233,28 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   offering "Yritä uudelleen" for a connection that cannot be attempted at all. Fixed — such a
   redirect now leaves the card saying the build has no credentials — and covered by a test.
 
+- **A recovery reading on Today, with a measurement behind it.** The indicator removed for being a
+  constant is back, showing today's Oura readiness and a word for it, with sleep and activity beside
+  it when they exist. Four states, and telling them apart is the design: Oura not connected shows no
+  indicator at all; a day nothing has been fetched for says so; a day Oura answered about with **no
+  score** says "ei tietoa"; and a reading shows the number. The third is what the whole thing turns
+  on — the ring was not worn, and a zero would read as a verdict rather than as an absence. The word
+  describes the score and never what to do about it.
+- **The Oura tables have a writer.** `OuraRepository` fetches a date range, maps it and writes it;
+  nothing else touches those tables. The screens observe Room and never the network, so a failed
+  sync leaves the last known reading on screen rather than an error. A daily WorkManager job and a
+  fetch when Today opens both reach back several days, because Oura revises a day once the night is
+  processed and an offline weekend would otherwise leave a permanent hole. The worker exists only
+  while Oura is connected.
+
 ## Partially working
 
 - "Kevyempi versio" applies the plan's lighter payload, or falls back to a 40% reduction. The
   wider rule engine (load balancing, stacking prevention) is not built.
-- The Today screen no longer claims to know anything about recovery. The card there used to show
-  a coloured indicator reading "Palautuminen: Kohtalainen" above the advice "Kevyempi versio voi
-  olla järkevä" — a constant, set in two places, both to the same value, so it repeated the same
-  verdict every day and nudged towards a lighter session on all of them. The indicator and the
-  advice are gone; the "Sairastuin" and "Tervehdyin" buttons under them were always real and
-  stay. An indicator belongs there again the day Oura can fill one in.
+- The recovery card shows a reading but gives no advice. The number is real now, and what to *do*
+  about it is still the user's call: nothing connects readiness to "kevyempi versio" or to the
+  training engine. That link is the next honest step, and it is deliberately not guessed at — the
+  card this replaced was removed precisely for offering advice with nothing behind it.
 
 ## Not implemented
 
@@ -260,23 +279,24 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 ## Current blockers
 
-- **One real login.** Everything remaining in the Oura milestone is downstream of it, and it needs
-  an Oura developer application registered against `treenivalmentaja://oauth2callback` — which only
-  the owner's account can create. What it no longer needs is a PC: the credentials are pasted into
-  Settings on the phone. Everything that could be built without them has been.
+- None. A real Oura account is connected, and the milestone is built end to end. What is missing is
+  a *check* rather than a blocker: no number this app shows has been compared against what Oura's
+  own app says for the same day, so the parsing is verified against the specification but not
+  against the service.
 
 ## Recommended next task
 
-1. **Register the Oura developer application, then paste its credentials into Settings.** All of it
-   works in a phone browser: create the application at `developer.ouraring.com` with the redirect
-   URI `treenivalmentaja://oauth2callback`, then Asetukset → Oura. Scopes are `daily` and `workout`.
-   With that done, "Yhdistä Oura" can be walked end to end for the first time — which is also the
-   first check of whether the specification-derived fixtures match what Oura actually sends.
-2. **WorkManager sync**, writing what the client returns through a repository into
-   `oura_daily_summaries` and `oura_workouts`.
-3. **The recovery card**, which is where any of this first becomes visible. Its design constraint
-   is already known: `score` is optional, so a day the ring was not worn is a row that exists with
-   no number in it, and the card has to say "ei tietoa" rather than draw a zero.
+1. **Check the reading against Oura's own app.** The Oura milestone is built and a real account is
+   connected, but no number the app displays has ever been compared with what Oura itself shows for
+   the same day. That comparison is the only thing that can confirm the specification-derived
+   parsing is right, and it costs one look at two screens.
+2. **Decide what a reading is allowed to do.** The card shows readiness and stops there on purpose.
+   Connecting it to "kevyempi versio" or to the training engine is a training decision, not a
+   parsing one — and the card this replaced was removed for giving advice with nothing behind it,
+   so the rule wants writing down before it is coded.
+3. **Match Oura workouts to planned sessions.** `oura_workouts` fills up and
+   `matchedSessionId` is still always `null`; nothing yet notices that the run Oura recorded at
+   18:00 is the session the plan asked for.
 
 ## Files most relevant to the next task
 

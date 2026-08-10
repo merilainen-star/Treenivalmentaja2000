@@ -26,6 +26,9 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraAuthService
 import fi.merilainen.treenivalmentaja.data.oura.OuraAuthenticator
 import fi.merilainen.treenivalmentaja.data.oura.OuraClient
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
+import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.data.oura.OuraSyncWorker
+import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.oura.OuraCredentials
 import fi.merilainen.treenivalmentaja.data.oura.OuraCredentialsSource
 import fi.merilainen.treenivalmentaja.data.oura.OuraTokenStore
@@ -156,12 +159,31 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     )
   }
 
+  internal val ouraRepository: OuraRepository by lazy {
+    OuraRepository(client = ouraClient, dao = db.ouraDao())
+  }
+
   override fun onCreate() {
     super.onCreate()
     NotificationChannels.createChannels(this)
-    // Settings must be able to say whether Oura is connected the moment it is opened, and the
-    // answer is on disk behind a Keystore decryption rather than in memory.
-    applicationScope.launch { ouraConnection.refreshState() }
+    applicationScope.launch {
+      // Settings must be able to say whether Oura is connected the moment it is opened, and the
+      // answer is on disk behind a Keystore decryption rather than in memory.
+      ouraConnection.refreshState()
+    }
+    // Scheduled only while there is something to fetch with — a worker that woke daily to discover
+    // it has no token would be a battery cost with no possible result. Collected rather than
+    // checked once, so connecting or disconnecting mid-session takes effect immediately instead of
+    // at the next launch.
+    applicationScope.launch {
+      ouraConnection.state.collect { state ->
+        if (state == OuraConnectionState.Connected) {
+          OuraSyncWorker.schedule(this@TreenivalmentajaApplication)
+        } else {
+          OuraSyncWorker.cancel(this@TreenivalmentajaApplication)
+        }
+      }
+    }
   }
 
   /**

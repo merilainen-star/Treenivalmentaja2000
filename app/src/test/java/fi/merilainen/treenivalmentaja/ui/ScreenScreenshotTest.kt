@@ -9,12 +9,14 @@ import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.OuraCard
+import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.SettingsScreenContent
 import fi.merilainen.treenivalmentaja.TodayScreenContent
 import fi.merilainen.treenivalmentaja.WeekScreenContent
 import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
+import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -107,6 +109,69 @@ class ScreenScreenshotTest {
     @Test
     fun today_restDay() = capture("screen_today_rest_day") {
         TodayScreenContent(workouts = listOf(strength(1, "s-25")))
+    }
+
+    /**
+     * Today with a real readiness reading — the first thing the whole Oura milestone exists to put
+     * on screen, and a state that needs a connected Oura account to reach by hand.
+     */
+    @Test
+    fun today_withRecovery() = capture("screen_today_recovery") {
+        TodayScreenContent(
+            workouts = listOf(strength(0, "s-24")),
+            recovery = DailyRecovery(date = "2026-08-10", readiness = 82, sleep = 76, activity = 91),
+            ouraConnected = true,
+        )
+    }
+
+    // ------------------------------------------------------------------ the recovery card
+
+    /** Oura not connected: no indicator at all, which is what this card said before Oura existed. */
+    @Test
+    fun recovery_withoutOura() = capture("card_recovery_no_oura") {
+        RecoveryCard(onSickClicked = {}, onRecoveredClicked = {})
+    }
+
+    @Test
+    fun recovery_reading() = capture("card_recovery_reading") {
+        RecoveryCard(
+            onSickClicked = {},
+            onRecoveredClicked = {},
+            recovery = DailyRecovery(date = "2026-08-10", readiness = 82, sleep = 76, activity = 91),
+            ouraConnected = true,
+        )
+    }
+
+    /**
+     * The day the ring was not worn. Oura returns a document with no score, so the card has to say
+     * "ei tietoa" about a day that exists — a zero here would read as a verdict.
+     */
+    @Test
+    fun recovery_dayWithoutScore() = capture("card_recovery_no_score") {
+        RecoveryCard(
+            onSickClicked = {},
+            onRecoveredClicked = {},
+            recovery = DailyRecovery(date = "2026-08-10"),
+            ouraConnected = true,
+        )
+    }
+
+    /** Connected, but nothing fetched yet — different from a day Oura had nothing to say about. */
+    @Test
+    fun recovery_notFetched() = capture("card_recovery_not_fetched") {
+        RecoveryCard(onSickClicked = {}, onRecoveredClicked = {}, ouraConnected = true)
+    }
+
+    /** A failed fetch is a footnote under the number the database still holds, not a dialog. */
+    @Test
+    fun recovery_syncFailure() = capture("card_recovery_sync_failure") {
+        RecoveryCard(
+            onSickClicked = {},
+            onRecoveredClicked = {},
+            recovery = DailyRecovery(date = "2026-08-10", readiness = 64),
+            ouraConnected = true,
+            syncFailure = "Oura-tietojen haku vaatii verkkoyhteyden.",
+        )
     }
 
     // ------------------------------------------------------------------ Week

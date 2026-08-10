@@ -13,7 +13,9 @@ import fi.merilainen.treenivalmentaja.data.oura.FakeOuraTokenStorage
 import fi.merilainen.treenivalmentaja.data.oura.OuraAuthService
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.data.oura.OuraClient
 import fi.merilainen.treenivalmentaja.data.oura.OuraCredentials
+import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.data.update.UpdateInfo
@@ -149,6 +151,13 @@ class WorkoutViewModelTest {
           authService = OuraAuthService({ PLACEHOLDER_CREDENTIALS }),
           credentials = { PLACEHOLDER_CREDENTIALS },
           onDisconnected = {},
+        ),
+      // Points at a port nothing listens on, and is never reached anyway: syncOura() returns
+      // immediately unless Oura is connected, which a placeholder build cannot be.
+      ouraRepository =
+        OuraRepository(
+          client = OuraClient(tokens = { null }, baseUrl = "http://127.0.0.1:1"),
+          dao = db.ouraDao(),
         ),
     )
   }
