@@ -12,6 +12,7 @@ import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
+import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import java.time.Instant
 import java.time.LocalDate
@@ -80,6 +81,51 @@ class OuraRepository internal constructor(
         canRetry = e.canRetry,
       )
     }
+
+  /**
+   * Asks Oura the same questions a sync asks, and reports what came back rather than storing it.
+   *
+   * Each collection is caught on its own, so one failing does not hide the others' answers — the
+   * whole point is to tell "Oura returned nothing" apart from "we never asked" and from "it failed".
+   * Nothing here writes to the database.
+   */
+  suspend fun diagnose(from: LocalDate, to: LocalDate): OuraDiagnostics {
+    val failures = mutableListOf<String>()
+
+    suspend fun <T> attempt(label: String, block: suspend () -> List<T>): List<T> =
+      try {
+        block()
+      } catch (e: OuraException) {
+        failures += "$label: ${e.message}"
+        emptyList()
+      }
+
+    val readiness = attempt("Palautuminen") { client.readiness(from, to) }
+    val sleep = attempt("Uni") { client.sleep(from, to) }
+    val activity = attempt("Aktiivisuus") { client.activity(from, to) }
+    val workouts = attempt("Treenit") { client.workouts(from, to) }
+    val rows = OuraMappers.toWorkouts(workouts)
+    val samples =
+      if (rows.isEmpty()) emptyList()
+      else
+        attempt("Syke") {
+          client.heartRate(
+            Instant.ofEpochMilli(rows.minOf { it.startTimeUtc }),
+            Instant.ofEpochMilli(rows.maxOf { it.endTimeUtc }),
+          )
+        }
+
+    return OuraDiagnostics(
+      fromDate = from.toString(),
+      toDate = to.toString(),
+      readinessDays = readiness.size,
+      sleepDays = sleep.size,
+      activityDays = activity.size,
+      workouts = workouts.map { it.describe() },
+      heartRateSamples = samples.size,
+      failures = failures,
+    )
+  }
 
   /**
    * The heart-rate samples covering the workouts just fetched, or none.
@@ -172,6 +218,26 @@ class OuraRepository internal constructor(
   fun observeDay(date: LocalDate): Flow<DailyRecovery?> =
     dao.observeDailySummary(date.toString()).map { it?.toDomain() }
 }
+
+/**
+ * One workout as a single readable line, for the diagnostics screen.
+ *
+ * Straight from the DTO rather than from a stored row, because the question it answers is what Oura
+ * sent — a row would already have been through parsing and could hide the very thing being looked
+ * for. `source` is included: `autodetected` and `manual` are the difference between Oura noticing a
+ * session and someone entering it, and that is exactly the kind of thing worth seeing.
+ */
+private fun OuraWorkoutDto.describe(): String =
+  buildString {
+    append(day ?: "?")
+    append("  ")
+    append(activity ?: "?")
+    append("  ")
+    append(startDatetime?.substringAfter('T')?.take(5) ?: "?")
+    calories?.let { append("  ${it.toInt()} kcal") }
+    distance?.let { append("  ${"%.1f".format(it / 1000.0)} km") }
+    source?.let { append("  [$it]") }
+  }
 
 /** Metres and a millisecond span are Oura's units; kilometres and minutes are the screen's. */
 private fun OuraWorkoutEntity.toMetrics(): CompletedSessionMetrics =

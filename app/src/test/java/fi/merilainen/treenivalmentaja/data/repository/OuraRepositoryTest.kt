@@ -165,6 +165,73 @@ class OuraRepositoryTest {
     assertEquals(72, repository.observeDay(LocalDate.parse(DAY)).first()!!.readiness)
   }
 
+  // ------------------------------------------------------------------ diagnostics
+
+  /**
+   * The case this whole feature was built for: Oura answers, and has no workouts. Telling that
+   * apart from "we never asked" and from "the request failed" was impossible from the screen, and
+   * that ambiguity is what made a real missing session undebuggable.
+   */
+  @Test
+  fun `diagnostics report an empty workout collection as empty, not as a failure`() =
+    runTest(dispatcher) {
+      routes =
+        mapOf(
+          READINESS to (200 to scores(DAY, "66")),
+          SLEEP to (200 to EMPTY),
+          ACTIVITY to (200 to EMPTY),
+          WORKOUT to (200 to EMPTY),
+        )
+
+      val result = repository.diagnose(LocalDate.parse(DAY), LocalDate.parse(DAY))
+
+      assertEquals(0, result.workoutCount)
+      assertEquals(1, result.readinessDays)
+      assertTrue(result.failures.toString(), result.failures.isEmpty())
+    }
+
+  @Test
+  fun `diagnostics list each workout Oura returned`() = runTest(dispatcher) {
+    routes = mapOf(WORKOUT to (200 to """{"data":[{"id":"w1","activity":"strength_training","day":"$DAY","start_datetime":"${DAY}T07:38:00+03:00","end_datetime":"${DAY}T08:08:00+03:00","calories":135.0,"intensity":"moderate","source":"autodetected"}],"next_token":null}"""))
+
+    val result = repository.diagnose(LocalDate.parse(DAY), LocalDate.parse(DAY))
+
+    assertEquals(1, result.workoutCount)
+    val line = result.workouts.single()
+    assertTrue(line, line.contains("strength_training"))
+    assertTrue(line, line.contains("07:38"))
+    assertTrue(line, line.contains("135 kcal"))
+    // Whether Oura noticed the session or someone typed it in is exactly the kind of thing worth
+    // seeing when a workout is missing.
+    assertTrue(line, line.contains("autodetected"))
+  }
+
+  /** One collection failing must not hide what the others answered. */
+  @Test
+  fun `a failing collection is reported without silencing the rest`() = runTest(dispatcher) {
+    routes =
+      mapOf(
+        READINESS to (200 to scores(DAY, "66")),
+        WORKOUT to (401 to """{"detail":"nope"}"""),
+      )
+
+    val result = repository.diagnose(LocalDate.parse(DAY), LocalDate.parse(DAY))
+
+    assertEquals(1, result.readinessDays)
+    assertEquals(0, result.workoutCount)
+    assertTrue(result.failures.toString(), result.failures.any { it.startsWith("Treenit") })
+  }
+
+  /** Diagnostics answer a question; they must not change the answer. */
+  @Test
+  fun `diagnostics store nothing`() = runTest(dispatcher) {
+    routes = mapOf(READINESS to (200 to scores(DAY, "66")))
+
+    repository.diagnose(LocalDate.parse(DAY), LocalDate.parse(DAY))
+
+    assertNull(repository.observeDay(LocalDate.parse(DAY)).first())
+  }
+
   // ------------------------------------------------------------------ when it fails
 
   /**

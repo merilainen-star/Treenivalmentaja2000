@@ -27,6 +27,13 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 - Room schema version 5: `distanceMeters`, `avgHeartRate` and `maxHeartRate` on `oura_workouts`, by
   auto migration, with an instrumented test that runs it against a version-4 database with a row in
   it. A workout stored before the columns existed keeps its values and gets nulls, not a reset.
+- **"Mitä Oura palauttaa" in Settings.** Runs the same requests a sync runs, stores nothing, and
+  reports how many rows each collection returned plus one line per workout — day, activity, start,
+  calories and whether Oura auto-detected it or someone entered it. It exists because of a dead end
+  this app actually hit: a session visible in Oura's own app and absent here, with no way from the
+  outside to tell whether the API had not returned it, whether parsing had dropped it, or whether it
+  had been stored and not drawn. The phone makes the requests, so the phone answers — and nobody has
+  to hand their Oura credentials to anyone to find out.
 - **Oura workouts that belong to no planned session are listed too**, under "Muu Ourassa kirjattu
   liikunta". A spontaneous walk has no session, and one the matcher could not place would otherwise
   vanish — which from the outside looks identical to never having fetched it.

@@ -12,15 +12,16 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,646,459 B (19.69 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 338 tests, 0 failures, 0 errors |
+| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,662,843 B (19.71 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 342 tests, 0 failures, 0 errors |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug` | 45 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 36 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
-The whole Oura milestone cost **148,544 B (+0.72%)** over the last build before it: 20,497,915 B
-without any of it, 20,646,459 B with all of it — the week view, the unmatched-workout list and the
-resume fix added nothing measurable on top, coming out at the same 20,646,459 B. Its one new dependency is WorkManager, which is most
+The whole Oura milestone cost **164,928 B (+0.80%)** over the last build before it: 20,497,915 B
+without any of it, 20,662,843 B with all of it. The week view, the unmatched-workout list and the
+resume fix added nothing measurable at all — the same 20,646,459 B as before them — and the
+diagnostics screen 16,384 B on top. Its one new dependency is WorkManager, which is most
 of that; the API client, the authentication and the token store added none, because OkHttp was
 already inside the APK via Coil and the store uses platform crypto rather than a library.
 
@@ -254,6 +255,12 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   which is why the app now requests that scope. One request spans every workout in a sync rather
   than one per workout, and a failure to get it — the commonest being a connection granted before the
   scope existed — leaves the workouts stored without a heart rate instead of failing the sync.
+- **The app can say what Oura returned.** Settings → Oura → "Tarkista Oura-data" runs the same
+  requests a sync runs, writes nothing, and reports the count from each collection plus one line per
+  workout. Built after a real dead end: a strength session was in Oura's own app and not in this
+  one, and from the outside "the API did not return it", "parsing dropped it" and "it was stored and
+  not drawn" were indistinguishable. Each collection is caught separately, so one failing does not
+  hide the others' answers.
 - **Nothing fetched is invisible.** Oura workouts that no planned session claims are listed under
   "Muu Ourassa kirjattu liikunta" rather than dropped, because a workout the matcher could not place
   and a workout never fetched look identical from the screen otherwise. Both screens refresh on

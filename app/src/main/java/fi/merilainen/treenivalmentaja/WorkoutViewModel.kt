@@ -22,6 +22,7 @@ import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
+import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
@@ -293,6 +294,32 @@ class WorkoutViewModel(
   /** The last sync's failure, or `null`. Shown on the card as a footnote, never as a dialog. */
   private val _lastSyncFailure = MutableStateFlow<String?>(null)
   val lastSyncFailure: StateFlow<String?> = _lastSyncFailure.asStateFlow()
+
+  /**
+   * Asks Oura what it has, and reports it without storing anything.
+   *
+   * Exists because of a dead end this app actually hit: a session visible in Oura's own app and
+   * absent here, with no way from the outside to tell whether the API had not returned it, whether
+   * parsing had dropped it, or whether it had been stored and not drawn. The phone makes the
+   * requests, so the phone answers — which is also why nobody has to hand their Oura credentials to
+   * anyone to debug this.
+   */
+  fun runOuraDiagnostics() {
+    if (ouraState.value != OuraConnectionState.Connected) return
+    viewModelScope.launch {
+      _diagnostics.value = null
+      _diagnosing.value = true
+      val today = LocalDate.now()
+      _diagnostics.value = ouraRepository.diagnose(from = today.minusDays(SYNC_DAYS), to = today)
+      _diagnosing.value = false
+    }
+  }
+
+  private val _diagnostics = MutableStateFlow<OuraDiagnostics?>(null)
+  val ouraDiagnostics: StateFlow<OuraDiagnostics?> = _diagnostics.asStateFlow()
+
+  private val _diagnosing = MutableStateFlow(false)
+  val ouraDiagnosing: StateFlow<Boolean> = _diagnosing.asStateFlow()
 
   /** Drops the tokens and the cached Oura rows. The training plan is untouched. */
   fun disconnectOura() {

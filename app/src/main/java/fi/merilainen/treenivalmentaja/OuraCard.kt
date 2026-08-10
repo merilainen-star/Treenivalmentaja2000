@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 
 /**
  * The Oura connection, as a function of its state.
@@ -45,6 +46,9 @@ fun OuraCard(
   onDismissFailure: () -> Unit = {},
   onSaveCredentials: (String, String) -> Unit = { _, _ -> },
   onForgetCredentials: () -> Unit = {},
+  diagnostics: OuraDiagnostics? = null,
+  diagnosing: Boolean = false,
+  onRunDiagnostics: () -> Unit = {},
 ) {
   Card(
     modifier = Modifier.fillMaxWidth(),
@@ -65,7 +69,10 @@ fun OuraCard(
         OuraConnectionState.NotConfigured -> CredentialsNeeded(onSaveCredentials)
         OuraConnectionState.Disconnected -> Disconnected(onConnect, onForgetCredentials)
         OuraConnectionState.Connecting -> Connecting()
-        OuraConnectionState.Connected -> Connected(onDisconnect)
+        OuraConnectionState.Connected -> {
+          Connected(onDisconnect)
+          Diagnostics(diagnostics = diagnostics, running = diagnosing, onRun = onRunDiagnostics)
+        }
         is OuraConnectionState.Failed -> Failed(state.message, onConnect, onDismissFailure)
       }
     }
@@ -156,6 +163,70 @@ private fun Connecting() {
     color = MaterialTheme.colorScheme.onSurfaceVariant,
   )
   CircularProgressIndicator(modifier = Modifier.size(24.dp))
+}
+
+/**
+ * What Oura returned, as counts and one line per workout.
+ *
+ * Here rather than in a hidden developer menu because the person who needs it is the only person
+ * who has this app. It exists because "Oura shows the session and Treenivalmentaja does not" had no
+ * answer from the outside: the phone makes the requests, so the phone reports. Nobody has to send
+ * their Oura credentials anywhere to find out what the API said.
+ */
+@Composable
+private fun Diagnostics(
+  diagnostics: OuraDiagnostics?,
+  running: Boolean,
+  onRun: () -> Unit,
+) {
+  HorizontalDivider()
+  Text(
+    text = "Mitä Oura palauttaa",
+    style = MaterialTheme.typography.titleMedium,
+  )
+  Text(
+    text =
+      "Hakee saman kuin normaali synkronointi, mutta ei tallenna mitään. Kertoo montako " +
+        "riviä kustakin kokoelmasta tuli.",
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  OutlinedButton(onClick = onRun, modifier = Modifier.fillMaxWidth(), enabled = !running) {
+    Text(if (running) "Haetaan…" else "Tarkista Oura-data")
+  }
+  diagnostics?.let { result ->
+    Text(
+      text = "Aikaväli ${result.fromDate} – ${result.toDate}",
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      text =
+        "Palautuminen ${result.readinessDays} · Uni ${result.sleepDays} · " +
+          "Aktiivisuus ${result.activityDays} · Syke ${result.heartRateSamples}",
+      style = MaterialTheme.typography.bodyMedium,
+    )
+    Text(
+      text = "Treenit: ${result.workoutCount}",
+      style = MaterialTheme.typography.bodyMedium,
+      fontWeight = FontWeight.Bold,
+    )
+    if (result.workouts.isEmpty()) {
+      Text(
+        // The finding this whole screen was built to make legible.
+        text = "Oura ei palauttanut yhtään treeniä tältä aikaväliltä.",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.error,
+      )
+    } else {
+      result.workouts.forEach {
+        Text(text = it, style = MaterialTheme.typography.bodySmall)
+      }
+    }
+    result.failures.forEach {
+      Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    }
+  }
 }
 
 @Composable

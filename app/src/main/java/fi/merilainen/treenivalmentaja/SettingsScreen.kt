@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +48,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val updateStatus by viewModel.updateStatus.collectAsState()
     val ouraState by viewModel.ouraState.collectAsState()
     val ouraAuthorizationUrl by viewModel.ouraAuthorizationUrl.collectAsState()
+    val diagnostics by viewModel.ouraDiagnostics.collectAsState()
+    val diagnosing by viewModel.ouraDiagnosing.collectAsState()
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -145,6 +148,9 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onDismissOuraFailure = viewModel::dismissOuraFailure,
         onSaveOuraCredentials = viewModel::saveOuraCredentials,
         onForgetOuraCredentials = viewModel::forgetOuraCredentials,
+        ouraDiagnostics = diagnostics,
+        ouraDiagnosing = diagnosing,
+        onRunOuraDiagnostics = viewModel::runOuraDiagnostics,
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -181,6 +187,9 @@ fun SettingsScreenContent(
     onDismissOuraFailure: () -> Unit = {},
     onSaveOuraCredentials: (String, String) -> Unit = { _, _ -> },
     onForgetOuraCredentials: () -> Unit = {},
+    ouraDiagnostics: OuraDiagnostics? = null,
+    ouraDiagnosing: Boolean = false,
+    onRunOuraDiagnostics: () -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -277,6 +286,9 @@ fun SettingsScreenContent(
             onDismissFailure = onDismissOuraFailure,
             onSaveCredentials = onSaveOuraCredentials,
             onForgetCredentials = onForgetOuraCredentials,
+            diagnostics = ouraDiagnostics,
+            diagnosing = ouraDiagnosing,
+            onRunDiagnostics = onRunOuraDiagnostics,
         )
 
         Card(
