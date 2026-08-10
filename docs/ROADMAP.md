@@ -46,8 +46,10 @@ the numbers behind them.
 - Nothing. The app is being used in real training between milestones.
 
 ## Next Milestone
-1. **Oura API V2 integration** via Retrofit, developed against `MockWebServer` so it needs no
-   credentials until the end.
+1. **Oura API V2 integration**, developed against a local server so it needs no credentials until
+   the end. The specification is vendored at `docs/api/oura-openapi-1.37.json` and what it says is
+   summarised in [API_INTEGRATIONS.md](API_INTEGRATIONS.md) — including that its own `servers.url`
+   is a broken placeholder, and that the sandbox namespace still requires a token.
 2. **In-app OAuth2 token exchange with PKCE**
    ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) — no backend), tokens in
    `EncryptedSharedPreferences`.

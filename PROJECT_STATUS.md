@@ -148,8 +148,10 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 ## Not implemented
 
 - Oura connection and API integration. The two Oura tables exist in the database and have **zero
-  callers**; there is no network layer, and `retrofit` / `okhttp` are commented out in
-  `app/build.gradle.kts`.
+  callers**; there is no Oura network layer. `retrofit` is commented out in
+  `app/build.gradle.kts`; OkHttp 4.12.0 is already on the classpath as Coil's transitive
+  dependency, so whichever client is built it costs nothing to reach for. The API specification is
+  vendored at `docs/api/oura-openapi-1.37.json`.
 - In-app OAuth2 token exchange with PKCE.
 - WorkManager background sync.
 - AI advisor. `metadata.json` declares `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API`, but there is no
