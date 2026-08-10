@@ -164,6 +164,18 @@ class WorkoutViewModel(
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
   /**
+   * Today's Oura workouts that no planned session claims.
+   *
+   * Shown on their own rather than dropped. A spontaneous walk belongs to no session, and a session
+   * the matcher could not place would otherwise be invisible — which looks exactly like never having
+   * fetched it.
+   */
+  val unmatchedToday: StateFlow<List<CompletedSessionMetrics>> =
+    ouraRepository
+      .observeUnmatchedOn(LocalDate.now(), ZoneId.systemDefault())
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  /**
    * Set when a login is waiting for a browser to be opened, and cleared the moment one is.
    *
    * The ViewModel builds the URL — it is the half that knows the PKCE verifier and has to write it

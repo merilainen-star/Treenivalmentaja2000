@@ -167,6 +167,30 @@ class ScreenScreenshotTest {
         )
     }
 
+    /**
+     * A workout Oura recorded that belongs to no planned session — a spontaneous walk, or one the
+     * matcher could not place. Shown rather than dropped: a fetched thing the app says nothing
+     * about looks exactly like a thing it never fetched.
+     */
+    @Test
+    fun today_withUnmatchedWorkout() = capture("screen_today_unmatched_workout") {
+        TodayScreenContent(
+            workouts = listOf(strength(0, "s-24")),
+            recovery = DailyRecovery(date = "2026-08-10", readiness = 83, sleep = 79),
+            ouraConnected = true,
+            unmatchedWorkouts = listOf(
+                CompletedSessionMetrics(
+                    ouraWorkoutId = "w9",
+                    activityType = "walking",
+                    startTimeUtc = 1_754_845_200_000L,
+                    durationMin = 52,
+                    calories = 180,
+                    distanceKm = 4.1,
+                )
+            ),
+        )
+    }
+
     // ------------------------------------------------------------------ the recovery card
 
     /** Oura not connected: no indicator at all, which is what this card said before Oura existed. */
@@ -229,6 +253,32 @@ class ScreenScreenshotTest {
                 strength(3, "s-27"),
                 run(3, "s-67"),
             )
+        )
+    }
+
+    /**
+     * The week with a session Oura recorded, shown **collapsed**.
+     *
+     * That placement is the decision worth a baseline: scanning the week for what was actually done
+     * is the reason to be on this screen, so the numbers sit in the header rather than behind a tap
+     * on every day.
+     */
+    @Test
+    fun week_withCompletedMetrics() = capture("screen_week_completed_metrics") {
+        WeekScreenContent(
+            workouts = listOf(run(0, "s-66", status = SessionStatus.COMPLETED), strength(1, "s-25")),
+            completedMetrics = mapOf(
+                "s-66" to CompletedSessionMetrics(
+                    ouraWorkoutId = "w1",
+                    activityType = "running",
+                    startTimeUtc = 1_754_845_200_000L,
+                    durationMin = 38,
+                    calories = 431,
+                    distanceKm = 6.2,
+                    avgHeartRate = 142,
+                    maxHeartRate = 168,
+                )
+            ),
         )
     }
 

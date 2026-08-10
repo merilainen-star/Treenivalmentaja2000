@@ -31,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
+import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -58,10 +60,20 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorRed
 fun WeekScreen(viewModel: WorkoutViewModel) {
     val workouts by viewModel.workouts.collectAsState()
     val guideState by viewModel.guideState.collectAsState()
+    val ouraState by viewModel.ouraState.collectAsState()
+    val completedMetrics by viewModel.completedMetrics.collectAsState()
+
+    // On resume, for the same reason as Today: an app left open in the background would otherwise
+    // keep showing what was true when the screen was first composed.
+    LifecycleResumeEffect(ouraState) {
+        viewModel.syncOura()
+        onPauseOrDispose {}
+    }
 
     WeekScreenContent(
         workouts = workouts,
         guideState = guideState,
+        completedMetrics = completedMetrics,
         onExerciseClick = viewModel::openExerciseGuide,
         onGuideRetry = viewModel::retryExerciseGuide,
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
@@ -78,6 +90,7 @@ fun WeekScreenContent(
     onGuideRetry: () -> Unit = {},
     onGuideSuggestionSelected: (ExerciseGuide) -> Unit = {},
     onGuideDismiss: () -> Unit = {},
+    completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
 ) {
     Column(
         modifier = Modifier
@@ -133,6 +146,7 @@ fun WeekScreenContent(
                             WorkoutCardWeek(
                                 workout = workout,
                                 onExerciseClick = onExerciseClick,
+                                completed = completedMetrics[workout.id],
                             )
                         }
                     }
@@ -160,13 +174,18 @@ fun WeekScreenContent(
  * which is what the screenshot tests drive.
  */
 @Composable
-fun WorkoutCardWeek(workout: Workout, onExerciseClick: ((Exercise) -> Unit)? = null) {
+fun WorkoutCardWeek(
+    workout: Workout,
+    onExerciseClick: ((Exercise) -> Unit)? = null,
+    completed: CompletedSessionMetrics? = null,
+) {
     var expanded by rememberSaveable(workout.id) { mutableStateOf(false) }
     WorkoutCardWeek(
         workout = workout,
         expanded = expanded,
         onToggle = { expanded = !expanded },
         onExerciseClick = onExerciseClick,
+        completed = completed,
     )
 }
 
@@ -176,6 +195,7 @@ fun WorkoutCardWeek(
     expanded: Boolean,
     onToggle: () -> Unit,
     onExerciseClick: ((Exercise) -> Unit)? = null,
+    completed: CompletedSessionMetrics? = null,
 ) {
     val indicatorColor = when (workout.type) {
         WorkoutType.RUNNING -> ColorBlue
@@ -245,6 +265,15 @@ fun WorkoutCardWeek(
                         text = workout.status.title,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                // In the collapsed header rather than the expanded content: scanning the week for
+                // what was actually done is the reason to be on this screen, and it should not cost
+                // a tap on every day.
+                completed?.let {
+                    CompletedMetricsRow(
+                        metrics = it,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }

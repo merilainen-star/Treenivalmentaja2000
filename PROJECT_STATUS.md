@@ -13,13 +13,14 @@ Every number below was measured on this commit, not carried over from a previous
 | Check | Command | Result |
 | --- | --- | --- |
 | Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,646,459 B (19.69 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 336 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 43 comparisons, 0 changed |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 338 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 45 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 36 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
 The whole Oura milestone cost **148,544 B (+0.72%)** over the last build before it: 20,497,915 B
-without any of it, 20,646,459 B with all of it. Its one new dependency is WorkManager, which is most
+without any of it, 20,646,459 B with all of it — the week view, the unmatched-workout list and the
+resume fix added nothing measurable on top, coming out at the same 20,646,459 B. Its one new dependency is WorkManager, which is most
 of that; the API client, the authentication and the token store added none, because OkHttp was
 already inside the APK via Coil and the store uses platform crypto rather than a library.
 
@@ -82,7 +83,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   only a real screen can do — the file picker, the clipboard, the notification permission. That is
   what makes a whole screen capturable, and states that are awkward to reach by hand — a rest day,
   a missing notification permission — are now baselines rather than something to remember.
-- **Screenshot tests.** 43 Roborazzi baselines: all three screens whole, plus the Today and Week
+- **Screenshot tests.** 45 Roborazzi baselines: all three screens whole, plus the Today and Week
   cards, a started workout's checklist, the recovery card, every status badge, both import
   dialogs, every state of the exercise-guide sheet, every state of the Oura card, and a session
   showing what Oura recorded for it — several of which cannot be produced on this machine at all,
@@ -233,8 +234,11 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   score** says "ei tietoa"; and a reading shows the number. The third is what the whole thing turns
   on — the ring was not worn, and a zero would read as a verdict rather than as an absence. The word
   describes the score and never what to do about it.
-- **What actually happened, under what was planned.** A session Oura recorded shows its real
-  duration, distance, calories and heart rate beneath the plan's own line. Only what exists is drawn:
+- **What actually happened, under what was planned** — on the Today card and in the week list
+  alike. A session Oura recorded shows its real duration, distance, calories and heart rate beneath
+  the plan's own line; in the week they sit in the collapsed header, because scanning for what was
+  done is the reason to open that screen. Either screen refreshes from Oura when it appears. Only
+  what exists is drawn:
   a strength session has no distance, a ring on the charger has no heart rate, and a row of dashes
   standing in for them would be worse than their absence.
 
@@ -250,6 +254,11 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   which is why the app now requests that scope. One request spans every workout in a sync rather
   than one per workout, and a failure to get it — the commonest being a connection granted before the
   scope existed — leaves the workouts stored without a heart rate instead of failing the sync.
+- **Nothing fetched is invisible.** Oura workouts that no planned session claims are listed under
+  "Muu Ourassa kirjattu liikunta" rather than dropped, because a workout the matcher could not place
+  and a workout never fetched look identical from the screen otherwise. Both screens refresh on
+  resume rather than only when first composed — an app left open in the background used to keep
+  showing what was true when it was opened.
 - **The Oura tables have a writer.** `OuraRepository` fetches a date range, maps it and writes it;
   nothing else touches those tables. The screens observe Room and never the network, so a failed
   sync leaves the last known reading on screen rather than an error. A daily WorkManager job and a

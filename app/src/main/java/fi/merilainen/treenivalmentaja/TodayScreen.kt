@@ -23,14 +23,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.util.Locale
@@ -70,10 +71,18 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val syncing by viewModel.ouraSyncing.collectAsState()
     val syncFailure by viewModel.lastSyncFailure.collectAsState()
     val completedMetrics by viewModel.completedMetrics.collectAsState()
+    val unmatched by viewModel.unmatchedToday.collectAsState()
 
-    // Once per visit to this screen, not on a timer: the reading is what you came here to see, and
-    // the fetch is four requests of a few kilobytes. A disconnected Oura makes it a no-op.
-    LaunchedEffect(ouraState) { viewModel.syncOura() }
+    // On every **resume**, not merely on first composition.
+    //
+    // A LaunchedEffect here only ran when this screen entered composition, so an app left open in
+    // the background since morning never fetched again: the workout recorded at 07:38 was not there
+    // when the screen was composed, and nothing asked afterwards. Coming back to the app is exactly
+    // when the answer is likely to have changed. A disconnected Oura makes it a no-op.
+    LifecycleResumeEffect(ouraState) {
+        viewModel.syncOura()
+        onPauseOrDispose {}
+    }
 
     // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
     // every launch and rewrote the calendar — see WorkoutViewModel.checkMissedSessions.
@@ -94,6 +103,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         syncing = syncing,
         syncFailure = syncFailure,
         completedMetrics = completedMetrics,
+        unmatchedWorkouts = unmatched,
     )
 }
 
@@ -116,6 +126,7 @@ fun TodayScreenContent(
     syncing: Boolean = false,
     syncFailure: String? = null,
     completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
+    unmatchedWorkouts: List<CompletedSessionMetrics> = emptyList(),
 ) {
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
@@ -163,6 +174,30 @@ fun TodayScreenContent(
                     modifier = Modifier.padding(16.dp),
                     style = MaterialTheme.typography.bodyLarge
                 )
+            }
+        }
+
+        // What Oura recorded that no session claims. Listed rather than dropped: otherwise a
+        // workout the matcher could not place is indistinguishable from one never fetched.
+        if (unmatchedWorkouts.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Muu Ourassa kirjattu liikunta",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    unmatchedWorkouts.forEach { metrics ->
+                        CompletedMetricsRow(metrics)
+                    }
+                }
             }
         }
 
@@ -327,7 +362,10 @@ private fun RecoveryReading(recovery: DailyRecovery?, syncing: Boolean, syncFail
  * actually happened.
  */
 @Composable
-fun CompletedMetricsRow(metrics: CompletedSessionMetrics) {
+fun CompletedMetricsRow(
+    metrics: CompletedSessionMetrics,
+    style: TextStyle = MaterialTheme.typography.bodyMedium,
+) {
     val parts = buildList {
         add("${metrics.durationMin} min")
         metrics.distanceKm?.let { add(String.format(Locale("fi", "FI"), "%.1f km", it)) }
@@ -339,7 +377,7 @@ fun CompletedMetricsRow(metrics: CompletedSessionMetrics) {
     }
     Text(
         text = parts.joinToString(" · "),
-        style = MaterialTheme.typography.bodyMedium,
+        style = style,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

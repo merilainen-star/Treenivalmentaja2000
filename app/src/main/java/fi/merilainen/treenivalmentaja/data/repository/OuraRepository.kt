@@ -15,6 +15,7 @@ import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.map
@@ -147,6 +148,19 @@ class OuraRepository internal constructor(
           forSession.maxBy { it.endTimeUtc - it.startTimeUtc }.toMetrics()
         }
     }
+
+  /**
+   * What Oura recorded on one day that no planned session claims.
+   *
+   * The counterpart to [observeMatchedMetrics], and the reason it exists: without it, a workout the
+   * matcher could not place simply vanishes, and "we never fetched it" and "we fetched it and said
+   * nothing" look identical from the screen.
+   */
+  fun observeUnmatchedOn(date: LocalDate, zone: ZoneId): Flow<List<CompletedSessionMetrics>> {
+    val from = date.atStartOfDay(zone).toInstant().toEpochMilli()
+    val to = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    return dao.observeUnmatchedWorkouts(from, to).map { rows -> rows.map { it.toMetrics() } }
+  }
 
   /**
    * One day as the screens see it.

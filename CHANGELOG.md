@@ -8,8 +8,11 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-08-10
 
 ### Added
-- **What actually happened, under what was planned.** A session Oura recorded now shows its real
-  duration, distance, calories and heart rate beneath the plan's own line — "38 min · 6,2 km ·
+- **What actually happened, under what was planned** — on both the Today card and the week list. A
+  session Oura recorded now shows its real duration, distance, calories and heart rate beneath the
+  plan's own line. In the week the numbers sit in the **collapsed** header, because scanning for
+  what was actually done is the reason to be on that screen and it should not cost a tap per day.
+  Opening the week also refreshes from Oura, which previously only the Today screen did — "38 min · 6,2 km ·
   431 kcal · syke 142 (max 168)". Only the measurements that exist are drawn: a strength session has
   no distance, and a ring that was charging has no heart rate.
 - Completed Oura workouts are tied to planned sessions automatically: **same day, nearest in time**,
@@ -24,6 +27,9 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 - Room schema version 5: `distanceMeters`, `avgHeartRate` and `maxHeartRate` on `oura_workouts`, by
   auto migration, with an instrumented test that runs it against a version-4 database with a row in
   it. A workout stored before the columns existed keeps its values and gets nulls, not a reset.
+- **Oura workouts that belong to no planned session are listed too**, under "Muu Ourassa kirjattu
+  liikunta". A spontaneous walk has no session, and one the matcher could not place would otherwise
+  vanish — which from the outside looks identical to never having fetched it.
 - **A recovery reading on the Today screen, with a measurement behind it.** The indicator that was
   removed for being a constant is back, now showing today's Oura readiness score and a word for it.
   It tells four situations apart, because what they mean differs: Oura not connected shows no
@@ -83,6 +89,11 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   the live service yet, and nothing in the app calls the client.
 
 ### Fixed
+- The app only fetched from Oura when a screen first entered composition, so one left open in the
+  background since morning never asked again — a workout recorded at 07:38 was simply not there when
+  the screen was composed, and nothing looked afterwards. Both screens now refresh on **resume**,
+  which is exactly when the answer is likely to have changed. Found from a real morning session that
+  Oura had and the app did not.
 - Disconnecting Oura also deleted the client credentials, so reconnecting would have meant pasting
   the Client ID and Secret again. The token store emptied its whole preferences file rather than the
   keys it meant to. Caught by an instrumented test on a device: the in-memory fake the unit tests

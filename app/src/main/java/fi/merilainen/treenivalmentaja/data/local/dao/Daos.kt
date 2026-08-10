@@ -176,6 +176,22 @@ interface OuraDao {
   @Query("SELECT * FROM oura_workouts WHERE matchedSessionId IS NOT NULL")
   fun observeMatchedWorkouts(): Flow<List<OuraWorkoutEntity>>
 
+  /**
+   * Workouts Oura recorded that belong to no planned session.
+   *
+   * A spontaneous walk, or one the matcher could not place. Shown rather than hidden: the app
+   * having fetched something and then saying nothing about it is indistinguishable, from the
+   * outside, from never having fetched it.
+   */
+  @Query(
+    """
+    SELECT * FROM oura_workouts
+    WHERE matchedSessionId IS NULL AND startTimeUtc BETWEEN :fromUtc AND :toUtc
+    ORDER BY startTimeUtc ASC
+    """
+  )
+  fun observeUnmatchedWorkouts(fromUtc: Long, toUtc: Long): Flow<List<OuraWorkoutEntity>>
+
   @Query("DELETE FROM oura_daily_summaries") suspend fun clearDailySummaries()
 
   @Query("DELETE FROM oura_workouts") suspend fun clearWorkouts()
