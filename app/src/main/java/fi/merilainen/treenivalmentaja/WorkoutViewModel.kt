@@ -536,7 +536,7 @@ class WorkoutViewModel(
      * More than today, because Oura revises a day after the fact and a phone that was offline over
      * a weekend would otherwise keep a permanent hole in it.
      */
-    private const val SYNC_DAYS = 4L
+    private const val SYNC_DAYS = 14L
 
     /** Statuses that describe a closed row and are never drawn on the Today/Week screens. */
     private val HIDDEN_STATUSES = setOf(SessionStatus.RESCHEDULED, SessionStatus.CANCELLED)

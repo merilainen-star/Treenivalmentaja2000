@@ -46,6 +46,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
+import androidx.compose.foundation.lazy.rememberLazyListState
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
@@ -91,6 +95,7 @@ fun WeekScreenContent(
     onGuideSuggestionSelected: (ExerciseGuide) -> Unit = {},
     onGuideDismiss: () -> Unit = {},
     completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
+    today: LocalDate = LocalDate.now(),
 ) {
     Column(
         modifier = Modifier
@@ -98,28 +103,43 @@ fun WeekScreenContent(
             .padding(16.dp)
     ) {
         Text(
-            text = "Viikon ohjelma",
+            text = "Ohjelma",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
+        // Which days get a row.
+        //
+        // The list used to be seven fixed days starting at today, which made scrolling back
+        // impossible and — worse — labelled the third row "Keskiviikko" whatever day it actually
+        // was. It only ever looked right because the week happened to start on a Monday.
+        //
+        // Now: the current week always appears, rest days included, and outside it a day earns a
+        // row by having something on it. That is what makes scrolling back useful rather than a
+        // month of "Lepo".
+        val days = remember(workouts) {
+            val earliest = minOf(-DAYS_BACK, workouts.minOfOrNull { it.dayOffset } ?: 0)
+            val latest = maxOf(DAYS_FORWARD, workouts.maxOfOrNull { it.dayOffset } ?: 6)
+            (earliest..latest).filter { offset ->
+                offset in 0..6 || workouts.any { it.dayOffset == offset }
+            }
+        }
+        // Opens on today rather than at the top, so the screen answers "what now" before it offers
+        // history.
+        val listState = rememberLazyListState(
+            initialFirstVisibleItemIndex = days.indexOf(0).coerceAtLeast(0)
+        )
+
         LazyColumn(
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(7) { dayIndex ->
+            items(days.size, key = { days[it] }) { index ->
+                val dayIndex = days[index]
                 val dayWorkouts = workouts.filter { it.dayOffset == dayIndex }
-                val dayName = when (dayIndex) {
-                    0 -> "Tänään"
-                    1 -> "Huomenna"
-                    2 -> "Keskiviikko"
-                    3 -> "Torstai"
-                    4 -> "Perjantai"
-                    5 -> "Lauantai"
-                    6 -> "Sunnuntai"
-                    else -> ""
-                }
-                
+                val dayName = dayLabel(today, dayIndex)
+
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = dayName,
@@ -318,3 +338,30 @@ fun WorkoutCardWeek(
       }
     }
 }
+
+/**
+ * A day's heading: what it is relative to today, and the date it actually is.
+ *
+ * The date is always shown, because "Torstai" alone is ambiguous the moment the list scrolls past
+ * one week. The weekday comes from the date rather than from the row's position, which is what the
+ * previous version got wrong — it called the third row "Keskiviikko" regardless of the day.
+ */
+internal fun dayLabel(today: LocalDate, offset: Int): String {
+    val date = today.plusDays(offset.toLong())
+    val weekday = date.dayOfWeek.getDisplayName(TextStyle.FULL_STANDALONE, FINNISH)
+        .replaceFirstChar { it.uppercase(FINNISH) }
+    val stamp = "%d.%d.".format(date.dayOfMonth, date.monthValue)
+    return when (offset) {
+        0 -> "Tänään · $stamp"
+        1 -> "Huomenna · $stamp"
+        -1 -> "Eilen · $stamp"
+        else -> "$weekday $stamp"
+    }
+}
+
+private val FINNISH = Locale("fi", "FI")
+
+/** Four weeks back and four forward, before the plan's own span is taken into account. */
+private const val DAYS_BACK = 28
+
+private const val DAYS_FORWARD = 27

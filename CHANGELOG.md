@@ -53,6 +53,17 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 - The Oura tables finally have a writer. `OuraRepository` is the only thing that writes them, and
   the screens observe Room rather than the network, so a failed sync leaves the last known reading
   on screen instead of an error.
+- **The week list is a calendar you can scroll.** It opens on today, goes four weeks back and four
+  forward — further when the plan reaches further — so a session done last week can be looked up
+  with the numbers Oura recorded for it. Days outside the current week earn a row by having
+  something on them, which keeps scrolling useful rather than a month of "Lepo".
+- Day headings now carry the real weekday and date. They were positional before — the third row was
+  always called "Keskiviikko" — which was right only in a week starting on a Monday, and silently
+  wrong every other day.
+- The Oura sync window went from four days to fourteen, so scrolling back finds data rather than
+  blanks. Heart rate is now fetched per workout instead of one request spanning the whole window:
+  over a fortnight that span would have downloaded every night in between to find the twenty samples
+  belonging to a run.
 - **Oura is set up entirely on the phone.** Settings asks for the Client ID and Client Secret of an
   application registered in Oura's developer portal, stores them encrypted beside the tokens, and
   connects from there. Nothing needs a PC, a checkout, an `.env` file or a file copied from a
@@ -96,6 +107,10 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   the live service yet, and nothing in the app calls the client.
 
 ### Fixed
+- A heart rate was shown for a session that had none. Oura samples continuously, so a workout's
+  window always holds *something*: a strength session Oura itself marked "heart rate data
+  unavailable" came out as "syke 75 (max 81)" from a couple of background readings. Fewer than five
+  samples in the window is now treated as no reading at all.
 - **Today's Oura data was never requested.** The collections do not agree on whether `end_date`
   includes that day: asking 08-06..08-10 against a real account returned five days of readiness and
   sleep but no workouts after 08-09, and four days of activity. The client now asks one day beyond

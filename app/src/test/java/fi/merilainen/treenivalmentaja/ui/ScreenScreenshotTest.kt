@@ -25,6 +25,7 @@ import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
+import java.time.LocalDate
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -65,6 +66,9 @@ class ScreenScreenshotTest {
             }
         }
     }
+
+    /** A Monday. The week list's headings show real dates, so they need a date that never moves. */
+    private val FIXED_TODAY: LocalDate = LocalDate.of(2026, 8, 10)
 
     private fun strength(dayOffset: Int, id: String) = Workout(
         id = id,
@@ -252,7 +256,10 @@ class ScreenScreenshotTest {
                 strength(1, "s-25"),
                 strength(3, "s-27"),
                 run(3, "s-67"),
-            )
+            ),
+            // Fixed, because the headings now carry real dates: with today's date the baseline
+            // would change every night.
+            today = FIXED_TODAY,
         )
     }
 
@@ -267,6 +274,7 @@ class ScreenScreenshotTest {
     fun week_withCompletedMetrics() = capture("screen_week_completed_metrics") {
         WeekScreenContent(
             workouts = listOf(run(0, "s-66", status = SessionStatus.COMPLETED), strength(1, "s-25")),
+            today = FIXED_TODAY,
             completedMetrics = mapOf(
                 "s-66" to CompletedSessionMetrics(
                     ouraWorkoutId = "w1",

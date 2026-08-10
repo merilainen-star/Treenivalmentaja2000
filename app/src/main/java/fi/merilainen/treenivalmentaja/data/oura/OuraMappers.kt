@@ -113,7 +113,11 @@ internal object OuraMappers {
     if (beats.isEmpty()) return workouts
     return workouts.map { workout ->
       val inside = beats.filter { (at, _) -> at in workout.startTimeUtc..workout.endTimeUtc }
-      if (inside.isEmpty()) workout
+      // Fewer than a handful of samples is not a workout heart rate, and showing one as if it were
+      // is worse than showing none. Measured case: Oura reported "heart rate data unavailable" for a
+      // strength session, the window still held a couple of background samples, and the app printed
+      // "syke 75" for a set of heavy squats.
+      if (inside.size < MIN_HEART_RATE_SAMPLES) workout
       else
         workout.copy(
           avgHeartRate = inside.sumOf { it.second }.toDouble().div(inside.size).roundToInt(),
@@ -139,4 +143,10 @@ internal object OuraMappers {
   }
 
   private const val UNKNOWN_ACTIVITY = "unknown"
+
+  /**
+   * Below this, the samples in a workout's window are background readings rather than a record of
+   * the effort — Oura samples continuously, so a window always contains *something*.
+   */
+  private const val MIN_HEART_RATE_SAMPLES = 5
 }

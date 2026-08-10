@@ -5,7 +5,6 @@ import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.oura.OuraClient
 import fi.merilainen.treenivalmentaja.data.oura.OuraException
-import fi.merilainen.treenivalmentaja.data.oura.OuraHeartRateDto
 import fi.merilainen.treenivalmentaja.data.oura.OuraMappers
 import fi.merilainen.treenivalmentaja.data.oura.OuraWorkoutDto
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
@@ -69,7 +68,7 @@ class OuraRepository internal constructor(
 
       val fetchedAt = clock()
       val summaries = OuraMappers.toDailySummaries(readiness, sleep, activity, fetchedAt)
-      val workoutRows = OuraMappers.withHeartRate(OuraMappers.toWorkouts(workouts), heartRate(workouts))
+      val workoutRows = withHeartRatePerWorkout(OuraMappers.toWorkouts(workouts))
 
       if (summaries.isNotEmpty()) dao.upsertDailySummaries(summaries)
       if (workoutRows.isNotEmpty()) dao.upsertWorkouts(workoutRows)
@@ -139,15 +138,29 @@ class OuraRepository internal constructor(
    * scores that arrived successfully would trade the whole feature for the newest part of it. The
    * workouts are simply stored without a heart rate.
    */
-  private suspend fun heartRate(workouts: List<OuraWorkoutDto>): List<OuraHeartRateDto> {
-    val rows = OuraMappers.toWorkouts(workouts)
-    if (rows.isEmpty()) return emptyList()
-    val from = Instant.ofEpochMilli(rows.minOf { it.startTimeUtc })
-    val to = Instant.ofEpochMilli(rows.maxOf { it.endTimeUtc })
-    return try {
-      client.heartRate(from, to)
-    } catch (e: OuraException) {
-      emptyList()
+  private suspend fun withHeartRatePerWorkout(
+    rows: List<OuraWorkoutEntity>
+  ): List<OuraWorkoutEntity> {
+    if (rows.isEmpty()) return rows
+    // One request per workout rather than one spanning all of them. A single span covering a
+    // fortnight would download every night in between to find the twenty samples that belong to a
+    // run — the sync window is now long enough that the difference is thousands of samples.
+    var giveUp = false
+    return rows.map { row ->
+      if (giveUp) return@map row
+      val samples =
+        try {
+          client.heartRate(
+            Instant.ofEpochMilli(row.startTimeUtc),
+            Instant.ofEpochMilli(row.endTimeUtc),
+          )
+        } catch (e: OuraException) {
+          // A missing `heartrate` scope fails identically for every workout, so asking the other
+          // twenty-seven times would spend requests to be told the same thing.
+          giveUp = true
+          emptyList()
+        }
+      OuraMappers.withHeartRate(listOf(row), samples).single()
     }
   }
 

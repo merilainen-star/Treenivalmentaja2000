@@ -206,15 +206,40 @@ class OuraMappersTest {
         ),
         listOf(
           beat("2026-08-08T17:50:00+03:00", 60), // before it started
+          beat("2026-08-08T18:05:00+03:00", 140),
           beat("2026-08-08T18:10:00+03:00", 140),
+          beat("2026-08-08T18:15:00+03:00", 150),
+          beat("2026-08-08T18:20:00+03:00", 150),
           beat("2026-08-08T18:30:00+03:00", 160),
           beat("2026-08-08T19:00:00+03:00", 70), // after it ended
         ),
       )
 
     val entity = entities.single()
-    assertEquals(150, entity.avgHeartRate)
+    assertEquals(148, entity.avgHeartRate)
     assertEquals(160, entity.maxHeartRate)
+  }
+
+  /**
+   * Oura samples continuously, so a workout's window always holds *something*. A handful of resting
+   * readings is not a record of the effort, and printing one as the session's heart rate is worse
+   * than printing none — measured: Oura reported "heart rate data unavailable" for a strength
+   * session and the app showed "syke 75" for a set of heavy squats.
+   */
+  @Test
+  fun `a couple of stray samples are not a workout heart rate`() {
+    val entities =
+      OuraMappers.withHeartRate(
+        OuraMappers.toWorkouts(
+          listOf(workout(id = "w1", start = "2026-08-08T18:00:00+03:00", end = "2026-08-08T18:40:00+03:00"))
+        ),
+        listOf(
+          beat("2026-08-08T18:10:00+03:00", 74),
+          beat("2026-08-08T18:20:00+03:00", 76),
+        ),
+      )
+
+    assertNull(entities.single().avgHeartRate)
   }
 
   /**
@@ -252,12 +277,17 @@ class OuraMappersTest {
           listOf(workout(id = "w1", start = "2026-08-08T18:00:00+03:00", end = "2026-08-08T18:40:00+03:00"))
         ),
         listOf(
-          beat("2026-08-08T18:10:00+03:00", null),
-          beat("2026-08-08T18:20:00+03:00", 0),
+          beat("2026-08-08T18:05:00+03:00", null),
+          beat("2026-08-08T18:08:00+03:00", 0),
+          beat("2026-08-08T18:10:00+03:00", 150),
+          beat("2026-08-08T18:15:00+03:00", 150),
+          beat("2026-08-08T18:20:00+03:00", 150),
+          beat("2026-08-08T18:25:00+03:00", 150),
           beat("2026-08-08T18:30:00+03:00", 150),
         ),
       )
 
+    // The null and the zero are dropped before the threshold is applied, and five real ones remain.
     assertEquals(150, entities.single().avgHeartRate)
   }
 

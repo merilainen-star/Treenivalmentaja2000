@@ -13,7 +13,7 @@ Every number below was measured on this commit, not carried over from a previous
 | Check | Command | Result |
 | --- | --- | --- |
 | Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,662,843 B (19.71 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 342 tests, 0 failures, 0 errors |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 348 tests, 0 failures, 0 errors |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug` | 45 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 36 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
@@ -77,8 +77,14 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   `MIGRATION_3_4` (hand-written) and the 4 → 5 auto migration covered by instrumented tests. There is deliberately **no**
   `fallbackToDestructiveMigration`: a missing migration now fails loudly instead of silently
   emptying the database.
-- **Expandable week rows.** Tapping a row in the Week view unrolls the session's content beneath
-  it.
+- **A scrollable calendar rather than a fixed week.** It opens on today and runs four weeks either
+  way, further when the plan does, so a session from last week can be looked up with what Oura
+  recorded for it. Outside the current week a day earns a row by having something on it. Tapping a
+  row unrolls the session's content beneath it.
+
+  The headings carry the real weekday and date. They were positional before — row three was always
+  "Keskiviikko" — correct only in a week that began on a Monday and quietly wrong on every other
+  day, which is the kind of error nobody finds by looking at a seven-row list.
 - **Screens are functions of their state.** Each of the three is a stateless `…Content` taking
   plain values and callbacks, plus a thin wrapper that reads the ViewModel and owns the things
   only a real screen can do — the file picker, the clipboard, the notification permission. That is

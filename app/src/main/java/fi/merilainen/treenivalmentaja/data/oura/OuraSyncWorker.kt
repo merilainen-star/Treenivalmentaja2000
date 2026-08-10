@@ -46,7 +46,7 @@ internal class OuraSyncWorker(
   }
 
   companion object {
-    private const val SYNC_DAYS = 5L
+    private const val SYNC_DAYS = 14L
 
     private const val WORK_NAME = "oura-sync"
 
