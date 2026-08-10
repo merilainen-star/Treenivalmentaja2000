@@ -200,10 +200,12 @@ private fun Diagnostics(
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    // "päivää" and "näytettä" spelled out: these are row counts, and read as scores without them —
+    // "Palautuminen 5" looks like a readiness of 5 rather than five days of it.
     Text(
       text =
-        "Palautuminen ${result.readinessDays} · Uni ${result.sleepDays} · " +
-          "Aktiivisuus ${result.activityDays} · Syke ${result.heartRateSamples}",
+        "Palautuminen ${result.readinessDays} pv · Uni ${result.sleepDays} pv · " +
+          "Aktiivisuus ${result.activityDays} pv · Syke ${result.heartRateSamples} näytettä",
       style = MaterialTheme.typography.bodyMedium,
     )
     Text(

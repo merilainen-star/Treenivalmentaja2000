@@ -157,7 +157,15 @@ internal class OuraClient(
       .newBuilder()
       // Both accept a date or a date-time; a plain ISO date is what the app schedules in.
       .addQueryParameter("start_date", from.toString())
-      .addQueryParameter("end_date", to.toString())
+      // **One day beyond what was asked for**, and this is not an off-by-one.
+      //
+      // Oura's collections do not agree on whether `end_date` includes that day. Measured against a
+      // real account on 2026-08-10, asking 08-06..08-10 returned five days of readiness and sleep —
+      // today included — but no workouts at all after 08-09, and four days of activity rather than
+      // five. Asking one day further is the only request that means "up to and including `to`" for
+      // every collection at once. Any extra row it brings back is a future day, which is stored
+      // harmlessly and read by nothing.
+      .addQueryParameter("end_date", to.plusDays(1).toString())
       .apply { nextToken?.let { addQueryParameter("next_token", it) } }
       .build()
     // `fields` is deliberately never sent: the sandbox does not accept it, and trimming a response

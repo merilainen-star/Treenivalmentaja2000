@@ -136,9 +136,35 @@ of an answer as though it were all of it is the one outcome that is not allowed.
 Oura returns nothing for days the ring was not worn, and returns documents with missing optional
 fields for days it was worn incompletely. Neither is zero, and neither may be rendered as zero.
 
-### Third-party imports
+### Third-party imports — this document was wrong
 
-Workouts synced into Oura from elsewhere (Suunto → Strava → Oura) appear in `/workout` with
-`source` naming the origin. The app uses them transparently when matching planned sessions.
+It used to say that workouts synced into Oura from elsewhere (Suunto → Strava → Oura) appear in
+`/workout` with `source` naming the origin. **Measured on 2026-08-10 against a real account, they do
+not.** Oura's own app showed an "Afternoon Run / 6.2 km, 14:55, 38 min, 540 Cal — Imported from
+Strava" on 2026-08-09, and a request for 08-06..08-10 returned seven workouts including a walk from
+that same day at 10:37 — and not the run. Every row that did come back carried `source: confirmed`.
 
-**Future extension:** direct Strava integration for richer telemetry, bypassing Oura.
+So a third-party import is visible in Oura's app and absent from the workout collection, at least
+promptly. What that means for this app: a run recorded on a watch and synced through Strava will not
+appear as a completed session here, and no amount of matching logic fixes that.
+
+**Two things left to establish**, neither of them guessed at here: whether such an import appears
+later once Oura has processed it, and whether it carries a different `source` when it does.
+
+### The `end_date` boundary is not the same for every collection
+
+Measured in the same request. Asking `start_date=2026-08-06&end_date=2026-08-10` returned:
+
+| Collection | Days back |
+| --- | --- |
+| `daily_readiness` | 5 — includes 08-10 |
+| `daily_sleep` | 5 — includes 08-10 |
+| `daily_activity` | 4 — stops at 08-09 |
+| `workout` | nothing after 08-09 |
+
+The client therefore sends `end_date` as **one day past** the range it was asked for, which is the
+only request that means "up to and including this day" for all of them at once. See
+`OuraClient.url`.
+
+**Future extension:** direct Strava integration for richer telemetry, bypassing Oura — which the
+finding above makes considerably more attractive than it looked.

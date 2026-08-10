@@ -118,15 +118,23 @@ class OuraClientTest {
     assertEquals("Bearer test-access-token", received.single().authorization)
   }
 
+  /**
+   * `end_date` is sent one day beyond the range asked for, deliberately.
+   *
+   * Oura's collections disagree about whether `end_date` includes that day. Measured against a real
+   * account: asking 08-06..08-10 returned readiness and sleep for all five days but **no workouts
+   * after 08-09**. Asking one day further is what makes "up to and including `to`" true for every
+   * collection, and this test is here so nobody tidies it back into an apparent off-by-one.
+   */
   @Test
-  fun `the range is sent as start_date and end_date`() = runTest {
+  fun `the range is sent as start_date and an end_date one day past the range`() = runTest {
     routes = readinessRoute(fixture("daily_readiness_page2.json"))
 
     client().readiness(FROM, TO)
 
     val query = received.single().query!!
     assertTrue(query, query.contains("start_date=2026-08-07"))
-    assertTrue(query, query.contains("end_date=2026-08-09"))
+    assertTrue(query, query.contains("end_date=2026-08-10"))
   }
 
   /** The sandbox is a different path on the same host, and it still carries the token. */

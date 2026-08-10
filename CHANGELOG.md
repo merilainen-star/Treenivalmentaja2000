@@ -96,6 +96,12 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   the live service yet, and nothing in the app calls the client.
 
 ### Fixed
+- **Today's Oura data was never requested.** The collections do not agree on whether `end_date`
+  includes that day: asking 08-06..08-10 against a real account returned five days of readiness and
+  sleep but no workouts after 08-09, and four days of activity. The client now asks one day beyond
+  the range it was given, which is the only request that means "up to and including this day" for
+  all of them. Found through the diagnostics screen, not by reading the specification — which says
+  nothing about it.
 - The app only fetched from Oura when a screen first entered composition, so one left open in the
   background since morning never asked again — a workout recorded at 07:38 was simply not there when
   the screen was composed, and nothing looked afterwards. Both screens now refresh on **resume**,
@@ -110,6 +116,11 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   left Settings offering "Yritä uudelleen" for a connection that cannot be attempted at all. Found
   by firing a forged redirect at the exported activity on the emulator, not by reading the code.
   Such a redirect is now ignored, and the card keeps asking for the credentials it still needs.
+- A third correction to the documents, from measurement: `API_INTEGRATIONS.md` said workouts synced
+  into Oura from elsewhere appear in `/workout` with `source` naming the origin. They do not. A run
+  imported from Strava was visible in Oura's own app and absent from a request covering that day,
+  while a walk from the same day came back. The document now records the evidence instead of the
+  claim, and what is still unknown about it.
 - Two things the documents promised that turned out not to exist. `AUTHENTICATION.md` said
   disconnecting calls Oura's revoke endpoint; the vendored specification declares **no `/oauth`
   paths at all**, so there is nothing to call and inventing a URL would have been worse than saying

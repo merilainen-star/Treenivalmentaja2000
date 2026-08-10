@@ -255,6 +255,13 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   which is why the app now requests that scope. One request spans every workout in a sync rather
   than one per workout, and a failure to get it — the commonest being a connection granted before the
   scope existed — leaves the workouts stored without a heart rate instead of failing the sync.
+- **Two real findings, both from the diagnostics screen on its first use.** Oura's collections
+  disagree about whether `end_date` includes that day — readiness and sleep returned today, workouts
+  and activity stopped at yesterday — so the client now asks one day beyond the range it was given.
+  And a workout imported into Oura from Strava does **not** appear in the workout collection at all,
+  which contradicts what `docs/API_INTEGRATIONS.md` claimed; a run visible in Oura's own app was
+  absent from a request that returned a walk from the same day. That one has no fix here: a session
+  recorded on a watch and synced through Strava will not show as completed in this app.
 - **The app can say what Oura returned.** Settings → Oura → "Tarkista Oura-data" runs the same
   requests a sync runs, writes nothing, and reports the count from each collection plus one line per
   workout. Built after a real dead end: a strength session was in Oura's own app and not in this
@@ -312,15 +319,18 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 ## Recommended next task
 
-1. **Check the reading against Oura's own app.** The Oura milestone is built and a real account is
+1. **See whether the `end_date` fix brings today's workouts through.** If it does, the boundary was
+   the cause; if today's are still missing while yesterday's arrive, Oura publishes workouts to the
+   API only once the day has closed, and that is worth knowing before anything is built on top.
+2. **Check the reading against Oura's own app.** The Oura milestone is built and a real account is
    connected, but no number the app displays has ever been compared with what Oura itself shows for
    the same day. That comparison is the only thing that can confirm the specification-derived
    parsing is right, and it costs one look at two screens.
-2. **Decide what a reading is allowed to do.** The card shows readiness and stops there on purpose.
+3. **Decide what a reading is allowed to do.** The card shows readiness and stops there on purpose.
    Connecting it to "kevyempi versio" or to the training engine is a training decision, not a
    parsing one — and the card this replaced was removed for giving advice with nothing behind it,
    so the rule wants writing down before it is coded.
-3. **Check the pairing against a real week.** Workouts are matched to sessions by time alone, and
+4. **Check the pairing against a real week.** Workouts are matched to sessions by time alone, and
    the rule has never met a week with two sessions in a day, a session done far from its planned
    hour, or an Oura workout that was not a planned session at all.
 
