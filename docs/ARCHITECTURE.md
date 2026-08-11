@@ -1,15 +1,13 @@
 # Architecture
 
 This document outlines the architecture for the Treenivalmentaja Android application. 
-*(Note: the local half of this architecture — Compose UI, `WorkoutViewModel`, `TrainingEngine`,
-`TrainingRepository`, Room and the AlarmManager reminders — is **implemented**. Of the Oura half,
-the API client and the whole OAuth flow in `data/oura` exist, are tested, and are reachable from
-Settings; the background sync and workout matching are **planned**, so nothing yet writes to the
-Oura tables and no login has been completed against the live service. Network calls
-do exist: the update check in `data/update`, a single `HttpURLConnection` GET of the published
-build's metadata, and the exercise-guide lookups in `data/guide` against ExerciseDB and wger, also
-plain `HttpURLConnection`, made when a movement is tapped and storing nothing —
-[EXERCISE_GUIDE.md](EXERCISE_GUIDE.md).)*
+*(Note: this architecture is **implemented**, Oura included — the client, the OAuth flow, the daily
+sync and the matching all run against a real account. What remains planned is the AI advisor, and
+acting on a recovery reading rather than merely showing it. Two other network callers predate the
+Oura work and are unlike it: the update check in `data/update` and the exercise-guide lookups in
+`data/guide`, both plain `HttpURLConnection`, single unauthenticated GETs with nothing to renew —
+[EXERCISE_GUIDE.md](EXERCISE_GUIDE.md), and [ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client)
+for why the Oura client is not one of them.)*
 
 ## System Context
 The application is a standalone Android app that acts as an offline-first training companion. It
@@ -32,8 +30,9 @@ All source lives under the package `fi.merilainen.treenivalmentaja`.
 
 - **UI Layer:** Jetpack Compose screens (`TodayScreen`, `WeekScreen`, `SettingsScreen`)
 - **Presentation Layer:** `WorkoutViewModel`
-- **Domain Layer:** models and status transition rules (`domain/`); use cases for scheduling and
-  matching are still planned
+- **Domain Layer:** models and status transition rules (`domain/`), plus use cases —
+  `RescheduleAlarmsUseCase`, `ResolveReminderUseCase`, `LoadExerciseGuideUseCase`,
+  `CheckForUpdateUseCase` and `MatchOuraWorkoutsUseCase`
 - **Data Layer:** Room database, DAOs and repositories (`data/`); the Oura API client in
   `data/oura`, built on OkHttp ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client))
 
@@ -54,20 +53,24 @@ Everything that a backend would have done is done on-device:
 
 | Concern | MVP implementation |
 | --- | --- |
-| OAuth2 code → token exchange | In-app POST to the Oura token endpoint, PKCE + client secret from `BuildConfig` |
-| Client secret storage | Git-ignored `.env` → `BuildConfig` at build time |
-| Token storage | `EncryptedSharedPreferences` |
-| Token refresh | Local OkHttp `Authenticator` |
+| OAuth2 code → token exchange | In-app POST to the Oura token endpoint, PKCE (S256) + client secret |
+| Client credentials | **Typed into Settings** and stored encrypted; `BuildConfig` from a git-ignored `.env` only as a fallback for local builds ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)) |
+| Token storage | AES-256-GCM under an Android Keystore key, in `SharedPreferences` — **not** `EncryptedSharedPreferences`, whose library is deprecated ([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)) |
+| Token refresh | Local OkHttp `Authenticator`, serialised so a rotated refresh token is not spent twice |
 | Scheduling / rescheduling | Local deterministic engine over Room |
 
 ## Data Flows
 
-### Data Flow from Oura to UI (Planned)
-1. WorkManager triggers background sync.
-2. App requests health data from Oura API (via Retrofit, using the locally stored access token).
-3. Data is parsed and stored in Room.
-4. ViewModel observes Room via Kotlin `Flow`.
-5. Compose UI recomposes automatically with new data.
+### Data flow from Oura to UI
+1. A daily WorkManager job, or the Today or week screen **resuming**, triggers a sync.
+2. `OuraClient` (OkHttp) requests the collections with the stored access token — and asks for one
+   day beyond the range, because Oura's collections disagree about whether `end_date` includes its
+   own day. See [API_INTEGRATIONS.md](API_INTEGRATIONS.md).
+3. `OuraMappers` turns the documents into rows; `OuraRepository` writes them, then
+   `MatchOuraWorkoutsUseCase` ties completed workouts to planned sessions.
+4. The ViewModel observes Room via Kotlin `Flow`. **Never the network** — a failed sync leaves the
+   last known reading on screen rather than an error.
+5. Compose recomposes.
 
 ### Local Database Flow
 Room acts as the single source of truth. All modifications (completing, skipping, shifting) are
@@ -94,8 +97,16 @@ clear of the exact-alarm permission, and only sessions belonging to the active p
 - Importing a plan **replaces** the previous one: the old plan and its sessions are deleted, not
   deactivated. See [DATA_MODEL.md](DATA_MODEL.md#replacing-a-plan).
 
-### Workout Matching Flow
-Oura workouts (potentially imported from Strava/Suunto) are synced and matched against the planned sessions in Room based on time, duration, and type.
+### Workout matching flow
+Oura workouts are matched against planned sessions on **the same day, nearest in time, one-to-one,
+and only when the activity fits** — see [TRAINING_ENGINE.md](TRAINING_ENGINE.md). Duration is
+deliberately not compared: the plan's is what was asked for and Oura's is what happened, and the gap
+between them is the interesting part rather than grounds for rejecting the pair. A match attaches
+Oura's numbers to the session; it does not complete it.
+
+Workouts **imported into Oura from Strava or Suunto do not arrive here at all** — measured, not
+assumed. They reach only the daily activity and readiness scores. See
+[API_INTEGRATIONS.md](API_INTEGRATIONS.md#third-party-imports--this-document-was-wrong).
 
 ### Future AI Proposal Flow
 1. User requests AI advice.
@@ -108,9 +119,13 @@ Oura workouts (potentially imported from Strava/Suunto) are synced and matched a
 The app is fully functional offline. The local deterministic engine reschedules workouts based on existing local data. Notifications rely on AlarmManager and do not require internet access.
 
 ## Error Handling
-- Network errors during sync log silently and retry using WorkManager backoff policies.
-- UI displays cached data during outages.
-- Oura API rate limits will be respected using HTTP 429 backoff handling.
+- A failed sync returns rather than throws: it happens unasked, and a network that is merely
+  absent must not crash a screen. The background worker retries with WorkManager's backoff when the
+  failure is worth retrying, and gives up when it is not — a rejected token will be rejected
+  identically forever.
+- The UI displays what Room holds during outages.
+- Every documented Oura status has its own type carrying an already-Finnish message and a `canRetry`
+  flag, `429` included.
 
 ### Notification Scheduling Flow
 `RescheduleAlarmsUseCase` computes the correct `remindAtUtc` for `PLANNED` sessions based on `ResolveReminderUseCase` and updates the database, ensuring AlarmManager fires at the exact desired times.

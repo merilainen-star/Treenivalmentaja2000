@@ -2,8 +2,9 @@
 
 *(Status: the **state machine is implemented and enforced** by `TrainingRepository` — every
 transition is validated and logged. The **rescheduling and illness rules are implemented** in
-`TrainingEngine` and covered by `TrainingEngineTest`. Only **Oura matching** is still planned,
-since no Oura data reaches the app yet.)*
+`TrainingEngine` and covered by `TrainingEngineTest`. **Oura matching is implemented**, in
+`MatchOuraWorkoutsUseCase` rather than in the engine — and it deliberately does not change a
+session's status; see "Matching imported workouts" below.)*
 
 ## Overview
 The Training Engine is the core domain logic responsible for modifying the training schedule based on user actions and external factors (missed days, illness). It is a local, deterministic rule engine.
@@ -125,12 +126,28 @@ later be completed or skipped.
 - **One missed session:** Usually ignored or shifted to the next rest day.
 - **Two or three missed sessions:** The engine shifts the entire plan forward or rebuilds the current week to prioritize key workouts (e.g., long run, heavy lift).
 
-### Matching Imported Workouts
-Background sync fetches Oura workouts. The engine attempts a match:
-- Matches date.
-- Matches `activity_type` to `WorkoutType`.
-- Matches duration (within 20% margin).
-If matched, the planned session status changes to `COMPLETED`.
+### Matching imported workouts
+
+Implemented in `MatchOuraWorkoutsUseCase`, not in the engine: pairing a recorded workout with a
+planned one is a question about two lists, and it changes nothing about the schedule.
+
+- **Same day, nearest in time**, one-to-one, and no further than twelve hours from the session's own
+  moment — without that limit a midnight walk attaches itself to a morning session for lack of
+  competition.
+- **The activity has to fit.** Oura's `activity` is compared to the session's `WorkoutType` with
+  case and punctuation stripped, because Oura returns `strengthTraining` where its own prose writes
+  `strength_training`. An activity with no mapping — `houseWork` is a real returned value — matches
+  nothing and is listed under its own day instead.
+- Duration is **not** compared. A 20% margin sounds principled and is not: the plan's `durationMin`
+  is what was asked for and Oura's is what happened, and the gap between them is the interesting
+  part rather than grounds for rejecting the pair.
+
+**A match does not complete a session.** The earlier version of this document said it set the status
+to `COMPLETED`; it does not, and should not. Whether a session counts as done is the user's
+statement about their own training, and a ring that noticed some movement is not that statement —
+the state machine's whole value is that every transition has an author. What a match does is attach
+what Oura recorded to the session, so the card can show what actually happened beneath what was
+planned.
 
 ## Future AI Advisor
 - **Role:** Replaces the local deterministic rules for complex, multi-week plan adjustments based on chronic load and Oura readiness scores.

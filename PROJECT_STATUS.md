@@ -302,13 +302,16 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 ## Not implemented
 
-- **A completed Oura login.** The client and the whole OAuth flow exist and are tested, but nothing
-  has authenticated against the live service — that needs a registered developer application and a
-  local `.env`. Until then the two Oura tables still have zero writers and stay empty.
-- **Background sync.** Nothing schedules a fetch, so even a connected build would hold no rows.
-  This is where WorkManager goes.
-- **Anything on screen from Oura.** The Today screen still says nothing about recovery.
-- WorkManager background sync.
+- **Anything that acts on a recovery reading.** The number is on screen and nothing uses it: no
+  rule connects readiness to "kevyempi versio" or to the training engine. That link is a training
+  decision, and the card this replaced was removed precisely for giving advice with nothing behind
+  it — so it wants deciding before it is coded.
+- **Workouts recorded elsewhere.** A run tracked on a watch and synced into Oura through Strava
+  never reaches the workout collection, so it cannot appear as a completed session here. Measured,
+  not assumed — see [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md). Getting those would mean a
+  Strava integration of our own.
+- **A workout Oura has not published yet.** Oura's app shows a session before its API does, so
+  today's may only arrive later. Nothing on this side fixes that.
 - AI advisor. `metadata.json` declares `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API`, but there is no
   code behind it.
 
@@ -323,34 +326,35 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 ## Current blockers
 
-- None. A real Oura account is connected, and the milestone is built end to end. What is missing is
-  a *check* rather than a blocker: no number this app shows has been compared against what Oura's
-  own app says for the same day, so the parsing is verified against the specification but not
-  against the service.
+- None. A real Oura account is connected, the milestone is built end to end, and the readings have
+  been checked by hand against Oura's own app and matched — readiness and sleep on 2026-08-10, and a
+  strength session's duration and calories on 2026-08-11.
 
 ## Recommended next task
 
-1. **See whether the `end_date` fix brings today's workouts through.** If it does, the boundary was
-   the cause; if today's are still missing while yesterday's arrive, Oura publishes workouts to the
-   API only once the day has closed, and that is worth knowing before anything is built on top.
-2. **Check the reading against Oura's own app.** The Oura milestone is built and a real account is
-   connected, but no number the app displays has ever been compared with what Oura itself shows for
-   the same day. That comparison is the only thing that can confirm the specification-derived
-   parsing is right, and it costs one look at two screens.
-3. **Decide what a reading is allowed to do.** The card shows readiness and stops there on purpose.
+1. **Decide whether a heart rate this thin should be shown at all.** A strength session Oura itself
+   marked "heart rate data unavailable" still displays "syke 75 (max 81)", computed from background
+   samples that happened to fall in the window. Requiring five samples was not enough. Either the
+   bar goes up, or the samples must cover some share of the session — both risk dropping real
+   readings, which is why it is a decision rather than a tweak.
+2. **Decide what a reading is allowed to do.** The card shows readiness and stops there on purpose.
    Connecting it to "kevyempi versio" or to the training engine is a training decision, not a
    parsing one — and the card this replaced was removed for giving advice with nothing behind it,
    so the rule wants writing down before it is coded.
-4. **Check the pairing against a real week.** Workouts are matched to sessions by time alone, and
-   the rule has never met a week with two sessions in a day, a session done far from its planned
-   hour, or an Oura workout that was not a planned session at all.
+3. **Watch the pairing over a real week.** It now requires the activity to fit, which fixed walks
+   being shown as strength training, but it has still never met a day with two sessions of the same
+   kind, or a session done far from its planned hour.
 
 ## Files most relevant to the next task
 
-- `app/src/main/java/fi/merilainen/treenivalmentaja/data/oura/OuraApi.kt` — `OuraTokenSource` is
-  the seam OAuth plugs into
-- `app/src/main/java/fi/merilainen/treenivalmentaja/data/oura/OuraClient.kt`
-- `app/src/main/java/fi/merilainen/treenivalmentaja/SettingsScreen.kt` — where "Yhdistä Oura" goes
-- `app/src/main/java/fi/merilainen/treenivalmentaja/TodayScreen.kt` — the recovery card
-- `app/src/main/java/fi/merilainen/treenivalmentaja/WorkoutViewModel.kt`
-- `docs/api/oura-openapi-1.37.json` — the authorization and token URLs, and every response shape
+- `app/src/main/java/fi/merilainen/treenivalmentaja/data/oura/OuraMappers.kt` — where the
+  heart-rate sample threshold lives
+- `app/src/main/java/fi/merilainen/treenivalmentaja/domain/MatchOuraWorkoutsUseCase.kt` — the
+  pairing rule, and the activity mapping it now requires
+- `app/src/main/java/fi/merilainen/treenivalmentaja/TodayScreen.kt` — the recovery card and the
+  completed-session line
+- `app/src/main/java/fi/merilainen/treenivalmentaja/WeekScreen.kt` — the calendar
+- `app/src/main/java/fi/merilainen/treenivalmentaja/OuraCard.kt` — the connection and the
+  diagnostics that answered two questions the specification could not
+- `docs/api/oura-openapi-1.37.json` — every response shape, and stale in two places this repository
+  now records: the `end_date` boundary and third-party imports

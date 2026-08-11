@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 4 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 5 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -83,7 +83,8 @@ An exercise whose sets differ from each other carries `setPlan` instead of `sets
 exercise may also carry `guide`, the plan author's pointer into an exercise catalogue; nothing
 fetched with it is ever stored, only the pointer itself
 ([EXERCISE_GUIDE.md](EXERCISE_GUIDE.md)). Because the whole array is one column, fields can be
-added to it without a Room migration, which is why the schema is still at version 4.
+added to it without a Room migration — which is why none of the plan's own growth has ever moved
+the version.
 
 
 #### Reminder Resolution (`remindAtUtc`)
@@ -187,10 +188,15 @@ rows nothing reads.
 The version number describes the **shape** of the tables, never how much data they hold. Inserting
 rows never changes it. It changes when a column, table or index appears, disappears or is renamed.
 
-A consequence worth stating, because it is easy to assume otherwise: the Oura tables already exist
-at version 4. Wiring up the Oura integration will insert rows into tables that are already there,
-and will not bump the version by itself. Only a new field — somewhere to keep an OAuth token, say —
-would.
+A consequence worth stating, because it is easy to assume otherwise: the Oura tables existed at
+version 4 with no writer at all. Wiring up the Oura integration filled them without moving the
+version, exactly as expected — the tables were already the right shape. Version 5 came later and for
+a different reason: three new **columns** on `oura_workouts` (`distanceMeters`, `avgHeartRate`,
+`maxHeartRate`), added by an auto migration.
+
+The OAuth tokens, incidentally, never touched the schema at all. They live in encrypted
+`SharedPreferences` rather than in Room
+([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
 
 **There is no `fallbackToDestructiveMigration`, on purpose.** With it, a schema change lacking a
 migration empties the database silently: no error, no log line, just a blank history on the next

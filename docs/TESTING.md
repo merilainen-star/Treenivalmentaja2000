@@ -4,11 +4,11 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 198 unit tests + 18 instrumented tests, all passing.
+**Status:** 354 unit tests + 36 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 198 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 29 screenshot comparisons (a subset of the 198 above)
-- `./gradlew :app:connectedDebugAndroidTest` — 18 tests / 0 failures / 0 errors
+- `./gradlew :app:testDebugUnitTest` — 354 tests / 0 failures / 0 errors
+- `./gradlew :app:verifyRoborazziDebug` — 46 screenshot comparisons (a subset of the 354 above)
+- `./gradlew :app:connectedDebugAndroidTest` — 36 tests / 0 failures / 0 errors
 
 | Suite | Covers |
 | --- | --- |
@@ -26,12 +26,27 @@ The testing strategy ensures the deterministic training engine works flawlessly 
 | `ui/ScreenScreenshotTest` | The three screens whole, which the state hoisting made possible: Today with sessions and on a rest day, the week list, and Settings with and without the notification permission. |
 | `ui/ComponentScreenshotTest` | Visual regression of the Today and Week cards, the expanded week row, timed and loaded exercises, tappable exercise rows, a started workout drawn from the plan, every state of the exercise-guide sheet, the recovery card, the update card, the import dialog and every status badge. |
 | `ImageLoaderConfigurationTest` (instrumented) | That the image loader has no disk cache and creates no cache directory. A terms-of-use requirement, and a breach would leave no visible trace in the app — see [EXERCISE_GUIDE.md](EXERCISE_GUIDE.md). |
-| `data/local/MigrationTest` (instrumented) | Room migration 3 → 4 against the KSP-generated schemas. |
+| `data/local/MigrationTest` (instrumented) | Room migrations 3 → 4 (hand-written) and 4 → 5 (auto) against the KSP-generated schemas. The 4 → 5 case inserts a workout first: an existing row must survive with its old values and nulls in the new columns, not be recreated empty. |
+| `data/oura/OuraClientTest` | The Oura client against a `com.sun.net.httpserver`: the bearer header, the date parameters — including that `end_date` is sent one day past the range, which reads like an off-by-one and is not — paging, every documented status code, an unreachable host and a body that is not JSON. |
+| `data/oura/OuraMappersTest` | Oura's documents as rows. Mostly about absence: which days exist, which scores are `null`, which workouts are dropped, and that a couple of stray heart-rate samples are not a workout's heart rate. |
+| `data/oura/OuraOAuthTest` | PKCE, the authorization URL and what a redirect may be acted on as. The security-relevant half: the activity receiving redirects is exported, so anything on the device can start it with any URI. |
+| `data/oura/OuraAuthServiceTest` | The token endpoint: the exchange, the refresh, and each OAuth2 rejection in the user's language. |
+| `data/oura/OuraAuthenticatorTest` | Renewal on `401`, including two threads failing at once producing **one** refresh — Oura rotates refresh tokens, so the second would otherwise spend an invalidated one. |
+| `data/oura/OuraConnectionTest` | Connecting, failing to connect, disconnecting, and the credentials typed into Settings. A forged redirect must never reach the token endpoint. |
+| `data/repository/OuraRepositoryTest` | The whole data path, from an HTTP response to a row a screen observes: a real client against a local server and a real in-memory Room database. Includes that a failed sync leaves what was already stored alone, and that diagnostics report an empty workout collection as empty rather than as an error. |
+| `domain/MatchOuraWorkoutsUseCaseTest` | Which workout belongs to which session — two sessions in a day, a workout hours from anything, and that a walk does not become strength training. |
+| `DayLabelTest` | The calendar's day headings. Worth its own file because what it replaced was positional — row three was always "Keskiviikko" — and therefore right only in a week beginning on a Monday. |
+| `data/oura/OuraTokenStoreTest` (instrumented) | The real token store on a device, because there is no Android Keystore on the JVM: that a round trip returns what went in, that what lands in `SharedPreferences` is not the token, that the same token encrypts differently each time, that a tampered ciphertext fails to decrypt, and that disconnecting keeps the client credentials. That last one caught a real bug the unit tests could not — the in-memory fake kept them while the real store wiped them. |
 | `data/local/MigrationGuardTest` (instrumented) | That a missing migration throws and leaves the rows on disk, instead of emptying the database quietly. Fails if `fallbackToDestructiveMigration` is ever reintroduced. |
 | `data/alarm/ReminderReceiverTest`, `ReminderReceiverNoPermissionTest`, `BootReceiverTest` (instrumented) | Alarm delivery, the missing-notification-permission path, the BootReceiver action guard, and that a session belonging to a replaced plan is ignored. |
 | `ImportStartDialogTest` (instrumented) | That the import dialog returns the choice the user made. Returning it backwards would put a plan on the wrong dates while looking correct on screen, which no screenshot would catch. |
 
-**Gaps:** nothing covers the Oura layer, which does not exist yet. `WorkoutViewModel`'s cover is
+**Gaps:** no test has ever run against Oura itself. Everything above stands on a local server and
+on fixtures **derived from the vendored specification** rather than captured from the service —
+which is a real distinction, and the reason two behaviours the specification does not mention were
+found by hand instead: that `end_date` excludes its own day for some collections, and that
+third-party imports never appear in the workout collection at all. What the tests prove is that the
+client obeys the specification. `WorkoutViewModel`'s cover is
 its guide sheet and its import confirmation; the training-engine actions it delegates
 (`markSick`, `checkMissedSessions`) are tested through `TrainingEngineTest` rather than through
 it. No test drives a screen's interactions — the captures are of states, not of tapping through
@@ -66,8 +81,15 @@ them; `ImportStartDialogTest` is the only interaction test and it is instrumente
   activity resolves the launcher icon, and Robolectric cannot load the `adaptive-icon` XML from
   `mipmap-anydpi-v26`, which fails every capture before the composable is reached.
 
-### API & OAuth Tests
-- MockWebServer will be used to simulate Oura API responses and OAuth token exchanges.
+### API & OAuth tests
+- The JDK's own `com.sun.net.httpserver`, not MockWebServer: the app already tests its two other
+  HTTP callers that way, and this needs a handful of handlers rather than a dependency.
+- Fixtures under `src/test/resources/oura/` are **derived from the vendored specification**, which
+  contains no response examples at all — unlike the exercise-guide fixtures beside them, which are
+  recorded responses. Worth knowing when one of them disagrees with reality.
+- The one thing a unit test cannot reach is the token store: the Android Keystore has no JVM
+  equivalent, so `OuraTokenStorage` is an interface with an in-memory fake, and the real
+  implementation is covered by an instrumented test.
 
 ## Manual Test Scenarios
 - Import a plan, complete a workout, verify UI updates.

@@ -9,7 +9,7 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 **Implemented:**
 - Jetpack Compose UI (Today, Week and Settings) with bottom-tab navigation; a Week row expands to
   show what that session is
-- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 4
+- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 5
   with tested migrations
 - Session state machine with an append-only event history
 - Training plan JSON import (file + clipboard) with validation and duplicate detection
@@ -19,13 +19,18 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 - Exercises shown as the plan wrote them, with loads, per-set ramps and clocks for timed movements
 - Exercise guides: tap a movement for an animation and instructions from ExerciseDB or wger,
   fetched on demand and never stored ([docs](docs/EXERCISE_GUIDE.md))
+- Oura: connect from the phone, a readiness reading on Today, and what Oura recorded for a finished
+  session — duration, distance, calories, heart rate — under what the plan asked for
+  ([docs](docs/API_INTEGRATIONS.md))
+- A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
 - Rolling test APK built by GitHub Actions, with an in-app check for whether the build is current
 - App icon and splash screen
 
 **Planned / Missing:**
-- Oura API V2 integration (OAuth exchange happens in-app; no backend — see ADR-006)
-- WorkManager integration (background sync)
 - Remote AI advisor
+- Strava integration. Workouts recorded elsewhere and synced into Oura do **not** come through
+  Oura's workout collection — measured, see [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md) — so a
+  run tracked on a watch appears here only as a nudge to the day's recovery and activity scores.
 
 ## Main Features
 Implemented today:
@@ -34,8 +39,8 @@ Implemented today:
 - Adapt the plan when sessions are missed, or when training pauses for illness.
 
 Planned:
-- Adapt training based on recovery data.
-- Connect to Oura to track completed workouts.
+- Adapt training based on recovery data. The reading is on screen; nothing yet acts on it, and what
+  a number is allowed to change is a training decision rather than a parsing one.
 
 ## Technology Stack
 - **Language:** Kotlin
@@ -43,8 +48,8 @@ Planned:
 - **Architecture:** MVVM and Clean Architecture
 - **Local Storage:** Room
 - **JSON:** Moshi (plan import, JSON columns)
-- **Background Work:** AlarmManager (implemented); WorkManager (planned)
-- **Network:** Retrofit & OkHttp (planned — currently commented out in `app/build.gradle.kts`)
+- **Background Work:** AlarmManager for reminders; WorkManager for the daily Oura sync
+- **Network:** OkHttp for the Oura client ([ADR-007](docs/DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client)); plain `HttpURLConnection` for the update check and the exercise guides
 - **Screenshot tests:** Roborazzi on Robolectric (JVM, no device needed)
 - **Backend:** None ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp))
 
@@ -83,9 +88,15 @@ Always use the wrapper:
 - **Screenshot tests:** `./gradlew :app:verifyRoborazziDebug`
 
 ## Configuration Overview
-The app builds and runs with no configuration — plan management is entirely local. Connecting Oura
-requires `OURA_CLIENT_ID` and `OURA_CLIENT_SECRET` in a git-ignored `.env` file; there is no
+The app builds and runs with no configuration — plan management is entirely local, and there is no
 backend to set up ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)).
+
+Connecting Oura needs an application registered in Oura's developer portal, and its Client ID and
+Secret are **typed into the app's Settings screen**, not compiled in
+([ADR-009](docs/DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)).
+The whole setup happens on the phone; see [SETUP.md](docs/SETUP.md#4-oura-developer-application-setup).
+A local build may still supply them through a git-ignored `.env`, which is used only when nothing
+has been entered in the app.
 
 ## Links to Detailed Documentation
 - [Architecture](docs/ARCHITECTURE.md)
@@ -105,8 +116,13 @@ backend to set up ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-th
 - [AI Agents Instructions](AGENTS.md)
 
 ## Known Limitations
-- No Oura connection yet, so the app says nothing about recovery. The Today screen's card offers
-  the "Sairastuin" and "Tervehdyin" buttons and no verdict.
-- No background sync.
+- The recovery reading is shown but nothing acts on it. Connecting readiness to "kevyempi versio"
+  or to the training engine is a training decision, and the card this replaced was removed for
+  giving advice with nothing behind it.
+- Workouts recorded on another device and synced into Oura do not arrive through its workout
+  collection, so they appear only in the day's scores. Measured, not assumed —
+  [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md).
+- Oura publishes a workout to the API some time after the app shows it, so today's session may
+  appear only later.
 - No test taps through a screen: the captures pin what each state looks like, not what happens
   when you use it.

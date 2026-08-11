@@ -41,8 +41,19 @@ Begin every completion report with the line: `AGENTS.md luettu (v4)`
 ## General Rules
 - **Inspect Before Implementing:** Always inspect existing implementations (via `cat`, `grep`, or file viewing tools) before adding new ones. Do not assume architecture.
 - **Preserve Module Boundaries:** Maintain strict separation between UI (Compose), Presentation (ViewModel), Domain (UseCases/Entities), and Data (Repositories/Room/Network) layers.
-- **No Secrets in Client Code:** Client secrets, API keys, and Oura credentials must **never** be hardcoded in source, resources, or committed files. The only sanctioned mechanism is `BuildConfig` injection from a git-ignored `.env` via the Secrets Gradle Plugin ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)).
-- **Repository Pattern:** Do not bypass repositories. Never access Room DAOs or Retrofit services directly from UI components or ViewModels.
+- **No Secrets in Client Code:** Client secrets and API keys must **never** be hardcoded in source,
+  resources, or committed files. Two mechanisms are sanctioned, and nothing else is:
+  1. **Entered by the user at run time** and stored encrypted under an Android Keystore key — how
+     the Oura client id and secret actually arrive
+     ([ADR-009](docs/DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it),
+     [ADR-008](docs/DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
+  2. `BuildConfig` injection from a git-ignored `.env` via the Secrets Gradle Plugin, for local
+     builds only ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)).
+
+  **Never ask the user to paste a secret into a chat, an issue, or a commit**, and never accept one
+  offered. It has been offered, in good faith, to make debugging easier; the answer is to make the
+  app report what it sees — see the Oura diagnostics in Settings — not to move the secret.
+- **Repository Pattern:** Do not bypass repositories. Never access Room DAOs or HTTP clients directly from UI components or ViewModels.
 - **Type Safety:** Use typed models and sealed classes for state management. Avoid primitive obsession.
 
 ## Data Handling
@@ -71,6 +82,6 @@ version and its checksum, so builds are reproducible. Do **not** invoke a system
 - **Package:** all Kotlin sources live under `fi.merilainen.treenivalmentaja`
   (`applicationId` and `namespace` are the same). Never reintroduce `com.example`.
 - **Toolchain:** JDK 17+ (verified on Temurin 21), Android SDK Platform 36.1, Gradle via wrapper.
-- **Secrets:** the Oura client secret is injected into `BuildConfig` from a git-ignored `.env`
-  (see [ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)). That is the only
-  sanctioned mechanism — never hardcode a secret in Kotlin, XML, or `.env.example`.
+- **Secrets:** the Oura client id and secret are typed into Settings and stored encrypted on the
+  device; a local build may instead inject them into `BuildConfig` from a git-ignored `.env`. Never
+  hardcode one in Kotlin, XML, or `.env.example`.

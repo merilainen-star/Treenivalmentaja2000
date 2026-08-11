@@ -7,9 +7,9 @@ the numbers behind them.
 - Reminder system: AlarmManager notifications with a 7-day sliding window, `BOOT_COMPLETED`,
   `MY_PACKAGE_REPLACED` and timezone-change restoration, and notification permission checks. Uses
   inexact `setAndAllowWhileIdle` to comply with Google Play exact alarm policies.
-- Room database migrations: schema version 4 with `exportSchema = true`, `MIGRATION_3_4` covered
-  by an instrumented test, and no destructive fallback — a missing migration fails loudly rather
-  than emptying the database.
+- Room database migrations: `exportSchema = true`, both `MIGRATION_3_4` (hand-written) and the
+  4 → 5 auto migration covered by instrumented tests, and no destructive fallback — a missing
+  migration fails loudly rather than emptying the database.
 - Deterministic Training Engine: missed-session handling, plan shifting, illness pause
   (`markSick`) and the graduated return (`markRecovered`), wired into the Today screen.
 
