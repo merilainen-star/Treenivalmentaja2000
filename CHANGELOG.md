@@ -107,6 +107,17 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   the live service yet, and nothing in the app calls the client.
 
 ### Fixed
+- **A walk was being shown as strength training.** Matching used time alone, on the grounds that
+  Oura's `activity` was a free-form string nobody had seen real values of. Two weeks of real data
+  settled that: eleven `walking` entries against five `strengthTraining` ones, so the workout
+  nearest a 09:00 strength session was almost always a walk — a 1.8 km stroll appeared as that
+  morning's strength training, and a day whose only Oura entry was a walk claimed a session that
+  never happened. A workout now has to be the right *kind* of thing, compared with case and
+  punctuation stripped so `strengthTraining` and `strength_training` mean the same. `houseWork`,
+  which Oura really does return, matches nothing.
+- The other half of that: workouts no session claims are now listed under their own day in the
+  calendar, with Oura's own word for them in Finnish. Stricter matching without this would simply
+  have made every walk vanish.
 - A heart rate was shown for a session that had none. Oura samples continuously, so a workout's
   window always holds *something*: a strength session Oura itself marked "heart rate data
   unavailable" came out as "syke 75 (max 81)" from a couple of background readings. Fewer than five

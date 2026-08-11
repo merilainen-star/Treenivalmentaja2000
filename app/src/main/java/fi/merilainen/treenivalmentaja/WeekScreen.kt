@@ -66,6 +66,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val guideState by viewModel.guideState.collectAsState()
     val ouraState by viewModel.ouraState.collectAsState()
     val completedMetrics by viewModel.completedMetrics.collectAsState()
+    val unmatchedByDay by viewModel.unmatchedByDay.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.
@@ -78,6 +79,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         workouts = workouts,
         guideState = guideState,
         completedMetrics = completedMetrics,
+        unmatchedByDay = unmatchedByDay,
         onExerciseClick = viewModel::openExerciseGuide,
         onGuideRetry = viewModel::retryExerciseGuide,
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
@@ -96,6 +98,7 @@ fun WeekScreenContent(
     onGuideDismiss: () -> Unit = {},
     completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
     today: LocalDate = LocalDate.now(),
+    unmatchedByDay: Map<LocalDate, List<CompletedSessionMetrics>> = emptyMap(),
 ) {
     Column(
         modifier = Modifier
@@ -122,7 +125,9 @@ fun WeekScreenContent(
             val earliest = minOf(-DAYS_BACK, workouts.minOfOrNull { it.dayOffset } ?: 0)
             val latest = maxOf(DAYS_FORWARD, workouts.maxOfOrNull { it.dayOffset } ?: 6)
             (earliest..latest).filter { offset ->
-                offset in 0..6 || workouts.any { it.dayOffset == offset }
+                offset in 0..6 ||
+                    workouts.any { it.dayOffset == offset } ||
+                    unmatchedByDay.containsKey(today.plusDays(offset.toLong()))
             }
         }
         // Opens on today rather than at the top, so the screen answers "what now" before it offers
@@ -131,6 +136,8 @@ fun WeekScreenContent(
             initialFirstVisibleItemIndex = days.indexOf(0).coerceAtLeast(0)
         )
 
+        // Recomputed when either the plan or Oura's own record changes, so a day that holds only a
+        // walk still gets a row.
         LazyColumn(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -148,7 +155,9 @@ fun WeekScreenContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                     
-                    if (dayWorkouts.isEmpty()) {
+                    val loose = unmatchedByDay[today.plusDays(dayIndex.toLong())].orEmpty()
+
+                    if (dayWorkouts.isEmpty() && loose.isEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -168,6 +177,34 @@ fun WeekScreenContent(
                                 onExerciseClick = onExerciseClick,
                                 completed = completedMetrics[workout.id],
                             )
+                        }
+                    }
+
+                    // What Oura recorded that no session claims — a walk, housework, a session on a
+                    // day the plan had none. Listed under its day rather than dropped, which is the
+                    // other half of refusing to pair a walk with a strength session.
+                    loose.forEach { metrics ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                Text(
+                                    text = ouraActivityName(metrics.activityType),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                CompletedMetricsRow(
+                                    metrics = metrics,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                     }
                 }
@@ -365,3 +402,21 @@ private val FINNISH = Locale("fi", "FI")
 private const val DAYS_BACK = 28
 
 private const val DAYS_FORWARD = 27
+
+/**
+ * Oura's own word for an activity, in Finnish where this app knows one.
+ *
+ * Anything unrecognised is shown as Oura wrote it rather than as "muu": the vocabulary is
+ * free-form and open-ended, and a word the app has not met yet is more useful on screen than a
+ * label that hides it.
+ */
+internal fun ouraActivityName(activity: String): String =
+    when (activity.lowercase().filter { it.isLetterOrDigit() }) {
+        "walking" -> "Kävely"
+        "running" -> "Juoksu"
+        "strengthtraining" -> "Voimaharjoittelu"
+        "housework" -> "Kotityöt"
+        "cycling" -> "Pyöräily"
+        "swimming" -> "Uinti"
+        else -> activity
+    }

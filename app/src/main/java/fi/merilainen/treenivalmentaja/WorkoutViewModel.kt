@@ -171,6 +171,21 @@ class WorkoutViewModel(
    * the matcher could not place would otherwise be invisible — which looks exactly like never having
    * fetched it.
    */
+  /**
+   * Unclaimed Oura workouts across the calendar's span, by the day they happened on.
+   *
+   * Needed once matching started requiring the activity to fit: a walk no longer pretends to be a
+   * strength session, and without this it would simply disappear instead.
+   */
+  val unmatchedByDay: StateFlow<Map<LocalDate, List<CompletedSessionMetrics>>> =
+    ouraRepository
+      .observeUnmatchedByDay(
+        from = LocalDate.now().minusDays(CALENDAR_DAYS_BACK),
+        to = LocalDate.now().plusDays(1),
+        zone = ZoneId.systemDefault(),
+      )
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
   val unmatchedToday: StateFlow<List<CompletedSessionMetrics>> =
     ouraRepository
       .observeUnmatchedOn(LocalDate.now(), ZoneId.systemDefault())
@@ -284,7 +299,7 @@ class WorkoutViewModel(
           val date = runCatching { LocalDate.parse(it.scheduledDate) }.getOrNull()
           date != null && !date.isBefore(earliest) && !date.isAfter(today)
         }
-        .map { PlannedSession(id = it.id, scheduledAtUtc = it.remindAtUtc) }
+        .map { PlannedSession(id = it.id, scheduledAtUtc = it.remindAtUtc, type = it.type) }
     ouraRepository.matchWorkouts(sessions, from.toEpochMilli(), to.toEpochMilli())
   }
 
@@ -537,6 +552,9 @@ class WorkoutViewModel(
      * a weekend would otherwise keep a permanent hole in it.
      */
     private const val SYNC_DAYS = 14L
+
+    /** As far back as the calendar shows, so a day there can list what Oura holds for it. */
+    private const val CALENDAR_DAYS_BACK = 28L
 
     /** Statuses that describe a closed row and are never drawn on the Today/Week screens. */
     private val HIDDEN_STATUSES = setOf(SessionStatus.RESCHEDULED, SessionStatus.CANCELLED)

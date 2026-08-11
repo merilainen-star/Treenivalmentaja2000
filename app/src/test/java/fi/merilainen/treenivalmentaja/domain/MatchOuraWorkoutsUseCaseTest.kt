@@ -1,5 +1,6 @@
 package fi.merilainen.treenivalmentaja.domain
 
+import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -19,14 +20,21 @@ class MatchOuraWorkoutsUseCaseTest {
 
   private fun at(iso: String): Long = Instant.parse(iso).toEpochMilli()
 
-  private fun workout(id: String, start: String, durationMin: Long = 40) =
+  private fun workout(
+    id: String,
+    start: String,
+    durationMin: Long = 40,
+    activity: String = "strengthTraining",
+  ) =
     CompletedWorkout(
       id = id,
       startTimeUtc = at(start),
       endTimeUtc = at(start) + durationMin * 60_000,
+      activityType = activity,
     )
 
-  private fun session(id: String, at: String) = PlannedSession(id = id, scheduledAtUtc = at(at))
+  private fun session(id: String, at: String, type: WorkoutType = WorkoutType.STRENGTH) =
+    PlannedSession(id = id, scheduledAtUtc = at(at), type = type)
 
   @Test
   fun `a workout near a session is matched to it`() {
@@ -116,6 +124,82 @@ class MatchOuraWorkoutsUseCaseTest {
 
     assertEquals(first, second)
     assertEquals(2, first.size)
+  }
+
+  // ------------------------------------------------------------------ the activity has to fit
+
+  /**
+   * The failure this rule was added for, taken from real data. A fortnight held eleven `walking`
+   * entries against five `strengthTraining` ones, so the workout nearest a 09:00 strength session
+   * was almost always a walk — and a 1.8 km stroll was shown as that morning's strength training.
+   */
+  @Test
+  fun `a walk does not become a strength session`() {
+    val matches =
+      matcher.execute(
+        workouts = listOf(workout("walk", "2026-08-09T07:37:00Z", activity = "walking")),
+        sessions = listOf(session("s1", "2026-08-09T06:00:00Z", WorkoutType.STRENGTH)),
+      )
+
+    assertTrue(matches.toString(), matches.isEmpty())
+  }
+
+  /** And the day whose only Oura entry is a walk leaves its strength session honestly empty. */
+  @Test
+  fun `a nearer walk does not beat a further strength workout`() {
+    val matches =
+      matcher.execute(
+        workouts =
+          listOf(
+            workout("walk", "2026-08-08T07:41:00Z", activity = "walking"),
+            workout("gym", "2026-08-08T12:13:00Z", activity = "strengthTraining"),
+          ),
+        sessions = listOf(session("s1", "2026-08-08T06:00:00Z", WorkoutType.STRENGTH)),
+      )
+
+    assertEquals(mapOf("gym" to "s1"), matches)
+  }
+
+  /** Oura writes `strengthTraining`; its own prose writes `strength_training`. Both are the same. */
+  @Test
+  fun `the activity is compared without case or punctuation`() {
+    val matches =
+      matcher.execute(
+        workouts = listOf(workout("w1", "2026-08-09T07:00:00Z", activity = "strength_training")),
+        sessions = listOf(session("s1", "2026-08-09T07:00:00Z", WorkoutType.STRENGTH)),
+      )
+
+    assertEquals(mapOf("w1" to "s1"), matches)
+  }
+
+  @Test
+  fun `a run matches a running session and not a strength one`() {
+    val run = listOf(workout("w1", "2026-08-09T07:00:00Z", activity = "running"))
+
+    assertEquals(
+      mapOf("w1" to "s1"),
+      matcher.execute(run, listOf(session("s1", "2026-08-09T07:00:00Z", WorkoutType.RUNNING))),
+    )
+    assertTrue(
+      matcher.execute(run, listOf(session("s2", "2026-08-09T07:00:00Z", WorkoutType.STRENGTH)))
+        .isEmpty()
+    )
+  }
+
+  /** `houseWork` is a real value Oura returned. It is not a training session of any kind. */
+  @Test
+  fun `an activity the app has no mapping for matches nothing`() {
+    val matches =
+      matcher.execute(
+        workouts = listOf(workout("w1", "2026-08-09T07:00:00Z", activity = "houseWork")),
+        sessions =
+          listOf(
+            session("s1", "2026-08-09T07:00:00Z", WorkoutType.STRENGTH),
+            session("s2", "2026-08-09T07:00:00Z", WorkoutType.RUNNING),
+          ),
+      )
+
+    assertTrue(matches.toString(), matches.isEmpty())
   }
 
   @Test

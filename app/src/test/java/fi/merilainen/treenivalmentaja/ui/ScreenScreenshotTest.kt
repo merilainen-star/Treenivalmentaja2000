@@ -290,6 +290,33 @@ class ScreenScreenshotTest {
         )
     }
 
+    /**
+     * A day whose Oura record includes something no session claims — here a walk on a day whose
+     * only planned session is strength training.
+     *
+     * This is the visible half of refusing to pair a walk with a strength session: the walk is
+     * still listed, under its own day, rather than disappearing because it could not be matched.
+     */
+    @Test
+    fun week_withUnmatchedWalk() = capture("screen_week_unmatched_walk") {
+        WeekScreenContent(
+            workouts = listOf(strength(0, "s-24")),
+            today = FIXED_TODAY,
+            unmatchedByDay = mapOf(
+                FIXED_TODAY to listOf(
+                    CompletedSessionMetrics(
+                        ouraWorkoutId = "w9",
+                        activityType = "walking",
+                        startTimeUtc = 1_754_845_200_000L,
+                        durationMin = 40,
+                        calories = 103,
+                        distanceKm = 1.8,
+                    )
+                )
+            ),
+        )
+    }
+
     // ------------------------------------------------------------------ Settings
 
     @Test

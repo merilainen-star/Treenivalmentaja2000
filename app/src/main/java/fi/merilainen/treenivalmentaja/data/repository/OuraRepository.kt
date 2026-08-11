@@ -176,7 +176,10 @@ class OuraRepository internal constructor(
     if (workouts.isEmpty()) return
     val matches =
       matcher.execute(
-        workouts = workouts.map { CompletedWorkout(it.id, it.startTimeUtc, it.endTimeUtc) },
+        workouts =
+          workouts.map {
+            CompletedWorkout(it.id, it.startTimeUtc, it.endTimeUtc, it.activityType)
+          },
         sessions = sessions,
       )
     for (workout in workouts) {
@@ -219,6 +222,27 @@ class OuraRepository internal constructor(
     val from = date.atStartOfDay(zone).toInstant().toEpochMilli()
     val to = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
     return dao.observeUnmatchedWorkouts(from, to).map { rows -> rows.map { it.toMetrics() } }
+  }
+
+  /**
+   * Unclaimed workouts over a span, grouped by the local day they started on.
+   *
+   * The calendar needs this because matching became stricter: a walk no longer attaches itself to a
+   * strength session, which is right, but it would leave every walk invisible if the days did not
+   * list what they hold. What Oura recorded should be findable somewhere.
+   */
+  fun observeUnmatchedByDay(
+    from: LocalDate,
+    to: LocalDate,
+    zone: ZoneId,
+  ): Flow<Map<LocalDate, List<CompletedSessionMetrics>>> {
+    val fromUtc = from.atStartOfDay(zone).toInstant().toEpochMilli()
+    val toUtc = to.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+    return dao.observeUnmatchedWorkouts(fromUtc, toUtc).map { rows ->
+      rows.map { it.toMetrics() }.groupBy {
+        Instant.ofEpochMilli(it.startTimeUtc).atZone(zone).toLocalDate()
+      }
+    }
   }
 
   /**

@@ -13,8 +13,8 @@ Every number below was measured on this commit, not carried over from a previous
 | Check | Command | Result |
 | --- | --- | --- |
 | Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,662,843 B (19.71 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 348 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 45 comparisons, 0 changed |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 354 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 46 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 36 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
@@ -90,7 +90,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   only a real screen can do — the file picker, the clipboard, the notification permission. That is
   what makes a whole screen capturable, and states that are awkward to reach by hand — a rest day,
   a missing notification permission — are now baselines rather than something to remember.
-- **Screenshot tests.** 45 Roborazzi baselines: all three screens whole, plus the Today and Week
+- **Screenshot tests.** 46 Roborazzi baselines: all three screens whole, plus the Today and Week
   cards, a started workout's checklist, the recovery card, every status badge, both import
   dialogs, every state of the exercise-guide sheet, every state of the Oura card, and a session
   showing what Oura recorded for it — several of which cannot be produced on this machine at all,
@@ -249,12 +249,17 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   a strength session has no distance, a ring on the charger has no heart rate, and a row of dashes
   standing in for them would be worse than their absence.
 
-  **The pairing is same day, nearest in time, one-to-one** (`MatchOuraWorkoutsUseCase`), with a
-  twelve-hour limit so a midnight walk cannot claim a morning session. Deliberately *not* matched on
-  Oura's `activity` word: it is free-form and this app has never seen real values of it, and a rule
-  that silently drops a workout because the word was unexpected is worse than one that occasionally
-  pairs the wrong two things — a wrong pair is visible, a missing one looks like Oura recorded
-  nothing.
+  **The pairing is same day, nearest in time, one-to-one, and the activity has to fit**
+  (`MatchOuraWorkoutsUseCase`), with a twelve-hour limit so a midnight walk cannot claim a morning
+  session.
+
+  The activity check was left out at first, on the argument that `activity` is free-form and a rule
+  that silently drops a workout is worse than one that occasionally mispairs. Real data reversed it:
+  a fortnight held eleven `walking` entries against five `strengthTraining`, so the nearest workout
+  to a 09:00 strength session was almost always a walk, and a 1.8 km stroll was displayed as that
+  morning's strength training. Comparison strips case and punctuation, because Oura writes
+  `strengthTraining` where its own prose writes `strength_training`. An activity with no mapping —
+  `houseWork` is a real returned value — matches nothing, and is listed under its own day instead.
 
   **Heart rate is not a field Oura returns on a workout.** There is none on the object at all, so the
   average and maximum are reduced from the `heartrate` time series over the workout's own window,
