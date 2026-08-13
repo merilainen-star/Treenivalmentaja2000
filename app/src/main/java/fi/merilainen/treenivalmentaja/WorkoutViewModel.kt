@@ -192,6 +192,20 @@ class WorkoutViewModel(
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
   /**
+   * Readiness across the same span the week list scrolls back over, by the day it belongs to.
+   *
+   * Only readiness is read here — sleep and activity stay a today-only reading on the Today card.
+   * A day with no entry is a day Oura has never answered about, same as [todayRecovery]'s `null`.
+   */
+  val recoveryByDay: StateFlow<Map<LocalDate, DailyRecovery>> =
+    ouraRepository
+      .observeRecoveryRange(
+        from = LocalDate.now().minusDays(CALENDAR_DAYS_BACK),
+        to = LocalDate.now(),
+      )
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+  /**
    * Set when a login is waiting for a browser to be opened, and cleared the moment one is.
    *
    * The ViewModel builds the URL — it is the half that knows the PKCE verifier and has to write it

@@ -254,6 +254,18 @@ class OuraRepository internal constructor(
    */
   fun observeDay(date: LocalDate): Flow<DailyRecovery?> =
     dao.observeDailySummary(date.toString()).map { it?.toDomain() }
+
+  /**
+   * Every day Oura has answered about, from [from] to [to] inclusive, keyed by date.
+   *
+   * A day with no row is simply absent from the map — the same "never asked" state [observeDay]
+   * represents as `null`. Days Oura answered about with no score are present with `isEmpty` true,
+   * exactly as [observeDay] would show them.
+   */
+  fun observeRecoveryRange(from: LocalDate, to: LocalDate): Flow<Map<LocalDate, DailyRecovery>> =
+    dao.observeDailySummaries(from.toString(), to.toString()).map { rows ->
+      rows.associate { LocalDate.parse(it.date) to it.toDomain() }
+    }
 }
 
 /**

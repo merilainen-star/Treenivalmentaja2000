@@ -80,7 +80,8 @@ the numbers behind them.
 - Logging what was actually lifted, so a strength session can be compared with the last time it
   was done. Oura holds completed workouts but not per-set loads, so the "history lives in Oura"
   reasoning does not cover this one.
-- Remote AI advisor integration (sending prompt, parsing JSON, user approval flow).
+- Remote AI advisor integration (sending prompt, parsing JSON, user approval flow). See
+  [INSPIRATION.md](INSPIRATION.md) for ideas worth a look if this is ever designed.
 - Strava API integration for richer workout telemetry.
 
 ## Blocked

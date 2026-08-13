@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-13
+
+### Added
+- **Readiness next to each day in the week list**, colour-banded the same way the Today card's
+  readiness label already is (green ≥85, yellow ≥70, red below). Reads the same
+  `oura_daily_summaries` table over the same 28-day span the week already scrolls back through, via
+  a new `observeRecoveryRange` query — no new fetch, no new permission. A day Oura has never
+  answered about shows no badge at all, same as a badge-free rest day; this is not a verdict drawn
+  from a missing measurement.
+- `docs/INSPIRATION.md`: ideas from a friend's training app worth a look if the AI advisor in
+  [ROADMAP.md](docs/ROADMAP.md) is ever designed — not scheduled work, just written down so it
+  is not lost.
+
 ## [Unreleased] - 2026-08-10
 
 ### Added

@@ -153,6 +153,9 @@ interface OuraDao {
   @Query("SELECT * FROM oura_daily_summaries WHERE date = :date")
   fun observeDailySummary(date: String): Flow<OuraDailySummaryEntity?>
 
+  @Query("SELECT * FROM oura_daily_summaries WHERE date BETWEEN :fromDate AND :toDate")
+  fun observeDailySummaries(fromDate: String, toDate: String): Flow<List<OuraDailySummaryEntity>>
+
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun upsertWorkouts(workouts: List<OuraWorkoutEntity>)
 

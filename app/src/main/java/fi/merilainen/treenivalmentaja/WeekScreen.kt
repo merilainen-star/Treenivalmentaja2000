@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
@@ -51,6 +52,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
+import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -58,6 +60,7 @@ import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
 import fi.merilainen.treenivalmentaja.ui.theme.ColorGreen
 import fi.merilainen.treenivalmentaja.ui.theme.ColorRed
+import fi.merilainen.treenivalmentaja.ui.theme.ColorYellow
 
 /** The stateful wrapper: reads the ViewModel and hands plain values down. */
 @Composable
@@ -67,6 +70,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val ouraState by viewModel.ouraState.collectAsState()
     val completedMetrics by viewModel.completedMetrics.collectAsState()
     val unmatchedByDay by viewModel.unmatchedByDay.collectAsState()
+    val recoveryByDay by viewModel.recoveryByDay.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.
@@ -80,6 +84,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         guideState = guideState,
         completedMetrics = completedMetrics,
         unmatchedByDay = unmatchedByDay,
+        recoveryByDay = recoveryByDay,
         onExerciseClick = viewModel::openExerciseGuide,
         onGuideRetry = viewModel::retryExerciseGuide,
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
@@ -99,6 +104,7 @@ fun WeekScreenContent(
     completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
     today: LocalDate = LocalDate.now(),
     unmatchedByDay: Map<LocalDate, List<CompletedSessionMetrics>> = emptyMap(),
+    recoveryByDay: Map<LocalDate, DailyRecovery> = emptyMap(),
 ) {
     Column(
         modifier = Modifier
@@ -148,13 +154,21 @@ fun WeekScreenContent(
                 val dayName = dayLabel(today, dayIndex)
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = dayName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = dayName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        recoveryByDay[today.plusDays(dayIndex.toLong())]?.let { recovery ->
+                            ReadinessBadge(recovery)
+                        }
+                    }
+
                     val loose = unmatchedByDay[today.plusDays(dayIndex.toLong())].orEmpty()
 
                     if (dayWorkouts.isEmpty() && loose.isEmpty()) {
@@ -219,6 +233,36 @@ fun WeekScreenContent(
                 onDismiss = onGuideDismiss,
             )
         }
+    }
+}
+
+/**
+ * A day's readiness, as a single number next to its heading.
+ *
+ * Colour follows the same bands as [DailyRecovery.readinessLabel], so a day the eye slides past
+ * still says something before it is read. Days Oura answered about with no score show no badge at
+ * all — a dash next to every rest day would be noise, not information.
+ */
+@Composable
+private fun ReadinessBadge(recovery: DailyRecovery) {
+    val readiness = recovery.readiness ?: return
+    val color = when {
+        readiness >= 85 -> ColorGreen
+        readiness >= 70 -> ColorYellow
+        else -> ColorRed
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = "$readiness",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+        )
     }
 }
 
