@@ -100,6 +100,17 @@ internal data class IntervalsActivityDto(
   /** Training impulse — the classic heart-rate integral, alongside intervals.icu's own load. */
   val trimp: Double? = null,
   /**
+   * Acute training load as it stood after this activity — fatigue, the short rolling average.
+   *
+   * Stored **because a use is named**, not in case one appears: the fatigue rule sketched in
+   * [ROADMAP.md](../../../../../../../../docs/ROADMAP.md) asks whether total load has outrun what
+   * the plan assumed, and this and [icuCtl] are what answers it. Nothing reads them yet, and the
+   * accessor arrives with that rule.
+   */
+  @Json(name = "icu_atl") val icuAtl: Double? = null,
+  /** Chronic training load — fitness, the long rolling average. See [icuAtl]. */
+  @Json(name = "icu_ctl") val icuCtl: Double? = null,
+  /**
    * Where the activity came from. A documented enum: `STRAVA`, `UPLOAD`, `MANUAL`,
    * `GARMIN_CONNECT`, `OAUTH_CLIENT`, `DROPBOX`, `POLAR`, **`SUUNTO`**, `COROS`, `WAHOO`, `ZWIFT`,
    * `ZEPP`, `CONCEPT2`, `HUAWEI`.

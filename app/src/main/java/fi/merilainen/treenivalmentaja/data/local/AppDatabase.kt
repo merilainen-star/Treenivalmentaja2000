@@ -33,7 +33,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       OuraWorkoutEntity::class,
       IntervalsActivityEntity::class,
     ],
-  version = 9,
+  version = 10,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -44,9 +44,9 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
   // **Nothing is lost by that drop.** Strava was never connected to a real account, so the table
   // it created has always been empty on every device this build reaches. Were that not true, this
   // would be a hand-written migration copying rows across instead.
-  // 7→8 and 8→9 are additive again: nullable columns on `intervals_activities` — cadence and
-  // intensity, then the speeds, the recording time and the two extra load figures. A row stored
-  // before any of them keeps its values and gets nulls.
+  // 7→8, 8→9 and 9→10 are additive again: nullable columns on `intervals_activities` — cadence and
+  // intensity, then the speeds, the recording time and the load figures, then acute and chronic
+  // load. A row stored before any of them keeps its values and gets nulls.
   autoMigrations =
     [
       AutoMigration(from = 4, to = 5),
@@ -54,6 +54,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 6, to = 7, spec = AppDatabase.DropStravaActivities::class),
       AutoMigration(from = 7, to = 8),
       AutoMigration(from = 8, to = 9),
+      AutoMigration(from = 9, to = 10),
     ],
 )
 @TypeConverters(Converters::class)

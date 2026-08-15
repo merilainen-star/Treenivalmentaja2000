@@ -23,6 +23,7 @@ import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnection
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
+import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsSyncResult
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
@@ -472,6 +473,53 @@ class WorkoutViewModel(
   /** The last sync's failure, or `null`. Shown on the card as a footnote, never as a dialog. */
   private val _intervalsSyncFailure = MutableStateFlow<String?>(null)
   val intervalsSyncFailure: StateFlow<String?> = _intervalsSyncFailure.asStateFlow()
+
+  // ------------------------------------------------------------------ backfill
+
+  /**
+   * Non-null while a backfill is running, counting the activities stored so far.
+   *
+   * A count rather than a percentage: the walk does not know how many years it will take until it
+   * meets the end of the history, so a progress bar would be inventing a denominator.
+   */
+  private val _backfillProgress = MutableStateFlow<Int?>(null)
+  val backfillProgress: StateFlow<Int?> = _backfillProgress.asStateFlow()
+
+  /** What the last backfill managed, shown once and then dismissed. */
+  private val _backfillResult = MutableStateFlow<IntervalsBackfillResult?>(null)
+  val backfillResult: StateFlow<IntervalsBackfillResult?> = _backfillResult.asStateFlow()
+
+  /**
+   * Re-reads the whole history, so a column added today gets values for activities from before it.
+   *
+   * The ordinary sync looks back a fortnight; without this, an activity older than that keeps a
+   * null in every column added after it was first stored.
+   */
+  fun backfillIntervals() {
+    val repository = intervalsRepository ?: return
+    if (intervalsState.value == IntervalsConnectionState.NotConfigured) return
+    if (_backfillProgress.value != null) return
+    viewModelScope.launch {
+      _backfillProgress.value = 0
+      _backfillResult.value = null
+      val today = LocalDate.now()
+      val result =
+        repository.backfill(
+          today = today,
+          zone = ZoneId.systemDefault(),
+          onYearDone = { stored -> _backfillProgress.value = stored },
+        )
+      // Older activities have no planned sessions to belong to, so matching stays on its usual
+      // window rather than sweeping years of history for pairs that cannot exist.
+      matchIntervalsActivities(today)
+      _backfillProgress.value = null
+      _backfillResult.value = result
+    }
+  }
+
+  fun dismissBackfillResult() {
+    _backfillResult.value = null
+  }
 
   // ------------------------------------------------------------------ raw-data diagnostics
 

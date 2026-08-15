@@ -172,6 +172,15 @@ data class IntervalsActivityEntity(
   /** Training impulse — the classic heart-rate integral. */
   val trimp: Double? = null,
   /**
+   * Acute and chronic training load as they stood after this activity — fatigue and fitness.
+   *
+   * Stored because a use is named: the fatigue rule in `docs/ROADMAP.md` asks whether total load
+   * has outrun what the plan assumed, and these two are what answers it. **Nothing reads them
+   * yet**, and the accessor arrives with that rule rather than ahead of it.
+   */
+  val atl: Double? = null,
+  val ctl: Double? = null,
+  /**
    * Which service the activity came from: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … A documented
    * enum, stored because it answers "did this really come off the watch". Never filtered on — a
    * run uploaded by hand is still that run.

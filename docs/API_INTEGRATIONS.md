@@ -237,6 +237,7 @@ never sent.
 | `calories` | Present, where Strava's summary endpoint had none. |
 | `icu_training_load` | intervals.icu's own load figure. |
 | `icu_intensity` | Effort relative to threshold — the number that tells a *hard* 5 km from an easy one of the same distance and time. **Scale undocumented**; see below. |
+| `icu_atl`, `icu_ctl` | Acute and chronic training load — fatigue and fitness. Stored for the fatigue rule in [ROADMAP.md](ROADMAP.md); nothing reads them yet. |
 | `source` | A documented enum: `STRAVA`, `UPLOAD`, `MANUAL`, `GARMIN_CONNECT`, `OAUTH_CLIENT`, `DROPBOX`, `POLAR`, **`SUUNTO`**, `COROS`, `WAHOO`, `ZWIFT`, `ZEPP`, `CONCEPT2`, `HUAWEI`. Stored, never filtered on. |
 | `device_name` | Kept for diagnostics; shown nowhere. |
 
@@ -310,6 +311,25 @@ credentials", so the app's message for that case has to cover both, and it does.
 | `GET /api/v1/athlete/0/activities` | the sync, with `fields` naming eighteen columns |
 | `GET /api/v1/athlete/0/activities` | the raw-data screen, with **no** `fields`, so all 183 arrive |
 | `GET /api/v1/activity/{id}` | one activity in full on the raw-data screen, `intervals=true` |
+
+### Re-reading the history
+
+`IntervalsRepository.backfill` walks backwards a year at a time and stores what comes back, and
+exists because **adding a column does not fill it**: the ordinary sync looks back a fortnight, so
+every activity older than that keeps a null in each column added since it was first stored. That
+happened at v8, v9 and v10 in turn.
+
+A year per request rather than one span, because the endpoint has no pagination and the whole
+history would arrive as a single array. It stops after **two consecutive empty years** — one is a
+season off, two is the end of the history — with a twenty-year backstop in the spirit of the page
+cap on the client. It is safe to repeat: rows are keyed on the service's own activity id, the same
+property the overlapping sync window relies on.
+
+This is the reason the app does **not** store raw JSON for every activity against some future need.
+intervals.icu is the system of record and this app is a cache; when a field turns out to be wanted,
+the answer is a column and a backfill, not a hoard. Storing all 183 fields would also put weight,
+resting heart rate and threshold heart rate in the database with nothing reading them, which is
+exactly what [PRIVACY.md](PRIVACY.md) exists to prevent.
 
 ### The raw-data screen
 

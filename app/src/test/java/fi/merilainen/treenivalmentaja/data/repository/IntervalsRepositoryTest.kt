@@ -182,6 +182,105 @@ class IntervalsRepositoryTest {
     assertTrue(result.canRetry)
   }
 
+  // ------------------------------------------------------------------ backfill
+
+  /**
+   * The reason backfill exists: adding a column does not fill it.
+   *
+   * The ordinary sync looks back a fortnight, so an activity older than that keeps a null in every
+   * column added after it was first stored. This walks the whole history instead.
+   */
+  @Test
+  fun `backfill walks back a year at a time and stores what it finds`() = runTest(dispatcher) {
+    // Every year answers with one activity, so the walk only ends at the cap.
+    var request = 0
+    server.removeContext("/")
+    server.createContext("/") { exchange: HttpExchange ->
+      val bytes = oneRunBodyWrapped("i${request++}", "2026-08-15T06:00:00Z").toByteArray()
+      exchange.sendResponseHeaders(200, bytes.size.toLong())
+      exchange.responseBody.use { it.write(bytes) }
+    }
+
+    val result = repository.backfill(today = TO, zone = zone, maxYears = 3)
+
+    assertEquals(3, result.yearsScanned)
+    assertEquals(3, result.activities)
+    assertNull(result.failure)
+    assertEquals(3, db.intervalsDao().getActivitiesBetween(0, Long.MAX_VALUE).size)
+  }
+
+  /**
+   * One empty year is a season off; two is the end of the history. Stopping on the first would
+   * truncate an athlete who took a winter away from running.
+   */
+  @Test
+  fun `backfill stops after two consecutive empty years, not one`() = runTest(dispatcher) {
+    // Year 0 has one, year 1 is empty, year 2 has one, years 3 and 4 are empty.
+    val years = listOf(oneRun("i1"), "[]", oneRun("i2"), "[]", "[]", oneRun("i3"))
+    var request = 0
+    server.removeContext("/")
+    server.createContext("/") { exchange: HttpExchange ->
+      val bytes = years.getOrElse(request++) { "[]" }.toByteArray()
+      exchange.sendResponseHeaders(200, bytes.size.toLong())
+      exchange.responseBody.use { it.write(bytes) }
+    }
+
+    val result = repository.backfill(today = TO, zone = zone, maxYears = 10)
+
+    // Scanned years 0..4 and stopped at the second consecutive empty, never reaching year 5.
+    assertEquals(5, result.yearsScanned)
+    assertEquals(2, result.activities)
+  }
+
+  /** The whole point of keying rows on the service's id: a backfill over a synced range is safe. */
+  @Test
+  fun `backfill does not duplicate what the sync already stored`() = runTest(dispatcher) {
+    body = oneRun(id = "i1")
+    repository.sync(FROM, TO, zone)
+
+    repository.backfill(today = TO, zone = zone, maxYears = 2)
+
+    assertEquals(1, db.intervalsDao().getActivitiesBetween(0, Long.MAX_VALUE).size)
+  }
+
+  /**
+   * A top-up, not a transaction: a year that arrived before the failure is worth keeping, and the
+   * result says how far it got rather than pretending nothing happened.
+   */
+  @Test
+  fun `a failure part-way keeps what was already stored and reports it`() = runTest(dispatcher) {
+    var request = 0
+    server.removeContext("/")
+    server.createContext("/") { exchange: HttpExchange ->
+      if (request++ == 0) {
+        val bytes = oneRun("i1").toByteArray()
+        exchange.sendResponseHeaders(200, bytes.size.toLong())
+        exchange.responseBody.use { it.write(bytes) }
+      } else {
+        exchange.sendResponseHeaders(503, 0)
+        exchange.responseBody.use { }
+      }
+    }
+
+    val result = repository.backfill(today = TO, zone = zone, maxYears = 5)
+
+    assertEquals(1, result.activities)
+    assertTrue(result.failure.orEmpty(), result.failure != null)
+    assertEquals(1, db.intervalsDao().getActivitiesBetween(0, Long.MAX_VALUE).size)
+  }
+
+  /** An athlete with no history at all gets two requests and a clean zero, not an error. */
+  @Test
+  fun `an empty account backfills to nothing without failing`() = runTest(dispatcher) {
+    body = "[]"
+
+    val result = repository.backfill(today = TO, zone = zone, maxYears = 10)
+
+    assertEquals(0, result.activities)
+    assertEquals(2, result.yearsScanned)
+    assertNull(result.failure)
+  }
+
   // ------------------------------------------------------------------ matching
 
   @Test

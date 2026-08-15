@@ -114,6 +114,10 @@ or logged.
   or distances to guess whether two records are the same activity.
 - **Rate limits.** The app spends one request per sync. If intervals.icu ever answers `429` with a
   `Retry-After`, the app carries that number rather than inventing one.
+- **Täydennä koko historia** re-reads everything, a year at a time, stopping after two empty years.
+  Worth pressing after an app update that adds new fields: the ordinary sync only reaches back a
+  fortnight, so older activities would otherwise keep a blank where the new field should be. Safe to
+  press repeatedly — activities are keyed on their intervals.icu id, so nothing duplicates.
 - **Removing the key** (*Poista avain*) deletes it and the cached activities from the phone. Your
   training plan is untouched.
 - Activities uploaded by hand are read too — the app records where each came from (`SUUNTO`,

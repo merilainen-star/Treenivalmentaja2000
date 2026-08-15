@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
+import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 
 /**
  * The intervals.icu connection, as a function of its state.
@@ -47,6 +48,10 @@ fun IntervalsCard(
   onClearApiKey: () -> Unit = {},
   onDismissFailure: () -> Unit = {},
   onOpenRawData: () -> Unit = {},
+  backfillProgress: Int? = null,
+  backfillResult: IntervalsBackfillResult? = null,
+  onBackfill: () -> Unit = {},
+  onDismissBackfillResult: () -> Unit = {},
 ) {
   Card(
     modifier = Modifier.fillMaxWidth(),
@@ -66,10 +71,26 @@ fun IntervalsCard(
       when (state) {
         IntervalsConnectionState.NotConfigured -> KeyNeeded(onSaveApiKey)
         IntervalsConnectionState.Configured ->
-          Stored(tested = null, onTest = onTestApiKey, onClear = onClearApiKey)
+          Stored(
+            tested = null,
+            onTest = onTestApiKey,
+            onClear = onClearApiKey,
+            backfillProgress = backfillProgress,
+            backfillResult = backfillResult,
+            onBackfill = onBackfill,
+            onDismissBackfillResult = onDismissBackfillResult,
+          )
         IntervalsConnectionState.Testing -> Testing()
         is IntervalsConnectionState.Verified ->
-          Stored(tested = state.activities, onTest = onTestApiKey, onClear = onClearApiKey)
+          Stored(
+            tested = state.activities,
+            onTest = onTestApiKey,
+            onClear = onClearApiKey,
+            backfillProgress = backfillProgress,
+            backfillResult = backfillResult,
+            onBackfill = onBackfill,
+            onDismissBackfillResult = onDismissBackfillResult,
+          )
         is IntervalsConnectionState.Failed ->
           Failed(state.message, onTestApiKey, onClearApiKey, onDismissFailure)
       }
@@ -176,7 +197,15 @@ private fun KeyNeeded(onSave: (String) -> Unit) {
  *   broken key that is fine.
  */
 @Composable
-private fun Stored(tested: Int?, onTest: () -> Unit, onClear: () -> Unit) {
+private fun Stored(
+  tested: Int?,
+  onTest: () -> Unit,
+  onClear: () -> Unit,
+  backfillProgress: Int?,
+  backfillResult: IntervalsBackfillResult?,
+  onBackfill: () -> Unit,
+  onDismissBackfillResult: () -> Unit,
+) {
   Text(
     text = "API-avain on tallennettu.",
     style = MaterialTheme.typography.bodyMedium,
@@ -211,12 +240,70 @@ private fun Stored(tested: Int?, onTest: () -> Unit, onClear: () -> Unit) {
   )
   HorizontalDivider()
   OutlinedButton(onClick = onTest, modifier = Modifier.fillMaxWidth()) { Text("Testaa yhteys") }
+
+  Backfill(
+    progress = backfillProgress,
+    result = backfillResult,
+    onBackfill = onBackfill,
+    onDismissResult = onDismissBackfillResult,
+  )
+
   TextButton(
     onClick = onClear,
     modifier = Modifier.fillMaxWidth(),
     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
   ) {
     Text("Poista avain")
+  }
+}
+
+/**
+ * Re-reading the whole history, and why anyone would.
+ *
+ * The ordinary sync looks back a fortnight, so a column added today never gets a value for an
+ * activity older than that — the field is there and nothing will ever go and fetch it. This is the
+ * answer to that, and the reason the app does not hoard raw JSON against the day a new field is
+ * wanted: intervals.icu still has it, so it can simply be asked again.
+ *
+ * The progress is a count, not a bar. The walk does not know how many years it will take until it
+ * reaches the end of the history, so a percentage would be inventing a denominator.
+ */
+@Composable
+private fun Backfill(
+  progress: Int?,
+  result: IntervalsBackfillResult?,
+  onBackfill: () -> Unit,
+  onDismissResult: () -> Unit,
+) {
+  Text(
+    text =
+      "Tavallinen haku ulottuu kahteen viikkoon. Täydennys hakee koko historian uudelleen, " +
+        "jotta myös vanhoihin harjoituksiin saadaan myöhemmin lisätyt tiedot.",
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  OutlinedButton(
+    onClick = onBackfill,
+    modifier = Modifier.fillMaxWidth(),
+    enabled = progress == null,
+  ) {
+    Text(if (progress == null) "Täydennä koko historia" else "Haetaan… $progress harjoitusta")
+  }
+  if (progress != null) {
+    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+  }
+  result?.let {
+    Text(
+      text =
+        if (it.failure != null)
+          "Täydennys keskeytyi: ${it.failure} Ehdittiin hakea ${it.activities} harjoitusta."
+        else "Täydennetty: ${it.activities} harjoitusta ${it.yearsScanned} vuoden ajalta.",
+      style = MaterialTheme.typography.bodySmall,
+      color =
+        if (it.failure != null) MaterialTheme.colorScheme.error
+        else MaterialTheme.colorScheme.primary,
+    )
+    TextButton(onClick = onDismissResult) { Text("Selvä") }
   }
 }
 

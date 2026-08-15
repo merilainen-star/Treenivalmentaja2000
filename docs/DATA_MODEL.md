@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 9 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 10 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -192,6 +192,9 @@ The order of priority is:
     because it answers "did this come off the watch", **never filtered on**: a run uploaded by hand
     is still that run
   - `hrLoad` (Int?), `trimp` (Double?) — intervals.icu's other two load figures
+  - `atl` (Double?), `ctl` (Double?) — acute and chronic load, i.e. fatigue and fitness. Stored
+    because a use is **named** (the fatigue rule in [ROADMAP.md](ROADMAP.md)), not in case one
+    appears; nothing reads them yet
   - `deviceName` (String?) — kept for diagnostics, shown nowhere
   - `fetchedAtUtc` (Long)
 - **Nullability:** The same rule as the Oura tables. A treadmill run has no distance, a run without
@@ -260,7 +263,14 @@ which would read as a runner who never took a step.
 
 Version 9 adds `recordingTimeSec`, `avgSpeedMps`, `maxSpeedMps`, `hrLoad` and `trimp`, likewise by
 auto migration. `avgSpeedMps` is the one that matters: an activity synced before it cannot show the
-watch's own duration until it is fetched again, and gets a null rather than a zero speed.
+watch's own duration until it is fetched again, and gets a null rather than a zero speed. Version 10
+adds `atl` and `ctl`.
+
+**Adding a column does not fill it**, and that is worth stating because three versions in a row now
+have run into it. The ordinary sync looks back a fortnight, so an activity older than that keeps its
+null forever unless something goes and asks again. The answer is `IntervalsRepository.backfill`,
+which re-reads the whole history a year at a time — not storing raw JSON against the day a field is
+wanted, because intervals.icu still has it and can simply be asked.
 
 The API key and the OAuth tokens, incidentally, never touched the schema at all. They live in
 encrypted `SharedPreferences` rather than in Room
@@ -283,7 +293,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-`app/schemas/` holds `3.json` through `9.json`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `10.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

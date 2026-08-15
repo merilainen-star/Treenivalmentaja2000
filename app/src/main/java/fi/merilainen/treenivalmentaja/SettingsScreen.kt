@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
+import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -57,6 +58,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val rawLoading by viewModel.rawLoading.collectAsState()
     val rawError by viewModel.rawError.collectAsState()
     val rawActivities by viewModel.rawActivityRefs.collectAsState()
+    val backfillProgress by viewModel.backfillProgress.collectAsState()
+    val backfillResult by viewModel.backfillResult.collectAsState()
 
     /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
     var rawDataOpen by rememberSaveable { mutableStateOf(false) }
@@ -168,6 +171,10 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onClearIntervalsApiKey = viewModel::clearIntervalsApiKey,
         onDismissIntervalsFailure = viewModel::dismissIntervalsFailure,
         onOpenIntervalsRawData = { rawDataOpen = true },
+        intervalsBackfillProgress = backfillProgress,
+        intervalsBackfillResult = backfillResult,
+        onIntervalsBackfill = viewModel::backfillIntervals,
+        onDismissIntervalsBackfillResult = viewModel::dismissBackfillResult,
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -231,6 +238,10 @@ fun SettingsScreenContent(
     onClearIntervalsApiKey: () -> Unit = {},
     onDismissIntervalsFailure: () -> Unit = {},
     onOpenIntervalsRawData: () -> Unit = {},
+    intervalsBackfillProgress: Int? = null,
+    intervalsBackfillResult: IntervalsBackfillResult? = null,
+    onIntervalsBackfill: () -> Unit = {},
+    onDismissIntervalsBackfillResult: () -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -340,6 +351,10 @@ fun SettingsScreenContent(
             onClearApiKey = onClearIntervalsApiKey,
             onDismissFailure = onDismissIntervalsFailure,
             onOpenRawData = onOpenIntervalsRawData,
+            backfillProgress = intervalsBackfillProgress,
+            backfillResult = intervalsBackfillResult,
+            onBackfill = onIntervalsBackfill,
+            onDismissBackfillResult = onDismissIntervalsBackfillResult,
         )
 
         Card(

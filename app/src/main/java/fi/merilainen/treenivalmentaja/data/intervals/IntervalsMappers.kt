@@ -56,6 +56,8 @@ internal object IntervalsMappers {
       intensity = icuIntensity?.takeIf { it > 0.0 },
       hrLoad = hrLoad?.takeIf { it > 0 },
       trimp = trimp?.takeIf { it > 0.0 },
+      atl = icuAtl?.takeIf { it > 0.0 },
+      ctl = icuCtl?.takeIf { it > 0.0 },
       source = source?.takeIf { it.isNotBlank() },
       deviceName = deviceName?.takeIf { it.isNotBlank() },
       matchedSessionId = null,

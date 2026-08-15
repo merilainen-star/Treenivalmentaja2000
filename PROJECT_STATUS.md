@@ -12,11 +12,11 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,777,611 B (19.82 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 458 tests, 0 failures, 0 errors |
+| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,793,995 B (19.83 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 463 tests, 0 failures, 0 errors |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug` | 50 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 40 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 41 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
 Replacing the Strava client with the intervals.icu one **shrank** the APK by 16,472 B — 20,761,315 B
 before, 20,744,843 B after — which is the clearest measure of how much smaller a personal API key is
@@ -67,7 +67,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 - **UI shell.** Bottom navigation, splash screen, Today, Week and Settings.
 - **Room persistence.** `TrainingPlan`, `WorkoutSession`, `SessionEvent`, `OuraDailySummary`,
-  `OuraWorkout` and `IntervalsActivity` entities, DAOs and `AppDatabase` at schema version 9.
+  `OuraWorkout` and `IntervalsActivity` entities, DAOs and `AppDatabase` at schema version 10.
   `WorkoutViewModel` observes a Room `Flow`.
 - **Session state machine.** All nine statuses with a validated transition table; a forbidden
   transition is rejected and writes nothing.
@@ -91,7 +91,9 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   `com.sun.net.httpserver`, including a Robolectric pass over the whole path from HTTP response to
   an observable row. **A real account is connected and syncing**, confirmed 2026-08-15; what
   remains unchecked is whether every displayed number matches intervals.icu's own interface for
-  the same activity, and two undocumented fields are read on a stated assumption.
+  the same activity, and two undocumented fields are read on a stated assumption. A **backfill**
+  re-reads the whole history a year at a time, because adding a column does not fill it — the
+  ordinary sync reaches back only a fortnight.
 - **A raw-data diagnostics screen** for intervals.icu, in Settings. Fetches with **no** `fields`
   filter so all 183 fields arrive, returns the response body as text without parsing it, and shows
   it with whitespace-only pretty-printing. Also fetches one activity in full from the documented
@@ -108,7 +110,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` and `TIMEZONE_CHANGED`, with a notification-permission
   check in Settings.
 - **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`, and
-  `MIGRATION_3_4` (hand-written) plus the 4 → 5, 5 → 6, 6 → 7, 7 → 8 and 8 → 9 auto migrations each covered by an
+  `MIGRATION_3_4` (hand-written) plus the 4 → 5, 5 → 6, 6 → 7, 7 → 8, 8 → 9 and 9 → 10 auto migrations each covered by an
   instrumented test that runs it against a populated database of the older version. 6 → 7 is the
   first that drops a table, declared with a `@DeleteTable` spec so Room knows the removal is
   deliberate rather than a rename. There is deliberately **no**

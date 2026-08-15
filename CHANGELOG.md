@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-16 (second entry)
+
+### Added
+- **"Täydennä koko historia"** in Settings → Intervals.icu. Re-reads everything a year at a time
+  and stores what comes back, stopping after two consecutive empty years — one empty year is a
+  season off, two is the end of the history.
+  It exists because **adding a column does not fill it**, which has now bitten three versions in a
+  row: the ordinary sync looks back a fortnight, so when `avgSpeedMps` arrived at v9 every activity
+  older than that kept a null forever. The field was there and nothing would ever go and get its
+  value. Press this after an update that adds fields.
+  Safe to repeat. Rows are keyed on intervals.icu's own activity id, so a backfill over an
+  already-synced range rewrites rather than duplicates — the same property the deliberately
+  overlapping sync window relies on. A failure part-way keeps what already arrived and says how far
+  it got: this is a top-up, not a transaction.
+- `icu_atl` and `icu_ctl` — acute and chronic training load, i.e. fatigue and fitness — stored at
+  schema version 10. **Nothing reads them yet**, and they are here because a use is *named*: the
+  fatigue rule sketched in [ROADMAP.md](docs/ROADMAP.md), which asks whether total load has outrun
+  what the plan assumed. The accessor arrives with that rule.
+
+### Notes
+- This settles a question worth recording: **should the app store the raw JSON of every activity,
+  just in case?** No. intervals.icu is the system of record and this app is a cache, so when a
+  field turns out to be wanted the answer is a column and a backfill rather than a hoard. Storing
+  all 183 fields would also put `icu_weight`, `icu_resting_hr` and `lthr` in the database with
+  nothing reading them — precisely what PRIVACY.md's minimalism exists to prevent, and "just in
+  case" is the exact argument it was written against. The rule the project now follows: **store a
+  field once a use for it can be named.**
+- The backfill's progress is a count, not a percentage. The walk does not know how many years it
+  will take until it meets the end of the history, so a bar would be inventing a denominator.
+
 ## [Unreleased] - 2026-08-16
 
 ### Changed

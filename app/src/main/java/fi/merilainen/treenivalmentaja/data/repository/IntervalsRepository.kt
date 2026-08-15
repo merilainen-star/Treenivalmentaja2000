@@ -34,6 +34,18 @@ sealed interface IntervalsSyncResult {
 }
 
 /**
+ * What a backfill managed, whether or not it finished.
+ *
+ * [activities] counts what was stored before any failure, because a year that arrived is worth
+ * keeping — this is a top-up, not a transaction.
+ */
+data class IntervalsBackfillResult(
+  val activities: Int,
+  val yearsScanned: Int,
+  val failure: String? = null,
+)
+
+/**
  * The one thing that writes to the intervals.icu table.
  *
  * The same contract as [OuraRepository]: Room is the source of truth, the screens observe the
@@ -68,6 +80,62 @@ class IntervalsRepository internal constructor(
             ?.retryAfterSeconds,
       )
     }
+
+  /**
+   * Re-reads the athlete's whole history, a year at a time, and stores what comes back.
+   *
+   * **This exists because adding a column does not fill it.** The ordinary sync looks back a
+   * fortnight, so when `avgSpeedMps` arrived at schema v9 every activity older than that kept a
+   * null forever — the new column was there and nothing would ever go and get its value. The
+   * answer is not to hoard raw JSON against that day but to be able to ask again, which this does.
+   *
+   * A year per request rather than one enormous range: the response has no pagination, so the
+   * whole span would arrive as a single array. It walks backwards and **stops after two
+   * consecutive empty years** — one empty year is a season off, two is the end of the history.
+   * [maxYears] is the backstop, in the spirit of the page cap on the client: a loop that cannot
+   * end is worse than one that gives up.
+   *
+   * Safe to run repeatedly. Rows are keyed on intervals.icu's own activity id, so this rewrites
+   * rather than duplicates — the same property the overlapping sync window relies on.
+   *
+   * @param onYearDone called after each year with the running total, so a screen can count up.
+   */
+  suspend fun backfill(
+    today: LocalDate,
+    zone: ZoneId,
+    maxYears: Int = MAX_BACKFILL_YEARS,
+    onYearDone: (Int) -> Unit = {},
+  ): IntervalsBackfillResult {
+    var stored = 0
+    var emptyYears = 0
+    var scanned = 0
+    for (year in 0 until maxYears) {
+      val to = today.minusYears(year.toLong())
+      val from = today.minusYears(year + 1L)
+      val rows =
+        try {
+          IntervalsMappers.toActivities(client.activities(from, to), clock(), zone)
+        } catch (e: IntervalsException) {
+          // Whatever was stored before the failure stays stored: this is a top-up, not a
+          // transaction, and a year that did arrive is worth keeping.
+          return IntervalsBackfillResult(
+            activities = stored,
+            yearsScanned = scanned,
+            failure = e.message ?: "Intervals.icu-tietojen haku epäonnistui.",
+          )
+        }
+      scanned++
+      if (rows.isEmpty()) {
+        if (++emptyYears >= EMPTY_YEARS_BEFORE_STOPPING) break
+      } else {
+        emptyYears = 0
+        dao.upsertActivities(rows)
+        stored += rows.size
+      }
+      onYearDone(stored)
+    }
+    return IntervalsBackfillResult(activities = stored, yearsScanned = scanned)
+  }
 
   /**
    * The activities response as the server sends it, for the diagnostics screen. **Stores nothing.**
@@ -149,6 +217,17 @@ class IntervalsRepository internal constructor(
         .groupBy { it.matchedSessionId!! }
         .mapValues { (_, forSession) -> forSession.maxBy { it.movingTimeSec }.toMetrics() }
     }
+
+  private companion object {
+    /**
+     * Far past any real training history, and low enough that a service answering oddly ends the
+     * walk rather than looping. Twenty years of requests is twenty requests.
+     */
+    const val MAX_BACKFILL_YEARS = 20
+
+    /** One empty year is a season off; two is the end of the history. */
+    const val EMPTY_YEARS_BEFORE_STOPPING = 2
+  }
 }
 
 private fun IntervalsActivityEntity.toMetrics(): CompletedRunMetrics =

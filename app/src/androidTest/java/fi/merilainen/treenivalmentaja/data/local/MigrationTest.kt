@@ -318,4 +318,35 @@ class MigrationTest {
     assertTrue(activities.isNull(activities.getColumnIndex("trimp")))
     activities.close()
   }
+
+  /**
+   * Version 10 adds acute and chronic load.
+   *
+   * Additive, and the assertion is the familiar one: an activity stored before them gets nulls
+   * rather than zeros. A zero chronic load would read as an athlete with no fitness at all, which
+   * is a different and much more alarming claim than "not known".
+   */
+  @Test
+  fun migrate9To10() {
+    var db = helper.createDatabase(TEST_DB, 9)
+
+    db.execSQL(
+      """
+      INSERT INTO `intervals_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `recordingTimeSec`, `distanceMeters`, `avgSpeedMps`, `maxSpeedMps`, `avgHeartRate`, `maxHeartRate`, `avgCadence`, `elevationGainMeters`, `calories`, `trainingLoad`, `intensity`, `hrLoad`, `trimp`, `source`, `deviceName`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES ('i176132319', 'Afternoon Run', 'Run', 1786889278000, 3226, 3751, 9520.0, 3.096, 3.71, 148, 174, 81, 77.0, 842, 62, 77.13892, 62, 92.35979, 'SUUNTO', 'SUUNTO Suunto 5', 'session1', 1786889278000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 10, true)
+
+    val activities = db.query("SELECT * FROM intervals_activities")
+    assertTrue(activities.moveToFirst())
+    assertEquals("i176132319", activities.getString(activities.getColumnIndex("id")))
+    assertEquals(3.096, activities.getDouble(activities.getColumnIndex("avgSpeedMps")), 0.0001)
+    assertEquals(62, activities.getInt(activities.getColumnIndex("hrLoad")))
+    assertTrue(activities.isNull(activities.getColumnIndex("atl")))
+    assertTrue(activities.isNull(activities.getColumnIndex("ctl")))
+    activities.close()
+  }
 }

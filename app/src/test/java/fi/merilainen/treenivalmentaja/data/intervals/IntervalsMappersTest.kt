@@ -38,6 +38,8 @@ class IntervalsMappersTest {
             totalElevationGain = 42.0,
             calories = 540,
             icuTrainingLoad = 78,
+            icuAtl = 14.986127,
+            icuCtl = 11.150764,
             source = "SUUNTO",
             deviceName = "Suunto Race",
           )
@@ -56,6 +58,10 @@ class IntervalsMappersTest {
     assertEquals(540, row.calories)
     assertEquals(78, row.trainingLoad)
     assertEquals("SUUNTO", row.source)
+    // Acute and chronic load. Nothing reads them yet — the fatigue rule in ROADMAP.md is what
+    // will — but they are stored because that use is named rather than hypothetical.
+    assertEquals(14.986127, row.atl!!, 0.000001)
+    assertEquals(11.150764, row.ctl!!, 0.000001)
     // Never decided by the parser — matching is a training question.
     assertNull(row.matchedSessionId)
   }
