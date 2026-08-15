@@ -1,9 +1,10 @@
 # Inspiration
 
 Not a roadmap. This is a parking lot for ideas seen elsewhere that might be worth a proper design
-someday — none of it is scheduled, and nothing here should be read as a commitment. See
-[ROADMAP.md](ROADMAP.md) for what is actually planned; "Remote AI advisor integration" is listed
-there under **Later** and is the only thing below with any standing at all.
+someday. See [ROADMAP.md](ROADMAP.md) for what is actually planned — since 2026-08-15 its Next
+Milestone lays out a phased path to an AI coach (Strava first, then a deterministic readiness
+rule, then read-only AI comments, then AI-proposed changes behind user approval), and the ideas
+below fed that plan. What has not been adopted there remains just an idea.
 
 ## AI coach, seen in a friend's app (2026-08)
 
