@@ -125,7 +125,10 @@ private fun IntervalsActivityEntity.toMetrics(): CompletedRunMetrics =
     distanceKm = distanceMeters?.let { it / 1000.0 },
     avgHeartRate = avgHeartRate,
     maxHeartRate = maxHeartRate,
+    avgCadence = avgCadence,
     elevationGainMeters = elevationGainMeters?.roundToInt(),
     calories = calories,
     trainingLoad = trainingLoad,
+    intensity = intensity,
+    deviceName = deviceName,
   )

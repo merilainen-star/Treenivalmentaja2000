@@ -215,6 +215,96 @@ class IntervalsMappersTest {
     assertEquals("5:01 /km", metrics(movingTimeSec = 1806, distanceKm = 6.0).paceText)
   }
 
+  // ------------------------------------------------------------------ distance and intensity
+
+  /**
+   * The specification describes neither `distance` nor `icu_distance` and does not say how they
+   * differ, so the mapper states a preference instead of pretending to know: intervals.icu's own
+   * field wins.
+   */
+  @Test
+  fun `icu_distance is preferred over distance`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "a",
+            type = "Run",
+            startDate = "2026-08-15T06:00:00Z",
+            movingTime = 1800,
+            distance = 5000.0,
+            icuDistance = 5120.0,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    assertEquals(5120.0, rows.single().distanceMeters!!, 0.001)
+  }
+
+  /** And falls back, so an activity carrying only the plain field still has a distance. */
+  @Test
+  fun `distance is used when icu_distance is absent`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "a",
+            type = "Run",
+            startDate = "2026-08-15T06:00:00Z",
+            movingTime = 1800,
+            distance = 5000.0,
+            icuDistance = null,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    assertEquals(5000.0, rows.single().distanceMeters!!, 0.001)
+  }
+
+  /** Cadence is a float in the schema but reads as whole steps per minute. */
+  @Test
+  fun `cadence is rounded to whole steps per minute`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "a",
+            type = "Run",
+            startDate = "2026-08-15T06:00:00Z",
+            movingTime = 1800,
+            averageCadence = 167.6,
+            icuIntensity = 0.78,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    assertEquals(168, rows.single().avgCadence)
+    // Intensity is stored **raw**: normalising on the way in would bake a guess into the database.
+    assertEquals(0.78, rows.single().intensity!!, 0.0001)
+  }
+
+  /**
+   * The API's scale for intensity is undocumented, so the reading is normalised at display time
+   * and bounded so that no real value is ambiguous — a fraction above 3.0 and an intensity above
+   * 300 % are both impossible for a training session.
+   */
+  @Test
+  fun `intensity reads as a percentage whichever scale the service used`() {
+    assertEquals(78, metrics(1800, 5.0).copy(intensity = 0.78).intensityPercent)
+    assertEquals(78, metrics(1800, 5.0).copy(intensity = 78.0).intensityPercent)
+  }
+
+  @Test
+  fun `an absent intensity stays absent rather than becoming zero percent`() {
+    assertNull(metrics(1800, 5.0).copy(intensity = null).intensityPercent)
+  }
+
   private fun metrics(movingTimeSec: Long, distanceKm: Double?) =
     CompletedRunMetrics(
       activityId = "i1",

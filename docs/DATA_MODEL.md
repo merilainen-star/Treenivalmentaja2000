@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 5 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 8 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -155,6 +155,9 @@ The order of priority is:
 - **Purpose:** Represents an activity read from intervals.icu, where the Suunto watch's recordings
   arrive — the running telemetry Oura does not carry. Added in schema version 7, replacing the
   `strava_activities` table of version 6.
+- **Distance:** taken from `icu_distance` when present, otherwise `distance`. The specification
+  describes neither and does not say how they differ, so this is a stated preference with a
+  fallback rather than a documented fact.
 - **Primary Key:** `id` (**String** — intervals.icu's own activity id, e.g. `i84461234`). A string
   rather than the number Strava used, and what makes the sync idempotent: a re-fetched activity
   overwrites itself instead of arriving twice. Nothing compares start times or distances to guess
@@ -174,8 +177,12 @@ The order of priority is:
   - `distanceMeters` (Double?)
   - `avgHeartRate` (Int?), `maxHeartRate` (Int?) — absent without a sensor
   - `elevationGainMeters` (Double?)
+  - `avgCadence` (Int?) — steps per minute
   - `calories` (Int?) — present here, where Strava's summary endpoint carried none
   - `trainingLoad` (Int?) — intervals.icu's own `icu_training_load`
+  - `intensity` (Double?) — `icu_intensity`, **stored exactly as the service sent it**. Its scale is
+    undocumented, so normalising on the way in would bake a guess into the database where it could
+    never be re-examined; the interpretation lives in `CompletedRunMetrics.intensityPercent`
   - `source` (String?) — a documented enum: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … Stored
     because it answers "did this come off the watch", **never filtered on**: a run uploaded by hand
     is still that run
@@ -241,6 +248,10 @@ all, which is the right default: a table present in one schema and absent from t
 genuinely ambiguous. Nothing was lost by the drop — Strava was never connected to a real account,
 so the table has always been empty on every device.
 
+Version 8 is additive again: `avgCadence` and `intensity` on `intervals_activities`, by an auto
+migration. An activity stored before them keeps its values and gets nulls — not a zero cadence,
+which would read as a runner who never took a step.
+
 The API key and the OAuth tokens, incidentally, never touched the schema at all. They live in
 encrypted `SharedPreferences` rather than in Room
 ([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
@@ -262,7 +273,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-`app/schemas/` holds `3.json` through `7.json`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `8.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

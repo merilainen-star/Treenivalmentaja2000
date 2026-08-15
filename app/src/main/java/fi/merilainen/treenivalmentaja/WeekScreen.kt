@@ -393,6 +393,7 @@ fun WorkoutCardWeek(
                     RunMetricsRow(
                         metrics = it,
                         style = MaterialTheme.typography.bodySmall,
+                        compact = true,
                     )
                 }
             }

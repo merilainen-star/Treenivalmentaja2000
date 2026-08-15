@@ -176,9 +176,9 @@ about a day, and is intervals.icu now.
 reason the Oura client is. The setup a user performs is in [INTERVALS_SETUP.md](INTERVALS_SETUP.md).
 Written against the vendored [`docs/api/intervals-icu-openapi.json`](api/intervals-icu-openapi.json)
 — OpenAPI 3.0.1, 117 paths, 110 schemas — fetched from the service's own `/api/v1/docs`, so field
-names and types were read rather than remembered. **No real account has been connected yet**: the
-tests run against a local HTTP server, so what is verified is the client's behaviour, not that
-intervals.icu's answers match these shapes.)*
+names and types were read rather than remembered. **A real account is now connected and the app
+fetches from it**, confirmed 2026-08-15. What no one has checked field by field is whether every
+number it displays matches what intervals.icu's own interface shows for the same activity.)*
 
 ### Why this and not Strava
 
@@ -233,13 +233,34 @@ never sent.
 | `distance` | Metres. |
 | `average_heartrate`, `max_heartrate` | Integers here, unlike Strava's doubles. |
 | `total_elevation_gain` | Metres. |
+| `average_cadence` | Steps per minute. A float in the schema, read as a whole number. |
 | `calories` | Present, where Strava's summary endpoint had none. |
-| `icu_training_load` | intervals.icu's own load figure — the one genuinely new measurement this integration brings. |
+| `icu_training_load` | intervals.icu's own load figure. |
+| `icu_intensity` | Effort relative to threshold — the number that tells a *hard* 5 km from an easy one of the same distance and time. **Scale undocumented**; see below. |
 | `source` | A documented enum: `STRAVA`, `UPLOAD`, `MANUAL`, `GARMIN_CONNECT`, `OAUTH_CLIENT`, `DROPBOX`, `POLAR`, **`SUUNTO`**, `COROS`, `WAHOO`, `ZWIFT`, `ZEPP`, `CONCEPT2`, `HUAWEI`. Stored, never filtered on. |
 | `device_name` | Kept for diagnostics; shown nowhere. |
 
 **`pace` is deliberately not read**, though the field exists: its unit is undocumented, and a number
 whose unit is a guess is worse than one derived from two that are known.
+
+### Two fields the specification does not describe
+
+Neither is a small detail, and neither is documented anywhere — not in the schema, which carries no
+`description` for either, and not in the integration cookbook or the forum.
+
+**`distance` versus `icu_distance`.** Both are `number/float`, and nothing says how they differ.
+The client requests **both** and the mapper prefers `icu_distance`, falling back to `distance` — a
+stated preference with a fallback, rather than a choice dressed up as documented fact.
+
+**`icu_intensity`'s scale.** A service of this kind reports intensity either as a fraction of
+threshold (`0.78`) or as a percentage (`78`), and the schema does not say which. The value is
+therefore **stored raw** and normalised only where it is displayed
+(`CompletedRunMetrics.intensityPercent`): at or below 3.0 it is read as a fraction and scaled,
+above that it is already a percentage. The bound is what makes that safe rather than a coin flip —
+a session at 300 % of threshold and a *fraction* above 3.0 are both impossible, so no real value is
+ambiguous, and either reading lands on the number intervals.icu's own interface shows. Keeping the
+raw value in the database means that if this reading is ever proved wrong it is one function to
+correct and no stored data to migrate.
 
 ### Measured, not assumed
 

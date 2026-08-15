@@ -249,4 +249,37 @@ class MigrationTest {
     assertEquals(0, tables.count)
     tables.close()
   }
+
+  /**
+   * Version 8 adds cadence and intensity to `intervals_activities`.
+   *
+   * Additive, so the thing worth proving is the usual one: an activity stored before the columns
+   * existed keeps every value it had and gets nulls for the new ones — not a zero cadence, which
+   * would read as a runner who never took a step.
+   */
+  @Test
+  fun migrate7To8() {
+    var db = helper.createDatabase(TEST_DB, 7)
+
+    db.execSQL(
+      """
+      INSERT INTO `intervals_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `elapsedTimeSec`, `distanceMeters`, `avgHeartRate`, `maxHeartRate`, `elevationGainMeters`, `calories`, `trainingLoad`, `source`, `deviceName`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES ('i84461234', 'Aamulenkki', 'Run', 1754755200000, 2280, 2400, 6200.0, 148, 171, 42.0, 540, 78, 'SUUNTO', 'Suunto Race', 'session1', 1754755200000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 8, true)
+
+    val activities = db.query("SELECT * FROM intervals_activities")
+    assertTrue(activities.moveToFirst())
+    assertEquals("i84461234", activities.getString(activities.getColumnIndex("id")))
+    assertEquals(148, activities.getInt(activities.getColumnIndex("avgHeartRate")))
+    assertEquals(78, activities.getInt(activities.getColumnIndex("trainingLoad")))
+    assertEquals("session1", activities.getString(activities.getColumnIndex("matchedSessionId")))
+    // The point of the new columns: an activity that predates them has none.
+    assertTrue(activities.isNull(activities.getColumnIndex("avgCadence")))
+    assertTrue(activities.isNull(activities.getColumnIndex("intensity")))
+    activities.close()
+  }
 }

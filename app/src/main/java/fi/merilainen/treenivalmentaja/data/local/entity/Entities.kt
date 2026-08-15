@@ -145,10 +145,19 @@ data class IntervalsActivityEntity(
   val distanceMeters: Double? = null,
   val avgHeartRate: Int? = null,
   val maxHeartRate: Int? = null,
+  /** Steps per minute. */
+  val avgCadence: Int? = null,
   val elevationGainMeters: Double? = null,
   val calories: Int? = null,
   /** intervals.icu's own training load — a number neither Oura nor Strava's summary provided. */
   val trainingLoad: Int? = null,
+  /**
+   * intervals.icu's effort relative to threshold, **stored exactly as the service sent it**.
+   *
+   * The scale is undocumented, so normalising on the way in would bake a guess into the database
+   * where it could never be re-examined. Stored raw, interpreted at the point of display.
+   */
+  val intensity: Double? = null,
   /**
    * Which service the activity came from: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … A documented
    * enum, stored because it answers "did this really come off the watch". Never filtered on — a

@@ -47,14 +47,18 @@ whether a key is stored.
 ## What the app reads, and what happens next
 
 Opening the Tänään or Viikko screen fetches the last two weeks of activities. For each one the app
-keeps a dozen fields — sport, start, moving and elapsed time, distance, heart rate, elevation,
-calories and intervals.icu's own training load — out of the 183 the API offers, named explicitly in
-the request so the rest are never sent.
+keeps eighteen fields — sport, start, moving and elapsed time, distance, heart rate, cadence,
+elevation, calories, and intervals.icu's own training load and intensity — out of the 183 the API
+offers, named explicitly in the request so the rest are never sent.
 
 An activity lands under the planned session nearest it in time on the same day, through the **same**
 matcher Oura's workouts go through: the sport has to fit, so a `Run` can claim a running session and
 a `Walk` claims nothing. A matched session shows a "Kello:" line with pace, time, distance and heart
-rate.
+rate, and below it what the body did and what the session cost.
+
+The three numbers on that last line — calories, training load and intensity — are the ones that make
+an *easy* 5 km distinguishable from a hard one of the same distance and duration. Nothing acts on
+that yet; it is captured so that something can.
 
 **A match does not complete a session.** Whether a session counts as done is your statement about
 your own training, not something a watch recording decides — see

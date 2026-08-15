@@ -30,10 +30,21 @@ internal data class IntervalsActivityDto(
   @Json(name = "moving_time") val movingTime: Int? = null,
   /** Seconds start to finish, pauses included. */
   @Json(name = "elapsed_time") val elapsedTime: Int? = null,
-  /** Metres. */
+  /**
+   * Metres, as the recording device reported them.
+   *
+   * Both this and [icuDistance] are declared `number/float` with **no description** in the
+   * specification, and nothing on intervals.icu's forum or docs explains how they differ. The
+   * mapper therefore prefers `icu_distance` — the service's own figure for its own field — and
+   * falls back to this, rather than picking one and pretending the choice was documented.
+   */
   val distance: Double? = null,
+  /** Metres. See [distance] for why both are fetched. */
+  @Json(name = "icu_distance") val icuDistance: Double? = null,
   @Json(name = "average_heartrate") val averageHeartrate: Int? = null,
   @Json(name = "max_heartrate") val maxHeartrate: Int? = null,
+  /** Steps per minute for a run. A float in the schema, though it reads as a whole number. */
+  @Json(name = "average_cadence") val averageCadence: Double? = null,
   @Json(name = "total_elevation_gain") val totalElevationGain: Double? = null,
   /** Kilocalories. Strava's summary endpoint carried none; this one does. */
   val calories: Int? = null,
@@ -42,6 +53,15 @@ internal data class IntervalsActivityDto(
    * summary provides, and the one genuinely new measurement this integration brings.
    */
   @Json(name = "icu_training_load") val icuTrainingLoad: Int? = null,
+  /**
+   * How hard the effort was relative to threshold — the number that tells a *hard* 5 km from an
+   * easy one of the same distance and duration.
+   *
+   * **The scale is undocumented.** The schema says `number/float` and gives no description, and
+   * intervals.icu's own interface presents intensity as a percentage. It is therefore stored raw
+   * and normalised only at the point of display; see `CompletedRunMetrics.intensityPercent`.
+   */
+  @Json(name = "icu_intensity") val icuIntensity: Double? = null,
   /**
    * Where the activity came from. A documented enum: `STRAVA`, `UPLOAD`, `MANUAL`,
    * `GARMIN_CONNECT`, `OAUTH_CLIENT`, `DROPBOX`, `POLAR`, **`SUUNTO`**, `COROS`, `WAHOO`, `ZWIFT`,

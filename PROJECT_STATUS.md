@@ -13,10 +13,10 @@ Every number below was measured on this commit, not carried over from a previous
 | Check | Command | Result |
 | --- | --- | --- |
 | Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,744,843 B (19.78 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 419 tests, 0 failures, 0 errors |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 46 comparisons, 0 changed |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 428 tests, 0 failures, 0 errors |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 50 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 38 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 39 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
 Replacing the Strava client with the intervals.icu one **shrank** the APK by 16,472 B — 20,761,315 B
 before, 20,744,843 B after — which is the clearest measure of how much smaller a personal API key is
@@ -67,7 +67,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 - **UI shell.** Bottom navigation, splash screen, Today, Week and Settings.
 - **Room persistence.** `TrainingPlan`, `WorkoutSession`, `SessionEvent`, `OuraDailySummary`,
-  `OuraWorkout` and `IntervalsActivity` entities, DAOs and `AppDatabase` at schema version 7.
+  `OuraWorkout` and `IntervalsActivity` entities, DAOs and `AppDatabase` at schema version 8.
   `WorkoutViewModel` observes a Room `Flow`.
 - **Session state machine.** All nine statuses with a validated transition table; a forbidden
   transition is rejected and writes nothing.
@@ -88,8 +88,9 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   and a matched session shows pace, calories and intervals.icu's own training load, none of which
   Oura carries. The sync is idempotent on the service's activity id. 50 unit tests against a local
   `com.sun.net.httpserver`, including a Robolectric pass over the whole path from HTTP response to
-  an observable row. **No real account has been connected yet** — what is verified is the client,
-  not that intervals.icu's answers match the shapes it expects.
+  an observable row. **A real account is connected and syncing**, confirmed 2026-08-15; what
+  remains unchecked is whether every displayed number matches intervals.icu's own interface for
+  the same activity, and two undocumented fields are read on a stated assumption.
   This replaced a Strava integration that lived for one day: Strava paywalled its API in June 2026.
   Suunto's own API was ruled out first — its FAQ restricts access to organisations and says
   outright that personal use is not provided for.
@@ -101,7 +102,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` and `TIMEZONE_CHANGED`, with a notification-permission
   check in Settings.
 - **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`, and
-  `MIGRATION_3_4` (hand-written) plus the 4 → 5, 5 → 6 and 6 → 7 auto migrations each covered by an
+  `MIGRATION_3_4` (hand-written) plus the 4 → 5, 5 → 6, 6 → 7 and 7 → 8 auto migrations each covered by an
   instrumented test that runs it against a populated database of the older version. 6 → 7 is the
   first that drops a table, declared with a `@DeleteTable` spec so Room knows the removal is
   deliberate rather than a rename. There is deliberately **no**

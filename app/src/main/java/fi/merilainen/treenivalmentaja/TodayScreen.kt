@@ -419,31 +419,79 @@ fun CompletedMetricsRow(
  * this is the watch's own recording, and intervals.icu is plumbing they should not have to think
  * about while reading a training log.
  *
- * Pace leads: it is the measurement this integration exists for, and the one Oura cannot supply.
- * Training load comes last because it is the least familiar number here.
+ * **Three lines rather than one.** There are up to nine numbers here, and a single `·`-joined
+ * string of them stops being read at about the fourth — the eye has nothing to group by. They are
+ * therefore split by the question each answers: how the running went, what the body did, and what
+ * it cost. Pace leads the first line because it is the measurement this integration exists for and
+ * the one Oura cannot supply.
+ *
+ * @param compact one line instead of three, for the week list's collapsed header. Scanning a
+ *   fortnight for how the running went wants pace and distance and nothing else; the rest is there
+ *   on the day's own card.
  */
 @Composable
 fun RunMetricsRow(
     metrics: CompletedRunMetrics,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
+    compact: Boolean = false,
 ) {
-    val parts = buildList {
+    val finnish = Locale("fi", "FI")
+    val distance = metrics.distanceKm?.let { String.format(finnish, "%.1f km", it) }
+
+    // How the running itself went.
+    val effort = buildList {
         metrics.paceText?.let { add(it) }
         add("${metrics.movingMin} min")
-        metrics.distanceKm?.let { add(String.format(Locale("fi", "FI"), "%.1f km", it)) }
+        distance?.let { add(it) }
+        if (!compact) metrics.elevationGainMeters?.let { add("nousu $it m") }
+    }
+    // What the body was doing while it happened.
+    val body = buildList {
         metrics.avgHeartRate?.let { avg ->
             val max = metrics.maxHeartRate
             add(if (max != null) "syke $avg (max $max)" else "syke $avg")
         }
-        metrics.calories?.let { add("$it kcal") }
-        metrics.elevationGainMeters?.let { add("nousu $it m") }
-        metrics.trainingLoad?.let { add("kuormitus $it") }
+        metrics.avgCadence?.let { add("askeltiheys $it") }
     }
-    Text(
-        text = "Kello: ${parts.joinToString(" · ")}",
-        style = style,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    // What it cost — the three numbers that make a hard 5 km distinguishable from an easy one.
+    val cost = buildList {
+        metrics.calories?.let { add("$it kcal") }
+        metrics.trainingLoad?.let { add("kuormitus $it") }
+        metrics.intensityPercent?.let { add("intensiteetti $it %") }
+    }
+
+    if (compact) {
+        Text(
+            text = "Kello: ${(effort + body.take(1)).joinToString(" · ")}",
+            style = style,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "Kello: ${effort.joinToString(" · ")}",
+            style = style,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // Each line is drawn only when it has something in it — a treadmill run with no strap has
+        // no body line at all, and an empty label would be worse than its absence.
+        if (body.isNotEmpty()) {
+            Text(
+                text = body.joinToString(" · "),
+                style = style,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (cost.isNotEmpty()) {
+            Text(
+                text = cost.joinToString(" · "),
+                style = style,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable

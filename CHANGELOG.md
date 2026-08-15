@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-15 (third entry, after the first real sync)
+
+### Added
+- **Everything the watch can say about a run, grouped so it can be read.** Three more fields come
+  down now — `average_cadence`, `icu_intensity`, and `icu_distance` alongside the plain `distance`
+  — bringing the request to eighteen fields of the 183 the schema declares.
+  The session line is no longer one long string. Nine numbers joined by `·` stop being read at
+  about the fourth, so they are split by the question each answers:
+
+  ```
+  Kello: 6:07 /km · 38 min · 6,2 km · nousu 42 m
+  syke 148 (max 171) · askeltiheys 168
+  540 kcal · kuormitus 78 · intensiteetti 78 %
+  ```
+
+  A line with nothing in it is not drawn at all — a treadmill run with no strap has no middle line
+  rather than an empty label. The week list keeps a one-line compact form, because scanning a
+  fortnight wants pace and distance and nothing else.
+- That last line is the point of this change. Calories, training load and intensity are what make
+  an **easy** 5 km distinguishable from a hard one of the same distance and duration — the app can
+  now see that a session planned as easy was run harder than usual. Nothing acts on it yet; it is
+  captured so that something can.
+- Room schema version 8: `avgCadence` and `intensity` on `intervals_activities`, by auto migration,
+  with an instrumented test proving an activity stored before them keeps its values and gets nulls
+  — not a zero cadence, which would read as a runner who never took a step.
+- Four screenshot baselines for the new layout: the full three-line form, the compact one, a
+  sparse run where two of the three groups are empty, and the whole Today screen with Oura's line
+  and the watch's line under the same session.
+
+### Notes
+- **Two of these fields are documented nowhere** — not in the schema, which carries no description
+  for either, nor in intervals.icu's cookbook or forum.
+  `distance` vs `icu_distance`: both are fetched and `icu_distance` is preferred with a fallback,
+  which is a stated preference rather than a choice dressed up as fact.
+  `icu_intensity`'s **scale** is likewise unstated — a service of this kind reports intensity
+  either as a fraction (`0.78`) or a percentage (`78`). It is therefore stored **raw** and read as
+  a percentage only where it is displayed: at or below 3.0 it is scaled, above that it is already
+  one. The bound is what makes that safe — a session at 300 % of threshold and a fraction above 3.0
+  are both impossible, so no real value is ambiguous. Keeping the raw value means that if this
+  reading is ever proved wrong it is one function to fix and no stored data to migrate.
+- **A real intervals.icu account is now connected and syncing**, confirmed today. The caveat in the
+  entry below is therefore obsolete. What remains unchecked is whether every displayed number
+  matches intervals.icu's own interface for the same activity, field by field.
+
 ## [Unreleased] - 2026-08-15 (later the same day)
 
 ### Changed

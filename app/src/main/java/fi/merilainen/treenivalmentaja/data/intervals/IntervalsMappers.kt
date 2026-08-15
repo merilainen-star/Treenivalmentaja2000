@@ -5,6 +5,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeParseException
+import kotlin.math.roundToInt
 
 /**
  * intervals.icu's documents as this app's rows. The one rule is the Oura mappers' rule:
@@ -38,13 +39,18 @@ internal object IntervalsMappers {
       startTimeUtc = start,
       movingTimeSec = moving,
       elapsedTimeSec = elapsedTime?.takeIf { it > 0 }?.toLong(),
-      distanceMeters = distance?.takeIf { it > 0.0 },
+      // `icu_distance` first: it is the service's own field for its own figure. Neither it nor
+      // `distance` is described in the specification, so this is a stated preference with a
+      // fallback rather than a claim about which is authoritative.
+      distanceMeters = icuDistance?.takeIf { it > 0.0 } ?: distance?.takeIf { it > 0.0 },
       avgHeartRate = averageHeartrate?.takeIf { it > 0 },
       maxHeartRate = maxHeartrate?.takeIf { it > 0 },
+      avgCadence = averageCadence?.takeIf { it > 0.0 }?.roundToInt(),
       // A flat run reports 0.0, and "nousu 0 m" on screen is noise rather than a measurement.
       elevationGainMeters = totalElevationGain?.takeIf { it > 0.0 },
       calories = calories?.takeIf { it > 0 },
       trainingLoad = icuTrainingLoad?.takeIf { it > 0 },
+      intensity = icuIntensity?.takeIf { it > 0.0 },
       source = source?.takeIf { it.isNotBlank() },
       deviceName = deviceName?.takeIf { it.isNotBlank() },
       matchedSessionId = null,

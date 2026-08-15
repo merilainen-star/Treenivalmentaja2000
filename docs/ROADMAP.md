@@ -96,9 +96,11 @@ almost nothing to say about the sessions that matter most.
    API is free for personal use, and it authenticates with a personal API key over HTTP Basic — no
    OAuth, no callback activity, no refresh token, and one fewer exported component than before.
 
-   **Not yet connected to a real account** — the tests run against a local HTTP server, so what is
-   verified is the client, not that intervals.icu's answers match the shapes it expects. The setup
-   steps are in [INTERVALS_SETUP.md](INTERVALS_SETUP.md).
+   **Connected to a real account and fetching**, confirmed 2026-08-15. What remains unchecked is
+   whether every displayed number matches intervals.icu's own interface for the same activity, and
+   two undocumented fields are read on a stated assumption — see
+   [API_INTEGRATIONS.md](API_INTEGRATIONS.md#two-fields-the-specification-does-not-describe). The
+   setup steps are in [INTERVALS_SETUP.md](INTERVALS_SETUP.md).
 2. ~~**Readiness rule, deterministic (Phase A)**~~ — built, and no AI anywhere in it.
    `ReadinessAdviceUseCase` is a pure function of the stored Oura days and the plan: a session left
    open on a day whose readiness was below 70 raises a card the next morning offering to shift the

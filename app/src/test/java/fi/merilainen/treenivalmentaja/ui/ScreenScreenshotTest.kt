@@ -9,6 +9,7 @@ import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.CompletedMetricsRow
+import fi.merilainen.treenivalmentaja.RunMetricsRow
 import fi.merilainen.treenivalmentaja.OuraCard
 import fi.merilainen.treenivalmentaja.RecoveryCard
 import fi.merilainen.treenivalmentaja.SettingsScreenContent
@@ -22,6 +23,7 @@ import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
@@ -69,6 +71,23 @@ class ScreenScreenshotTest {
 
     /** A Monday. The week list's headings show real dates, so they need a date that never moves. */
     private val FIXED_TODAY: LocalDate = LocalDate.of(2026, 8, 10)
+
+    /** A run with every measurement the watch can report, so the full layout has something to draw. */
+    private val fullRunMetrics = CompletedRunMetrics(
+        activityId = "i84461234",
+        sportType = "Run",
+        startTimeUtc = 1_754_845_200_000L,
+        movingTimeSec = 2_280,
+        distanceKm = 6.2,
+        avgHeartRate = 148,
+        maxHeartRate = 171,
+        avgCadence = 168,
+        elevationGainMeters = 42,
+        calories = 540,
+        trainingLoad = 78,
+        intensity = 0.78,
+        deviceName = "Suunto Race",
+    )
 
     private fun strength(dayOffset: Int, id: String) = Workout(
         id = id,
@@ -168,6 +187,64 @@ class ScreenScreenshotTest {
                 durationMin = 45,
                 calories = 260,
             )
+        )
+    }
+
+    /**
+     * Everything the watch can say about a run, laid out in the three groups it is grouped into:
+     * how the running went, what the body did, and what it cost.
+     *
+     * The baseline exists because this is the layout decision — nine numbers on one line stop
+     * being read at about the fourth, and the only way to keep that from creeping back is to pin
+     * what the grouped version looks like.
+     */
+    @Test
+    fun runMetrics_full() = capture("card_run_metrics_full") {
+        RunMetricsRow(fullRunMetrics)
+    }
+
+    /** The week list's collapsed header: pace, time, distance and a heart rate, and no more. */
+    @Test
+    fun runMetrics_compact() = capture("card_run_metrics_compact") {
+        RunMetricsRow(fullRunMetrics, compact = true)
+    }
+
+    /**
+     * A treadmill run with no strap and no GPS. Two of the three groups have nothing in them, so
+     * neither line is drawn at all — an empty label would be worse than its absence.
+     */
+    @Test
+    fun runMetrics_sparse() = capture("card_run_metrics_sparse") {
+        RunMetricsRow(
+            CompletedRunMetrics(
+                activityId = "i2",
+                sportType = "Run",
+                startTimeUtc = 1_754_845_200_000L,
+                movingTimeSec = 1_800,
+            )
+        )
+    }
+
+    /** Under a completed session, beneath Oura's own line for the same run. */
+    @Test
+    fun today_completedWithWatchMetrics() = capture("screen_today_watch_metrics") {
+        TodayScreenContent(
+            workouts = listOf(run(0, "s-66", status = SessionStatus.COMPLETED)),
+            recovery = DailyRecovery(date = "2026-08-10", readiness = 82, sleep = 76),
+            ouraConnected = true,
+            completedMetrics = mapOf(
+                "s-66" to CompletedSessionMetrics(
+                    ouraWorkoutId = "w1",
+                    activityType = "running",
+                    startTimeUtc = 1_754_845_200_000L,
+                    durationMin = 38,
+                    calories = 431,
+                    distanceKm = 6.2,
+                    avgHeartRate = 142,
+                    maxHeartRate = 168,
+                )
+            ),
+            runMetrics = mapOf("s-66" to fullRunMetrics),
         )
     }
 

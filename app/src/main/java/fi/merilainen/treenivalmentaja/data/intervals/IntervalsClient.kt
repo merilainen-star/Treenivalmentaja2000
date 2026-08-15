@@ -164,15 +164,19 @@ internal class IntervalsClient(
     internal const val SELF = "0"
 
     /**
-     * The dozen fields the app reads, of the **183** the `Activity` schema declares.
+     * The eighteen fields the app reads, of the **183** the `Activity` schema declares.
      *
      * Naming them is not a micro-optimisation: without this the service sends every property of
      * every activity in the range, which for a fortnight of training is a large multiple of what
      * is used. The parameter also drops nulls from the response, per the specification.
+     *
+     * `distance` and `icu_distance` are both here because the specification describes neither and
+     * does not say how they differ — see [IntervalsActivityDto.distance].
      */
     internal const val FIELDS =
-      "id,name,type,start_date,start_date_local,moving_time,elapsed_time,distance," +
-        "average_heartrate,max_heartrate,total_elevation_gain,calories,icu_training_load," +
+      "id,name,type,start_date,start_date_local,moving_time,elapsed_time," +
+        "distance,icu_distance,average_heartrate,max_heartrate,average_cadence," +
+        "total_elevation_gain,calories,icu_training_load,icu_intensity," +
         "source,device_name"
 
     internal const val OFFLINE = "Intervals.icu-tietojen haku vaatii verkkoyhteyden."
