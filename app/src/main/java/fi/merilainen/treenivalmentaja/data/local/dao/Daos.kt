@@ -8,6 +8,7 @@ import androidx.room.Update
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.StravaActivityEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -198,4 +199,25 @@ interface OuraDao {
   @Query("DELETE FROM oura_daily_summaries") suspend fun clearDailySummaries()
 
   @Query("DELETE FROM oura_workouts") suspend fun clearWorkouts()
+}
+
+@Dao
+interface StravaDao {
+
+  /** `REPLACE` is safe for the reason it is on the Oura tables: nothing references these rows. */
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertActivities(activities: List<StravaActivityEntity>)
+
+  @Query("SELECT * FROM strava_activities WHERE startTimeUtc BETWEEN :fromUtc AND :toUtc")
+  suspend fun getActivitiesBetween(fromUtc: Long, toUtc: Long): List<StravaActivityEntity>
+
+  /** Same shape as the Oura matcher write: only the link, never the whole row. */
+  @Query("UPDATE strava_activities SET matchedSessionId = :sessionId WHERE id = :activityId")
+  suspend fun setMatchedSession(activityId: Long, sessionId: String?)
+
+  /** Every activity tied to any session, for the screens that draw a list of them. */
+  @Query("SELECT * FROM strava_activities WHERE matchedSessionId IS NOT NULL")
+  fun observeMatchedActivities(): Flow<List<StravaActivityEntity>>
+
+  @Query("DELETE FROM strava_activities") suspend fun clearActivities()
 }

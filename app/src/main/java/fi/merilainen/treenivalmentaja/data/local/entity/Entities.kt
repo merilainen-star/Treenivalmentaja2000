@@ -118,6 +118,38 @@ data class OuraDailySummaryEntity(
   val fetchedAtUtc: Long,
 )
 
+/**
+ * One Strava activity, as the summary endpoint reported it.
+ *
+ * Everything optional is nullable for the reason the Oura rows' fields are: Strava's summary
+ * carries no calories at all, a treadmill run may carry no distance, and heart rate exists only
+ * when a sensor was worn. Missing is never zero.
+ *
+ * `id` is Strava's own activity id, so a re-fetched activity overwrites itself.
+ */
+@Entity(
+  tableName = "strava_activities",
+  indices = [Index("matchedSessionId"), Index("startTimeUtc")],
+)
+data class StravaActivityEntity(
+  @PrimaryKey val id: Long,
+  val name: String? = null,
+  /** Strava's `SportType`, e.g. `Run`, `TrailRun`, `Walk`. Stored as it arrives. */
+  val sportType: String,
+  val startTimeUtc: Long,
+  /** Seconds actually moving — what pace is computed from. */
+  val movingTimeSec: Long,
+  /** Seconds start to finish, pauses included. */
+  val elapsedTimeSec: Long? = null,
+  val distanceMeters: Double? = null,
+  val avgHeartRate: Int? = null,
+  val maxHeartRate: Int? = null,
+  val elevationGainMeters: Double? = null,
+  /** The planned session this activity answers, decided by the matcher — never by Strava. */
+  val matchedSessionId: String? = null,
+  val fetchedAtUtc: Long,
+)
+
 /** See `docs/DATA_MODEL.md` § 5. */
 @Entity(tableName = "oura_workouts", indices = [Index("matchedSessionId"), Index("startTimeUtc")])
 data class OuraWorkoutEntity(

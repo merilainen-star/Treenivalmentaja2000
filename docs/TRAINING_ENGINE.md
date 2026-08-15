@@ -149,6 +149,45 @@ the state machine's whole value is that every transition has an author. What a m
 what Oura recorded to the session, so the card can show what actually happened beneath what was
 planned.
 
+### Readiness advice — asking, never acting
+
+Implemented in `ReadinessAdviceUseCase`, and like the matcher it is not part of the engine: it
+reads two lists and returns a question. Nothing it produces changes the schedule; accepting the
+question's offer calls operations that already existed.
+
+This is the first thing in the app that lets a readiness number *reach* the plan, and the shape of
+it is a direct answer to why the previous readiness indicator was deleted. That one showed the same
+verdict every day because nothing ever produced a different one — advice with no measurement behind
+it. The rule here can only speak when there is a measurement and a session to speak about.
+
+Two rules, checked in order:
+
+1. **A missed session after a poor day.** Yesterday holds a session still open, *and* yesterday's
+   readiness is below 70. Offers two things: shifting the programme forward, and starting today
+   lighter.
+2. **A poor reading today.** Today's readiness is below 70 and today has a session that can still
+   be lightened. Offers only lightening — moving a whole programme on one morning's number is a
+   bigger claim than one measurement supports.
+
+Rule 1 wins when both would fire; two cards about the same morning would be noise.
+
+What it will not do:
+
+- **A day with no reading produces nothing.** Oura returns a document with no score for a day the
+  ring was not worn, and treating that absence as a low score is the "missing is not zero" mistake
+  the whole Oura layer exists to avoid.
+- **70 is a boundary, not a band.** It is exactly where `DailyRecovery.readinessLabel` stops saying
+  "Hyvä", shared deliberately rather than invented a second time.
+- **Nothing is offered that cannot be done.** A session already lightened, already completed, or on
+  a rest day yields no card rather than a card with a button that would do nothing.
+- **Nothing happens automatically.** Both buttons run existing operations — `handleMissedSessions`
+  and `applyLighterVersion` — so the plan only ever changes because someone said so, and every
+  change lands in the event log with `EventSource.ENGINE` beside it.
+
+Dismissal ("Ei nyt") is held in memory for the current day rather than persisted. A question that
+comes back tomorrow morning against a fresh reading is the intended behaviour; a stored flag would
+need its own table and its own expiry rules to achieve something worse.
+
 ## Future AI Advisor
 - **Role:** Replaces the local deterministic rules for complex, multi-week plan adjustments based on chronic load and Oura readiness scores.
 - **Constraint:** The AI **never** modifies the Room database directly.

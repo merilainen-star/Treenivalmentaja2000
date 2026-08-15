@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-15
+
+### Added
+- **Strava, connected the same way Oura is.** Settings takes the Client ID and Secret of an API
+  application you register once at strava.com/settings/api, stores them under their own Android
+  Keystore key, and the login happens in a browser — see [STRAVA_SETUP.md](docs/STRAVA_SETUP.md)
+  for the steps on Strava's side. The one field that must be exact is **Authorization Callback
+  Domain: `localhost`**, because Strava validates the redirect's host and the app's redirect is
+  `treenivalmentaja://localhost/strava`.
+- **Pace, which Oura cannot supply.** A matched run now shows a Strava line — `5:32 /km · 38 min ·
+  6,2 km · syke 148 (max 171) · nousu 42 m` — under Oura's own. Two lines rather than one merged
+  number: the ring and the watch recorded the same run, and averaging them would hide which device
+  said what. Pace comes from moving time, not elapsed, so a pause at a crossing does not slow the
+  run on paper.
+- Runs match to planned sessions through the **same** use case Oura's workouts go through — same
+  day, nearest in time, one-to-one, and the sport has to fit. Strava's `SportType` is a closed
+  documented enum where Oura's `activity` is free-form, so `Run`, `TrailRun` and `VirtualRun` were
+  added to the running vocabulary and the ski variants to theirs.
+- Room schema version 6: the `strava_activities` table, by auto migration, with an instrumented
+  test that runs it against a populated version-5 database and then writes to the new table.
+
+- **The readiness number finally reaches the plan** — as a question, never as an action. A session
+  left undone on a day whose readiness was below 70 raises a card the next morning: *"Eilen jäi
+  treeni tekemättä ja palautuminen oli 57. Siirretäänkö ohjelmaa eteenpäin, vai aloitetaanko tämä
+  päivä kevyemmin?"* A poor reading on a day that has a session offers lightening alone — moving a
+  whole programme on one morning's number would be a bigger claim than one measurement supports.
+  Both buttons call operations that already existed, so nothing new can happen to the plan and
+  every change lands in the event log with an author beside it.
+  This is deliberately the opposite of the readiness indicator deleted back in the Oura milestone.
+  That one showed the same verdict daily because nothing ever produced a different one; this one
+  cannot speak without a measurement *and* a session to speak about. A day the ring was not worn
+  produces no card at all — 15 unit tests, most of them about mornings that must stay quiet.
+
+### Notes
+- **No real Strava account has been connected yet.** The tests run against a local
+  `com.sun.net.httpserver`, exactly as the Oura client was built, so what is verified is this
+  app's behaviour rather than that Strava's answers match the shapes it expects. This is the same
+  position the Oura client was in before a real login, and it is recorded rather than glossed.
+- Calories are deliberately not read from Strava: the summary endpoint carries none, and fetching
+  each activity's detail to add a number nothing decides on would spend the rate budget for
+  nothing.
+- The Strava flow has **no PKCE**, because Strava's token endpoint accepts no `code_verifier` and
+  authenticates the exchange with the client secret. `state` therefore carries the whole burden of
+  tying a redirect to a request this device made, and it is checked before the code is read.
+- [PRIVACY.md](docs/PRIVACY.md) is revised: `www.strava.com` is a fifth destination data goes to,
+  the scope requested is `activity:read_all` and nothing else, and there is no write scope at all.
+
 ## [Unreleased] - 2026-08-13
 
 ### Added

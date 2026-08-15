@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.data.strava.StravaConnectionState
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -50,6 +51,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val ouraAuthorizationUrl by viewModel.ouraAuthorizationUrl.collectAsState()
     val diagnostics by viewModel.ouraDiagnostics.collectAsState()
     val diagnosing by viewModel.ouraDiagnosing.collectAsState()
+    val stravaState by viewModel.stravaState.collectAsState()
+    val stravaAuthorizationUrl by viewModel.stravaAuthorizationUrl.collectAsState()
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -139,6 +142,18 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         else viewModel.ouraAuthorizationFailedToOpen()
     }
 
+    // Strava's login opens the same way and for the same reason: an external browser, never a
+    // WebView that could read the password as it is typed.
+    LaunchedEffect(stravaAuthorizationUrl) {
+        val url = stravaAuthorizationUrl ?: return@LaunchedEffect
+        val opened =
+            runCatching {
+                context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+            }.isSuccess
+        if (opened) viewModel.stravaAuthorizationOpened()
+        else viewModel.stravaAuthorizationFailedToOpen()
+    }
+
     SettingsScreenContent(
         settings = settings,
         updateStatus = updateStatus,
@@ -151,6 +166,12 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         ouraDiagnostics = diagnostics,
         ouraDiagnosing = diagnosing,
         onRunOuraDiagnostics = viewModel::runOuraDiagnostics,
+        stravaState = stravaState,
+        onConnectStrava = viewModel::connectStrava,
+        onDisconnectStrava = viewModel::disconnectStrava,
+        onDismissStravaFailure = viewModel::dismissStravaFailure,
+        onSaveStravaCredentials = viewModel::saveStravaCredentials,
+        onForgetStravaCredentials = viewModel::forgetStravaCredentials,
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -190,6 +211,12 @@ fun SettingsScreenContent(
     ouraDiagnostics: OuraDiagnostics? = null,
     ouraDiagnosing: Boolean = false,
     onRunOuraDiagnostics: () -> Unit = {},
+    stravaState: StravaConnectionState = StravaConnectionState.NotConfigured,
+    onConnectStrava: () -> Unit = {},
+    onDisconnectStrava: () -> Unit = {},
+    onDismissStravaFailure: () -> Unit = {},
+    onSaveStravaCredentials: (String, String) -> Unit = { _, _ -> },
+    onForgetStravaCredentials: () -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -289,6 +316,15 @@ fun SettingsScreenContent(
             diagnostics = ouraDiagnostics,
             diagnosing = ouraDiagnosing,
             onRunDiagnostics = onRunOuraDiagnostics,
+        )
+
+        StravaCard(
+            state = stravaState,
+            onConnect = onConnectStrava,
+            onDisconnect = onDisconnectStrava,
+            onDismissFailure = onDismissStravaFailure,
+            onSaveCredentials = onSaveStravaCredentials,
+            onForgetCredentials = onForgetStravaCredentials,
         )
 
         Card(

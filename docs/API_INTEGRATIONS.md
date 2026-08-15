@@ -166,5 +166,75 @@ The client therefore sends `end_date` as **one day past** the range it was asked
 only request that means "up to and including this day" for all of them at once. See
 `OuraClient.url`.
 
-**Future extension:** direct Strava integration for richer telemetry, bypassing Oura — which the
-finding above makes considerably more attractive than it looked.
+**This is what motivated the Strava integration below**: a run recorded on a watch reaches Oura's
+own app and not its API, so the only way to see it here is to ask Strava directly.
+
+## Strava API v3
+
+*(Built — `app/src/main/java/fi/merilainen/treenivalmentaja/data/strava/`, on OkHttp for the same
+reason the Oura client is. The setup a user performs on Strava's side is in
+[STRAVA_SETUP.md](STRAVA_SETUP.md). Written against Strava's published developer documentation; no
+specification is vendored, because Strava does not publish one this app could pin to. **No real
+account has been connected yet** — the tests run against a local HTTP server, so what has been
+verified is the client's behaviour, not that Strava's answers match the shapes below.)*
+
+### Base information
+
+| | |
+| --- | --- |
+| Base URL | `https://www.strava.com` |
+| Activities | `GET /api/v3/athlete/activities` |
+| Authorization URL | `https://www.strava.com/oauth/mobile/authorize` |
+| Token URL | `https://www.strava.com/oauth/token` |
+| Scope this app requests | `activity:read_all`, and nothing else |
+| Redirect | `treenivalmentaja://localhost/strava` |
+
+### Differences from Oura worth knowing
+
+Both are OAuth2 authorization-code flows over OkHttp, and the two clients look alike on purpose.
+Four things genuinely differ:
+
+1. **No PKCE.** Strava's token endpoint does not accept a `code_verifier`; the client secret
+   authenticates the exchange. So `state` carries the whole burden of tying a redirect to the
+   request this device made, and `StravaOAuth.readRedirect` is correspondingly strict.
+2. **Paging is by page number**, not by an opaque token. There is no `next_token`: request
+   `page=1,2,…` with `per_page=100` and stop when a page comes back short.
+3. **The host validates the redirect.** Strava checks the redirect URI's *host* against the API
+   application's "Authorization Callback Domain" field. `localhost` is what that field accepts for
+   an app with no web domain, hence the odd-looking `treenivalmentaja://localhost/strava`.
+4. **Expiry is absolute.** The token response carries `expires_at` in epoch seconds rather than
+   Oura's relative `expires_in`.
+
+### The activity shape
+
+```
+GET /api/v3/athlete/activities?after=&before=&page=&per_page=
+→ [ { … }, … ]          // a bare array, not an envelope
+```
+
+`after`/`before` are epoch **seconds**, and the app derives them from local dates in the device's
+zone — a run at 23:30 belongs to that local day, not to the UTC one.
+
+| Field | Notes |
+| --- | --- |
+| `id` | The activity id; also this app's primary key, so a re-fetch overwrites itself. |
+| `sport_type` | A closed enum — `Run`, `TrailRun`, `VirtualRun`, `Walk`, `Ride`, `WeightTraining`, … Unlike Oura's free-form `activity`, this is documented. |
+| `start_date` | UTC, `Z`-suffixed. |
+| `moving_time` | Seconds. **Pace is computed from this**, not from `elapsed_time`: a pause at a crossing is not part of how fast the running was. |
+| `elapsed_time` | Seconds, pauses included. |
+| `distance` | Metres. |
+| `average_heartrate`, `max_heartrate` | Doubles, and absent entirely without a sensor. |
+| `total_elevation_gain` | Metres. |
+
+**`calories` is deliberately not read.** The summary does not carry it — only `DetailedActivity`
+does, one request per activity — and a run's load is its pace, distance, time and heart rate, all
+of which the summary has. Spending the rate budget to add a number nothing decides on would be a
+bad trade.
+
+### Missing data
+
+The same rule as Oura, for the same reason: a treadmill run may have no distance, a run without a
+strap has no heart rate, and a flat run reports `0.0` elevation. None of those is rendered, and
+none becomes a zero. `StravaMappers` drops rows lacking an id, a sport, a parseable start or a
+moving time — those cannot be placed on the clock or reduced to a pace, which is all these rows
+exist for.

@@ -20,10 +20,17 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
+import fi.merilainen.treenivalmentaja.data.repository.StravaRepository
+import fi.merilainen.treenivalmentaja.data.strava.StravaConnection
+import fi.merilainen.treenivalmentaja.data.strava.StravaConnectionState
+import fi.merilainen.treenivalmentaja.domain.StravaRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
+import fi.merilainen.treenivalmentaja.domain.ReadinessAdviceUseCase
+import fi.merilainen.treenivalmentaja.domain.EventSource
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
@@ -36,6 +43,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -112,6 +120,9 @@ class WorkoutViewModel(
   private val loadExerciseGuideUseCase: LoadExerciseGuideUseCase,
   private val ouraConnection: OuraConnection,
   private val ouraRepository: OuraRepository,
+  private val stravaConnection: StravaConnection? = null,
+  private val stravaRepository: StravaRepository? = null,
+  private val readinessAdviceUseCase: ReadinessAdviceUseCase = ReadinessAdviceUseCase(),
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -359,6 +370,160 @@ class WorkoutViewModel(
     viewModelScope.launch { ouraConnection.dismissFailure() }
   }
 
+  // ------------------------------------------------------------------ Strava
+
+  /**
+   * Whether Strava is connected, being connected, or cannot be.
+   *
+   * The connection is nullable on the constructor so the existing unit tests, which have no
+   * Keystore to build a real one against, keep constructing the ViewModel; a missing connection
+   * reads as NotConfigured, which is also true.
+   */
+  val stravaState: StateFlow<StravaConnectionState> =
+    stravaConnection?.state
+      ?: MutableStateFlow<StravaConnectionState>(StravaConnectionState.NotConfigured).asStateFlow()
+
+  private val _stravaAuthorizationUrl = MutableStateFlow<String?>(null)
+  val stravaAuthorizationUrl: StateFlow<String?> = _stravaAuthorizationUrl.asStateFlow()
+
+  /** Starts a login. The screen opens whatever lands in [stravaAuthorizationUrl]. */
+  fun connectStrava() {
+    val connection = stravaConnection ?: return
+    viewModelScope.launch { _stravaAuthorizationUrl.value = connection.beginAuthorization() }
+  }
+
+  fun stravaAuthorizationOpened() {
+    _stravaAuthorizationUrl.value = null
+  }
+
+  fun stravaAuthorizationFailedToOpen() {
+    _stravaAuthorizationUrl.value = null
+    stravaConnection?.let { viewModelScope.launch { it.cancelAuthorization() } }
+  }
+
+  fun saveStravaCredentials(clientId: String, clientSecret: String) {
+    val connection = stravaConnection ?: return
+    viewModelScope.launch { connection.saveCredentials(clientId, clientSecret) }
+  }
+
+  fun forgetStravaCredentials() {
+    val connection = stravaConnection ?: return
+    viewModelScope.launch { connection.forgetCredentials() }
+  }
+
+  fun disconnectStrava() {
+    val connection = stravaConnection ?: return
+    viewModelScope.launch { connection.disconnect() }
+  }
+
+  fun dismissStravaFailure() {
+    val connection = stravaConnection ?: return
+    viewModelScope.launch { connection.dismissFailure() }
+  }
+
+  /**
+   * Fetches the last few days from Strava now. Called beside [syncOura] when a screen appears,
+   * and just as deliberately quiet — this runs without anyone asking for it.
+   */
+  fun syncStrava() {
+    val repository = stravaRepository ?: return
+    if (stravaState.value != StravaConnectionState.Connected) return
+    if (_stravaSyncing.value) return
+    viewModelScope.launch {
+      _stravaSyncing.value = true
+      val today = LocalDate.now()
+      repository.sync(from = today.minusDays(SYNC_DAYS), to = today, zone = ZoneId.systemDefault())
+      matchStravaActivities(today)
+      _stravaSyncing.value = false
+    }
+  }
+
+  /** The same pairing run the Oura workouts get, over the same window. */
+  private suspend fun matchStravaActivities(today: LocalDate) {
+    val stravaRepository = stravaRepository ?: return
+    val from = today.minusDays(SYNC_DAYS).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    val to = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    val earliest = today.minusDays(SYNC_DAYS)
+    val sessions =
+      repository
+        .getSessions()
+        .filter {
+          val date = runCatching { LocalDate.parse(it.scheduledDate) }.getOrNull()
+          date != null && !date.isBefore(earliest) && !date.isAfter(today)
+        }
+        .map { PlannedSession(id = it.id, scheduledAtUtc = it.remindAtUtc, type = it.type) }
+    stravaRepository.matchActivities(sessions, from.toEpochMilli(), to.toEpochMilli())
+  }
+
+  private val _stravaSyncing = MutableStateFlow(false)
+
+  /**
+   * What Strava recorded for each session that was actually done, keyed by session id — pace
+   * included, which is the measurement Oura does not carry.
+   */
+  val stravaRunMetrics: StateFlow<Map<String, StravaRunMetrics>> =
+    (stravaRepository?.observeMatchedRunMetrics()
+        ?: MutableStateFlow(emptyMap<String, StravaRunMetrics>()))
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+  // ------------------------------------------------------------------ readiness advice
+
+  /**
+   * This morning's question about a poor readiness reading, or nothing.
+   *
+   * Recomputed whenever the plan or the stored Oura days change, because both halves of the rule
+   * move: a session completed at nine answers yesterday's question, and a readiness score Oura
+   * revised after the fact changes whether there was one.
+   *
+   * Dismissal is held here rather than in the database. It is a "not now", scoped to this reading
+   * of this screen — the alternative, a persisted flag, would need its own table and its own
+   * expiry, and a question that comes back tomorrow morning is the desired behaviour anyway.
+   */
+  private val _dismissedAdviceFor = MutableStateFlow<LocalDate?>(null)
+
+  val readinessAdvice: StateFlow<ReadinessAdvice> =
+    combine(
+        repository.observeSessions(),
+        ouraRepository.observeRecoveryRange(
+          from = LocalDate.now().minusDays(ADVICE_DAYS_BACK),
+          to = LocalDate.now(),
+        ),
+        _dismissedAdviceFor,
+      ) { sessions, recovery, dismissedFor ->
+        val today = LocalDate.now()
+        if (dismissedFor == today) ReadinessAdvice.None
+        else readinessAdviceUseCase.execute(today, recovery, sessions)
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ReadinessAdvice.None)
+
+  /** "Ei nyt." Comes back tomorrow, deliberately. */
+  fun dismissReadinessAdvice() {
+    _dismissedAdviceFor.value = LocalDate.now()
+  }
+
+  /**
+   * Moves the programme forward, exactly the way a missed session already moves it.
+   *
+   * The engine decides how far — one session goes to the next rest day, several shift the whole
+   * plan — so accepting this offer does nothing the app could not already be asked to do; it only
+   * asks at the moment the readiness number makes it worth asking.
+   */
+  fun shiftProgrammeForward() {
+    viewModelScope.launch {
+      engine.handleMissedSessions()
+      dismissReadinessAdvice()
+    }
+  }
+
+  /** Starts today lighter, through the same operation the "Kevyempi versio" button uses. */
+  fun startTodayLighter() {
+    val advice = readinessAdvice.value as? ReadinessAdvice.Offer ?: return
+    viewModelScope.launch {
+      advice.lightenableSessionIds.forEach { repository.applyLighterVersion(it, EventSource.ENGINE) }
+      dismissReadinessAdvice()
+    }
+  }
+
   /** Cheap enough to run whenever Settings opens: one GET of a few hundred bytes. */
   fun checkForUpdate() {
     if (_updateStatus.value is UpdateStatus.Checking) return
@@ -570,6 +735,9 @@ class WorkoutViewModel(
     /** As far back as the calendar shows, so a day there can list what Oura holds for it. */
     private const val CALENDAR_DAYS_BACK = 28L
 
+    /** The advice rule reads today and yesterday; a couple of days is margin, not a window. */
+    private const val ADVICE_DAYS_BACK = 3L
+
     /** Statuses that describe a closed row and are never drawn on the Today/Week screens. */
     private val HIDDEN_STATUSES = setOf(SessionStatus.RESCHEDULED, SessionStatus.CANCELLED)
 
@@ -587,6 +755,8 @@ class WorkoutViewModel(
           application.loadExerciseGuideUseCase,
           application.ouraConnection,
           application.ouraRepository,
+          application.stravaConnection,
+          application.stravaRepository,
         )
       }
     }

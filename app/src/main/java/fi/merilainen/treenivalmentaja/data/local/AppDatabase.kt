@@ -11,11 +11,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import fi.merilainen.treenivalmentaja.data.local.dao.OuraDao
 import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
+import fi.merilainen.treenivalmentaja.data.local.dao.StravaDao
 import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.StravaActivityEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 
@@ -27,13 +29,15 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       SessionEventEntity::class,
       OuraDailySummaryEntity::class,
       OuraWorkoutEntity::class,
+      StravaActivityEntity::class,
     ],
-  version = 5,
+  version = 6,
   exportSchema = true,
-  // Purely additive — three nullable columns on `oura_workouts` — which is exactly the case the
-  // note on `build` says to use an auto migration for. Room writes the SQL by diffing the exported
-  // schemas, and `MigrationTest.migrate4To5` runs it against a version-4 database with rows in it.
-  autoMigrations = [AutoMigration(from = 4, to = 5)],
+  // Purely additive both times — 4→5 added three nullable columns on `oura_workouts`, 5→6 adds
+  // the whole `strava_activities` table — which is exactly the case the note on `build` says to
+  // use an auto migration for. Room writes the SQL by diffing the exported schemas;
+  // `MigrationTest` runs each against a populated database of the older version.
+  autoMigrations = [AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6)],
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -41,6 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun workoutSessionDao(): WorkoutSessionDao
   abstract fun sessionEventDao(): SessionEventDao
   abstract fun ouraDao(): OuraDao
+  abstract fun stravaDao(): StravaDao
 
   companion object {
     private const val DB_NAME = "treenivalmentaja.db"

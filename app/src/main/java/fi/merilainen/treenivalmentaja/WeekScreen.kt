@@ -56,6 +56,7 @@ import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.StravaRunMetrics
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
 import fi.merilainen.treenivalmentaja.ui.theme.ColorGreen
@@ -71,11 +72,14 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val completedMetrics by viewModel.completedMetrics.collectAsState()
     val unmatchedByDay by viewModel.unmatchedByDay.collectAsState()
     val recoveryByDay by viewModel.recoveryByDay.collectAsState()
+    val stravaState by viewModel.stravaState.collectAsState()
+    val stravaMetrics by viewModel.stravaRunMetrics.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.
-    LifecycleResumeEffect(ouraState) {
+    LifecycleResumeEffect(ouraState, stravaState) {
         viewModel.syncOura()
+        viewModel.syncStrava()
         onPauseOrDispose {}
     }
 
@@ -85,6 +89,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         completedMetrics = completedMetrics,
         unmatchedByDay = unmatchedByDay,
         recoveryByDay = recoveryByDay,
+        stravaMetrics = stravaMetrics,
         onExerciseClick = viewModel::openExerciseGuide,
         onGuideRetry = viewModel::retryExerciseGuide,
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
@@ -105,6 +110,7 @@ fun WeekScreenContent(
     today: LocalDate = LocalDate.now(),
     unmatchedByDay: Map<LocalDate, List<CompletedSessionMetrics>> = emptyMap(),
     recoveryByDay: Map<LocalDate, DailyRecovery> = emptyMap(),
+    stravaMetrics: Map<String, StravaRunMetrics> = emptyMap(),
 ) {
     Column(
         modifier = Modifier
@@ -190,6 +196,7 @@ fun WeekScreenContent(
                                 workout = workout,
                                 onExerciseClick = onExerciseClick,
                                 completed = completedMetrics[workout.id],
+                                strava = stravaMetrics[workout.id],
                             )
                         }
                     }
@@ -279,6 +286,7 @@ fun WorkoutCardWeek(
     workout: Workout,
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
+    strava: StravaRunMetrics? = null,
 ) {
     var expanded by rememberSaveable(workout.id) { mutableStateOf(false) }
     WorkoutCardWeek(
@@ -287,6 +295,7 @@ fun WorkoutCardWeek(
         onToggle = { expanded = !expanded },
         onExerciseClick = onExerciseClick,
         completed = completed,
+        strava = strava,
     )
 }
 
@@ -297,6 +306,7 @@ fun WorkoutCardWeek(
     onToggle: () -> Unit,
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
+    strava: StravaRunMetrics? = null,
 ) {
     val indicatorColor = when (workout.type) {
         WorkoutType.RUNNING -> ColorBlue
@@ -373,6 +383,14 @@ fun WorkoutCardWeek(
                 // a tap on every day.
                 completed?.let {
                     CompletedMetricsRow(
+                        metrics = it,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                // Pace belongs in the collapsed header for the same reason Oura's numbers do:
+                // scanning the week for how the running actually went is the reason to be here.
+                strava?.let {
+                    StravaMetricsRow(
                         metrics = it,
                         style = MaterialTheme.typography.bodySmall,
                     )

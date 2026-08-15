@@ -123,4 +123,57 @@ class MigrationTest {
     assertTrue(cursor.isNull(cursor.getColumnIndex("maxHeartRate")))
     cursor.close()
   }
+
+  /**
+   * Version 6 adds `strava_activities`. A new table rather than new columns, so the thing worth
+   * proving is the other half: everything already stored survives untouched, and the new table
+   * exists and is writable afterwards.
+   */
+  @Test
+  fun migrate5To6() {
+    var db = helper.createDatabase(TEST_DB, 5)
+
+    db.execSQL(
+      """
+      INSERT INTO `oura_workouts` (`id`, `activityType`, `startTimeUtc`, `endTimeUtc`, `calories`, `matchedSessionId`, `distanceMeters`, `avgHeartRate`, `maxHeartRate`)
+      VALUES ('w1', 'running', 1754755200000, 1754757600000, 431.0, 'session1', 6200.0, 142, 168)
+      """
+    )
+    db.execSQL(
+      """
+      INSERT INTO `oura_daily_summaries` (`date`, `readinessScore`, `sleepScore`, `activityScore`, `fetchedAtUtc`)
+      VALUES ('2026-08-15', 94, 88, 71, 1754755200000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 6, true)
+
+    // The existing rows are the point: a new table must not disturb them.
+    val workouts = db.query("SELECT * FROM oura_workouts")
+    assertTrue(workouts.moveToFirst())
+    assertEquals("w1", workouts.getString(workouts.getColumnIndex("id")))
+    assertEquals(142, workouts.getInt(workouts.getColumnIndex("avgHeartRate")))
+    workouts.close()
+
+    val summaries = db.query("SELECT * FROM oura_daily_summaries")
+    assertTrue(summaries.moveToFirst())
+    assertEquals(94, summaries.getInt(summaries.getColumnIndex("readinessScore")))
+    summaries.close()
+
+    // And the new table is really there, not merely declared.
+    db.execSQL(
+      """
+      INSERT INTO `strava_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `elapsedTimeSec`, `distanceMeters`, `avgHeartRate`, `maxHeartRate`, `elevationGainMeters`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES (12345, 'Aamulenkki', 'Run', 1754755200000, 2280, 2400, 6200.0, 148, 171, 42.0, NULL, 1754755200000)
+      """
+    )
+    val activities = db.query("SELECT * FROM strava_activities")
+    assertTrue(activities.moveToFirst())
+    assertEquals(12345L, activities.getLong(activities.getColumnIndex("id")))
+    assertEquals("Run", activities.getString(activities.getColumnIndex("sportType")))
+    assertEquals(2280L, activities.getLong(activities.getColumnIndex("movingTimeSec")))
+    assertTrue(activities.isNull(activities.getColumnIndex("matchedSessionId")))
+    activities.close()
+  }
 }

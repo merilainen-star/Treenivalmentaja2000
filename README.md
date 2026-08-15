@@ -22,15 +22,20 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 - Oura: connect from the phone, a readiness reading on Today, and what Oura recorded for a finished
   session — duration, distance, calories, heart rate — under what the plan asked for
   ([docs](docs/API_INTEGRATIONS.md))
+- Strava: connect from the phone, and a matched run shows its pace, moving time, distance, heart
+  rate and climb — the telemetry Oura does not carry ([setup](docs/STRAVA_SETUP.md))
+- A morning question when readiness was poor and a session went undone: shift the programme, or
+  start lighter. Asked from a measurement, never acted on by itself
+  ([docs](docs/TRAINING_ENGINE.md#readiness-advice--asking-never-acting))
 - A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
 - Rolling test APK built by GitHub Actions, with an in-app check for whether the build is current
 - App icon and splash screen
 
 **Planned / Missing:**
-- Remote AI advisor
-- Strava integration. Workouts recorded elsewhere and synced into Oura do **not** come through
-  Oura's workout collection — measured, see [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md) — so a
-  run tracked on a watch appears here only as a nudge to the day's recovery and activity scores.
+- Remote AI advisor. Planned in four phases, Strava first — see
+  [ROADMAP.md](docs/ROADMAP.md#next-milestone).
+- Acting on readiness beyond the morning question below — chronic load, multi-week adjustment,
+  and anything needing judgement rather than a rule.
 
 ## Main Features
 Implemented today:
@@ -116,12 +121,16 @@ has been entered in the app.
 - [AI Agents Instructions](AGENTS.md)
 
 ## Known Limitations
-- The recovery reading is shown but nothing acts on it. Connecting readiness to "kevyempi versio"
-  or to the training engine is a training decision, and the card this replaced was removed for
-  giving advice with nothing behind it.
+- The readiness rule asks about one day at a time and knows nothing about chronic load. It fires on
+  yesterday's missed session or this morning's low score, and offers only what the app could
+  already be asked to do by hand.
 - Workouts recorded on another device and synced into Oura do not arrive through its workout
   collection, so they appear only in the day's scores. Measured, not assumed —
-  [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md).
+  [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md). This is what the Strava integration exists to
+  work around: a watch-tracked run reaches the app through Strava instead.
+- **Strava has not been connected to a real account yet.** Its client is covered by unit tests
+  against a local HTTP server, the same way Oura's was before its first real login, so what is
+  verified is this app's behaviour rather than that Strava's answers match the shapes it expects.
 - Oura publishes a workout to the API some time after the app shows it, so today's session may
   appear only later.
 - No test taps through a screen: the captures pin what each state looks like, not what happens

@@ -101,13 +101,29 @@ class MatchOuraWorkoutsUseCase {
      */
     const val MAX_DISTANCE_MILLIS = 12L * 60 * 60 * 1000
 
-    /** `strengthTraining` is the value observed in real data; the rest are its plausible siblings. */
+    /**
+     * `strengthTraining` is the value observed in real Oura data; the rest are its plausible
+     * siblings. The single-word forms (`run`, `nordicski`, …) are Strava's `SportType` values,
+     * which flow through this same matcher — Strava's vocabulary is closed and documented where
+     * Oura's is free-form, so these are from the specification rather than observation.
+     */
     private val STRENGTH_ACTIVITIES =
       setOf("strengthtraining", "weighttraining", "crossfit", "resistancetraining")
 
-    private val RUNNING_ACTIVITIES = setOf("running", "jogging", "trailrunning", "treadmill")
+    private val RUNNING_ACTIVITIES =
+      setOf("running", "jogging", "trailrunning", "treadmill", "run", "trailrun", "virtualrun")
 
     private val SKIING_ACTIVITIES =
-      setOf("crosscountryskiing", "skiing", "nordicskiing", "alpineskiing", "backcountryskiing")
+      setOf(
+        "crosscountryskiing",
+        "skiing",
+        "nordicskiing",
+        "alpineskiing",
+        "backcountryskiing",
+        "nordicski",
+        "alpineski",
+        "backcountryski",
+        "rollerski",
+      )
   }
 }

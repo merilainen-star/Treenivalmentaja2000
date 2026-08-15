@@ -150,6 +150,32 @@ The order of priority is:
     recorded. Added in schema version 5 by an auto migration.
 - **Lifecycle:** Synced via WorkManager. Immutable once fetched. Cleared on Oura disconnect.
 
+### 6. Strava Activity (`StravaActivity`)
+- **Table:** `strava_activities`
+- **Purpose:** Represents an activity read from Strava — the running telemetry Oura does not carry.
+  Added in schema version 6.
+- **Primary Key:** `id` (Long — Strava's own activity id, so a re-fetch overwrites itself)
+- **Relationships:** Matches to `WorkoutSession` via `matchedSessionId` (String?, indexed), filled
+  by the **same** `MatchOuraWorkoutsUseCase` the Oura workouts go through — same day, nearest in
+  time, one-to-one, and the sport has to fit. A session can hold an Oura workout *and* a Strava
+  activity at once: two devices recorded the same run, and the screens show both lines rather than
+  choosing between them.
+- **Fields:**
+  - `name` (String?) — the activity's title on Strava, e.g. "Aamulenkki"
+  - `sportType` (String) — Strava's closed enum, e.g. `Run`, `TrailRun`, `WeightTraining`
+  - `startTimeUtc` (Long)
+  - `movingTimeSec` (Long) — **pace is computed from this**, not from elapsed time
+  - `elapsedTimeSec` (Long?)
+  - `distanceMeters` (Double?)
+  - `avgHeartRate` (Int?), `maxHeartRate` (Int?) — absent without a sensor
+  - `elevationGainMeters` (Double?)
+  - `fetchedAtUtc` (Long)
+- **Nullability:** The same rule as the Oura tables. A treadmill run has no distance, a run without
+  a strap has no heart rate, and neither becomes a zero. Calories are deliberately **not** stored:
+  Strava's summary endpoint does not carry them, and fetching each activity's detail to add a
+  number nothing decides on would spend the rate budget for nothing.
+- **Lifecycle:** Synced when Tänään or Viikko opens. Cleared on Strava disconnect.
+
 ## Rescheduling and the session chain
 Moving a session never edits `scheduledDate` in place:
 
@@ -215,7 +241,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-Only `3.json` and `4.json` are in `app/schemas/`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `6.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

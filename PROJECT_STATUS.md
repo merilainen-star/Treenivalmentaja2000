@@ -12,13 +12,18 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,662,843 B (19.71 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 354 tests, 0 failures, 0 errors |
+| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,761,315 B (19.80 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 406 tests, 0 failures, 0 errors |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug` | 46 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 36 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 37 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
-The whole Oura milestone cost **164,928 B (+0.80%)** over the last build before it: 20,497,915 B
+The Strava client and the readiness rule together cost **98,472 B (+0.48%)** over the previous
+clean build: 20,662,843 B before, 20,761,315 B after. No new dependency — OkHttp, Moshi and Room
+were all already in the APK, and the token store uses platform crypto rather than a library, so the
+whole figure is this app's own code.
+
+Before that, the whole Oura milestone cost **164,928 B (+0.80%)**: 20,497,915 B
 without any of it, 20,662,843 B with all of it. The week view, the unmatched-workout list and the
 resume fix added nothing measurable at all — the same 20,646,459 B as before them — and the
 diagnostics screen 16,384 B on top. Its one new dependency is WorkManager, which is most
@@ -56,8 +61,8 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 - **UI shell.** Bottom navigation, splash screen, Today, Week and Settings.
 - **Room persistence.** `TrainingPlan`, `WorkoutSession`, `SessionEvent`, `OuraDailySummary`,
-  `OuraWorkout` entities, DAOs and `AppDatabase` at schema version 5. `WorkoutViewModel` observes
-  a Room `Flow`.
+  `OuraWorkout` and `StravaActivity` entities, DAOs and `AppDatabase` at schema version 6.
+  `WorkoutViewModel` observes a Room `Flow`.
 - **Session state machine.** All nine statuses with a validated transition table; a forbidden
   transition is rejected and writes nothing.
 - **Append-only history.** Every accepted transition writes a `SessionEvent` in the same
@@ -70,11 +75,23 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 - **Deterministic training engine.** `TrainingEngine` handles missed sessions, plan shifting,
   illness pause (`markSick`) and the graduated return (`markRecovered`), wired to the Today
   screen's buttons and run at startup.
+- **Strava.** `data/strava` reads `/api/v3/athlete/activities` between two dates, pages by page
+  number, and stores `strava_activities`. OAuth2 with credentials typed into Settings and tokens
+  under their own Keystore key; **no PKCE**, because Strava's token endpoint accepts no verifier,
+  so `state` carries the whole burden. Runs match to planned sessions through the same use case
+  Oura's workouts go through, and a matched run shows a pace line Oura cannot supply. 37 unit tests
+  against a local `com.sun.net.httpserver`. **No real account has been connected yet** — what is
+  verified is the client, not that Strava's answers match the shapes it expects.
+- **Readiness advice.** `ReadinessAdviceUseCase` turns a poor readiness reading into a question on
+  the Today screen — shift the programme, or start today lighter — and never into an action. Both
+  buttons call operations that already existed, and a day the ring was not worn produces no card
+  at all. 15 unit tests, most of them about mornings that must stay quiet.
 - **Reminders.** AlarmManager with a 7-day sliding window and a re-arm alarm, restored on
   `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` and `TIMEZONE_CHANGED`, with a notification-permission
   check in Settings.
-- **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`, and both
-  `MIGRATION_3_4` (hand-written) and the 4 → 5 auto migration covered by instrumented tests. There is deliberately **no**
+- **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`, and
+  `MIGRATION_3_4` (hand-written) plus the 4 → 5 and 5 → 6 auto migrations each covered by an
+  instrumented test that runs it against a populated database of the older version. There is deliberately **no**
   `fallbackToDestructiveMigration`: a missing migration now fails loudly instead of silently
   emptying the database.
 - **A scrollable calendar rather than a fixed week.** It opens on today and runs four weeks either

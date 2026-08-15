@@ -33,6 +33,13 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraCredentials
 import fi.merilainen.treenivalmentaja.data.oura.OuraCredentialsSource
 import fi.merilainen.treenivalmentaja.data.oura.OuraTokenStore
 import fi.merilainen.treenivalmentaja.data.oura.clearCachedOuraData
+import fi.merilainen.treenivalmentaja.data.repository.StravaRepository
+import fi.merilainen.treenivalmentaja.data.strava.StravaAuthService
+import fi.merilainen.treenivalmentaja.data.strava.StravaAuthenticator
+import fi.merilainen.treenivalmentaja.data.strava.StravaClient
+import fi.merilainen.treenivalmentaja.data.strava.StravaConnection
+import fi.merilainen.treenivalmentaja.data.strava.StravaTokenStore
+import fi.merilainen.treenivalmentaja.data.strava.clearCachedStravaData
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -163,6 +170,44 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     OuraRepository(client = ouraClient, dao = db.ouraDao())
   }
 
+  private val stravaTokenStore: StravaTokenStore by lazy { StravaTokenStore(this) }
+
+  private val stravaAuthService: StravaAuthService by lazy {
+    StravaAuthService(credentials = { stravaTokenStore.credentials() })
+  }
+
+  /** One for the whole process, for the reason [ouraConnection] is. */
+  val stravaConnection: StravaConnection by lazy {
+    StravaConnection(
+      store = stravaTokenStore,
+      authService = stravaAuthService,
+      onDisconnected = { db.stravaDao().clearCachedStravaData() },
+    )
+  }
+
+  /** The `Authenticator` goes here and never on the auth service's own client — same as Oura. */
+  internal val stravaClient: StravaClient by lazy {
+    StravaClient(
+      tokens = stravaConnection.tokenSource(),
+      calls =
+        OkHttpClient.Builder()
+          .connectTimeout(10, TimeUnit.SECONDS)
+          .readTimeout(10, TimeUnit.SECONDS)
+          .authenticator(
+            StravaAuthenticator(
+              store = stravaTokenStore,
+              service = stravaAuthService,
+              onRefreshFailed = { applicationScope.launch { stravaConnection.refreshState() } },
+            )
+          )
+          .build(),
+    )
+  }
+
+  internal val stravaRepository: StravaRepository by lazy {
+    StravaRepository(client = stravaClient, dao = db.stravaDao())
+  }
+
   override fun onCreate() {
     super.onCreate()
     NotificationChannels.createChannels(this)
@@ -170,6 +215,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
       // Settings must be able to say whether Oura is connected the moment it is opened, and the
       // answer is on disk behind a Keystore decryption rather than in memory.
       ouraConnection.refreshState()
+      stravaConnection.refreshState()
     }
     // Scheduled only while there is something to fetch with — a worker that woke daily to discover
     // it has no token would be a battery cost with no possible result. Collected rather than
