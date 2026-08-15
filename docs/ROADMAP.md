@@ -110,13 +110,52 @@ almost nothing to say about the sessions that matter most.
    change carries an author in the event log. A day the ring was not worn produces nothing — see
    [TRAINING_ENGINE.md](TRAINING_ENGINE.md#readiness-advice--asking-never-acting). This is the
    first point where the readiness number reaches the plan at all.
-3. **AI coach comments, read-only (Phase B)** — a "pyydä valmentajan kommentit" button. BYOK: the
+3. **Easy-run drift, deterministic (Phase A′)** — designed 2026-08-16, not yet built. No AI, and
+   unusually for a rule here, **no engine operation either**: it changes nothing about the plan and
+   so needs none.
+
+   *What it detects.* Not one hard easy run — that is a Tuesday, a hill, a headwind. Three in a
+   row is a finding: base training stops being base training, and the next hard session arrives on
+   tired legs.
+
+   *The measure is `icu_intensity`, not `icu_training_load`.* Load grows with duration, so a long
+   calm run scores high without being hard — it answers "what did this cost". Intensity is a
+   percentage of threshold and therefore comparable across runs of different lengths; it answers
+   "was this hard", which is the question.
+
+   *The baseline is the athlete's own history, not a fixed band.* Writing "easy means under 75 % of
+   threshold" would put invented physiology in the code, which is what this project has avoided
+   everywhere else — `DailyRecovery.readinessLabel` shares Oura's own bands rather than inventing a
+   second opinion. The comparison is instead against the median of the athlete's own comparable
+   runs, which is self-calibrating, needs no invented number, and states a claim the person can
+   check for themselves.
+
+   *The rule, in one sentence:* the three most recent completed sessions of the same `WorkoutType`
+   **and** the same planned `intensity` were each above the median intensity of all comparable
+   stored runs. Fewer than six comparable runs — three judged plus three of baseline — produces
+   silence, on the same discipline as the readiness rule: no measurement, no advice.
+
+   *What it does.* A card on the morning a matching easy session is scheduled, saying that the last
+   three were run harder than usual and that this one is meant to be easy. It offers no button,
+   because there is nothing to change: the sessions in question are already done, and lightening a
+   session that is supposed to be easy is incoherent. The useful thing is the reminder arriving
+   before the run rather than a plan edit after it.
+
+   *What it needs that exists:* the plan's `intensity` (already in Plan Schema v1 and stored) and
+   `CompletedRunMetrics.intensityPercent` (stored since schema v9). Nothing new to fetch.
+   Activities synced before v9 carry no intensity and are correctly excluded from the comparison —
+   missing is not zero.
+
+   *Deliberately out of scope:* `icu_atl` and `icu_ctl` — acute and chronic load — are in the API
+   response and are **not** stored. They answer a different question ("has total load outrun the
+   plan?") and deserve their own rule rather than being folded into this one.
+4. **AI coach comments, read-only (Phase B)** — a "pyydä valmentajan kommentit" button. BYOK: the
    user's own LLM API key, typed into Settings and stored like the Oura credentials. The advisor
    reads completed sessions, Oura-recorded other activity and the watch's own runs, and writes an
    assessment — it changes nothing. The exact request payload is shown to the user before/with
    the response (see [INSPIRATION.md](INSPIRATION.md)); [PRIVACY.md](PRIVACY.md) must be updated
    before this ships, because health data leaves the device for a third party.
-4. **AI plan adjustments with approval (Phase C)** — the advisor may propose changes as
+5. **AI plan adjustments with approval (Phase C)** — the advisor may propose changes as
    structured operations (move session X to day Y, lighten session Z) that map onto the same
    engine operations Phase A uses. Nothing is written without the user accepting, and accepted
    changes go through the append-only session-event log like every other transition. Standing
