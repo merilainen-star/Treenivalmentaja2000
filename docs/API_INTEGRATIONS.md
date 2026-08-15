@@ -243,6 +243,41 @@ never sent.
 **`pace` is deliberately not read**, though the field exists: its unit is undocumented, and a number
 whose unit is a guess is worse than one derived from two that are known.
 
+### The three durations, measured
+
+A real Suunto run on 2026-08-15 settled what the time fields mean. The watch reported 9.52 km,
+**51:14.8** active, 11:16.5 paused and **1:02:31** total; intervals.icu's own page showed **53:46**
+moving. All three appear in the response, and the app now shows all three:
+
+| Value | Seconds | Field | Whose number |
+| --- | --- | --- | --- |
+| 1:02:31 | 3751 | **`icu_recording_time`** | the watch's Total time, exactly |
+| 53:46 | 3226 | `moving_time` | intervals.icu's own, recomputed from the stream |
+| 51:14.8 | 3074.8 | **no field** — but recoverable | the watch's own Duration |
+
+`elapsed_time` was 3752 and the interval row said 3753, so of the three near-identical totals it is
+`icu_recording_time` that matches the watch.
+
+**The watch's own duration is recoverable without downloading a FIT file**, which is the finding
+that matters most here. `average_speed` is anchored to it:
+
+```
+distance / average_speed = 9520 / 3.096 = 3074.9 s = 51:14.9   ← the watch's Duration
+distance / pace          = 9520 / 2.951 = 3226 s   = 53:46     ← moving_time
+```
+
+Two speeds for the same run, both in m/s despite one being called `pace`. They disagree by the
+151 s intervals.icu adds when it recomputes moving time. The app therefore leads with the watch's
+figures — the ones a runner recognises from their wrist — and keeps intervals.icu's beside them.
+
+`average_cadence` is likewise not what it looks like: **81.228 is cycles per minute, one leg.**
+`distance / (cadence × 2 × minutes)` reproduces the response's own `average_stride` of 1.0899 m
+exactly, where `× 1` does not, so the runner's figure is about 162 spm and the app doubles it at
+display.
+
+`icu_intensity` came back as **77.13892** — already a percentage, not a fraction, which settles the
+open question below for this account at least.
+
 ### Two fields the specification does not describe
 
 Neither is a small detail, and neither is documented anywhere — not in the schema, which carries no

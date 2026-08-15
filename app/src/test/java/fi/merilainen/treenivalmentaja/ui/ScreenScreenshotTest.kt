@@ -72,21 +72,32 @@ class ScreenScreenshotTest {
     /** A Monday. The week list's headings show real dates, so they need a date that never moves. */
     private val FIXED_TODAY: LocalDate = LocalDate.of(2026, 8, 10)
 
-    /** A run with every measurement the watch can report, so the full layout has something to draw. */
+    /**
+     * A real Suunto run, captured from the raw-data screen on 2026-08-15.
+     *
+     * Real values rather than invented ones, because this baseline is what pins the three-duration
+     * layout — and the whole reason that layout exists is that these three numbers disagree:
+     * 51:15 active, 53:46 moving, 1:02:31 total.
+     */
     private val fullRunMetrics = CompletedRunMetrics(
-        activityId = "i84461234",
+        activityId = "i176132319",
         sportType = "Run",
-        startTimeUtc = 1_754_845_200_000L,
-        movingTimeSec = 2_280,
-        distanceKm = 6.2,
+        startTimeUtc = 1_786_889_278_000L,
+        movingTimeSec = 3_226,
+        recordingTimeSec = 3_751,
+        distanceKm = 9.52,
+        avgSpeedMps = 3.096,
+        maxSpeedMps = 3.71,
         avgHeartRate = 148,
-        maxHeartRate = 171,
-        avgCadence = 168,
-        elevationGainMeters = 42,
-        calories = 540,
-        trainingLoad = 78,
-        intensity = 0.78,
-        deviceName = "Suunto Race",
+        maxHeartRate = 174,
+        avgCadence = 81,
+        elevationGainMeters = 77,
+        calories = 842,
+        trainingLoad = 62,
+        intensity = 77.13892,
+        hrLoad = 62,
+        trimp = 92.35979,
+        deviceName = "SUUNTO Suunto 5",
     )
 
     private fun strength(dayOffset: Int, id: String) = Workout(

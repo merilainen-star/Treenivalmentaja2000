@@ -138,14 +138,23 @@ data class IntervalsActivityEntity(
   /** intervals.icu's activity type, e.g. `Run`, `Walk`, `WeightTraining`. Stored as it arrives. */
   val sportType: String,
   val startTimeUtc: Long,
-  /** Seconds actually moving — what pace is computed from. */
+  /** Seconds intervals.icu counted as moving, recomputed by it from the stream. */
   val movingTimeSec: Long,
   /** Seconds start to finish, pauses included. */
   val elapsedTimeSec: Long? = null,
+  /** `icu_recording_time` — the total that matches the watch's own. */
+  val recordingTimeSec: Long? = null,
   val distanceMeters: Double? = null,
+  /**
+   * Metres per second, and the number the watch's own duration is recovered from:
+   * `distanceMeters / avgSpeedMps`. Stored rather than that duration, because a speed is what the
+   * service sent and the duration is a thing derived from it.
+   */
+  val avgSpeedMps: Double? = null,
+  val maxSpeedMps: Double? = null,
   val avgHeartRate: Int? = null,
   val maxHeartRate: Int? = null,
-  /** Steps per minute. */
+  /** **Cycles** per minute as the service sent it — one leg. Doubled at display, not here. */
   val avgCadence: Int? = null,
   val elevationGainMeters: Double? = null,
   val calories: Int? = null,
@@ -158,6 +167,10 @@ data class IntervalsActivityEntity(
    * where it could never be re-examined. Stored raw, interpreted at the point of display.
    */
   val intensity: Double? = null,
+  /** Heart-rate-derived load. Equal to [trainingLoad] on a session with no power meter. */
+  val hrLoad: Int? = null,
+  /** Training impulse — the classic heart-rate integral. */
+  val trimp: Double? = null,
   /**
    * Which service the activity came from: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … A documented
    * enum, stored because it answers "did this really come off the watch". Never filtered on — a

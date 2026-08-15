@@ -1,6 +1,8 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
+import fi.merilainen.treenivalmentaja.domain.formatDuration
+import kotlin.math.roundToInt
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -191,8 +193,8 @@ class IntervalsMappersTest {
   fun `pace comes from moving time and distance`() {
     val metrics = metrics(movingTimeSec = 2280, distanceKm = 6.2)
 
-    assertEquals(367, metrics.paceSecPerKm)
-    assertEquals("6:07 /km", metrics.paceText)
+    assertEquals(368, metrics.paceSecPerKm)
+    assertEquals("6:08 /km", metrics.paceText)
   }
 
   /** A strength session has no distance, and therefore no pace to print. */
@@ -303,6 +305,110 @@ class IntervalsMappersTest {
   @Test
   fun `an absent intensity stays absent rather than becoming zero percent`() {
     assertNull(metrics(1800, 5.0).copy(intensity = null).intensityPercent)
+  }
+
+  // ------------------------------------------------------------------ the real run
+
+  /**
+   * A real Suunto run, captured from the raw-data screen on 2026-08-15 and used here as the
+   * fixture the whole duration design was settled against.
+   *
+   * The watch said 9.52 km, 51:14.8 active, 11:16.5 paused, 1:02:31 total, 5:22 /km.
+   * intervals.icu said 53:46 moving and 5:39 /km. Both are right about different things, and
+   * these assertions are what keep the app from quietly picking one and forgetting the others.
+   */
+  private val realRun =
+    CompletedRunMetrics(
+      activityId = "i176132319",
+      sportType = "Run",
+      startTimeUtc = 1_786_889_278_000L,
+      movingTimeSec = 3226,
+      recordingTimeSec = 3751,
+      distanceKm = 9.52,
+      avgSpeedMps = 3.096,
+      maxSpeedMps = 3.71,
+      avgHeartRate = 148,
+      maxHeartRate = 174,
+      avgCadence = 81,
+      elevationGainMeters = 77,
+      calories = 842,
+      trainingLoad = 62,
+      intensity = 77.13892,
+      hrLoad = 62,
+      trimp = 92.35979,
+      deviceName = "SUUNTO Suunto 5",
+    )
+
+  /** 9520 m / 3.096 m/s = 3074.9 s, against a watch that reported 51:14.8. */
+  @Test
+  fun `the watch's own duration is recovered from distance and average speed`() {
+    assertEquals(3075L, realRun.activeDurationSec)
+    assertEquals("51:15", realRun.activeDurationSec!!.formatDuration())
+  }
+
+  /** All three durations survive, because all three are true of the same run. */
+  @Test
+  fun `moving time and recording time are kept beside it`() {
+    assertEquals("53:46", realRun.movingTimeSec.formatDuration())
+    assertEquals("1:02:31", realRun.recordingTimeSec!!.formatDuration())
+  }
+
+  /** The watch's pace leads, because it is the number the runner saw on their wrist. */
+  @Test
+  fun `pace is the watch's, not intervals icu's`() {
+    assertEquals("5:23 /km", realRun.paceText)
+    // What the app used to show, from moving time — kept as an assertion so the difference stays
+    // visible if anyone changes which duration leads.
+    assertEquals(339, (3226.0 / 9.52).roundToInt())
+  }
+
+  @Test
+  fun `max speed becomes the fastest pace`() {
+    // 1000 / 3.71 m/s = 269.5 s/km, rounded.
+    assertEquals("4:30 /km", realRun.maxPaceText)
+  }
+
+  /** 81 cycles per leg is 162 steps, which is the figure a runner recognises. */
+  @Test
+  fun `cadence is doubled into steps per minute`() {
+    assertEquals(162, realRun.stepsPerMinute)
+  }
+
+  /** Real data settled the scale: 77.13892 is already a percentage. */
+  @Test
+  fun `the real intensity reads as a whole percentage`() {
+    assertEquals(77, realRun.intensityPercent)
+  }
+
+  /** Without a speed there is no watch duration, and the moving time leads instead. */
+  @Test
+  fun `a run with no average speed falls back to moving time`() {
+    val noSpeed = realRun.copy(avgSpeedMps = null)
+
+    assertNull(noSpeed.activeDurationSec)
+    assertEquals(3226L, noSpeed.primaryDurationSec)
+    assertEquals("5:39 /km", noSpeed.paceText)
+  }
+
+  /** Under an hour reads as a stopwatch does, without a leading zero hour. */
+  @Test
+  fun `durations show hours only when there are hours`() {
+    assertEquals("51:15", 3075L.formatDuration())
+    assertEquals("1:02:31", 3751L.formatDuration())
+    assertEquals("0:45", 45L.formatDuration())
+  }
+
+  /**
+   * The rounding fix. 3075 s over 9.52 km is 323.0 s/km; truncation and rounding agree here, so
+   * the case that proves it is the one that used to be wrong: 3226 s over 9.52 km is 338.87, and
+   * the old code printed 5:38 where both the watch and intervals.icu said 5:39.
+   */
+  @Test
+  fun `pace is rounded rather than truncated`() {
+    val movingOnly = realRun.copy(avgSpeedMps = null)
+
+    assertEquals(339, movingOnly.paceSecPerKm)
+    assertEquals("5:39 /km", movingOnly.paceText)
   }
 
   private fun metrics(movingTimeSec: Long, distanceKm: Double?) =

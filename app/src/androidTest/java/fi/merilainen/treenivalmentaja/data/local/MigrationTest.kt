@@ -282,4 +282,40 @@ class MigrationTest {
     assertTrue(activities.isNull(activities.getColumnIndex("intensity")))
     activities.close()
   }
+
+  /**
+   * Version 9 adds the speeds, the recording time and the two extra load figures.
+   *
+   * `avgSpeedMps` is the one that matters: it is what the watch's own duration is recovered from,
+   * so an activity synced before this version cannot show that duration until it is fetched again.
+   * The test proves it gets a null rather than a zero, which would read as a runner who never
+   * moved.
+   */
+  @Test
+  fun migrate8To9() {
+    var db = helper.createDatabase(TEST_DB, 8)
+
+    db.execSQL(
+      """
+      INSERT INTO `intervals_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `elapsedTimeSec`, `distanceMeters`, `avgHeartRate`, `maxHeartRate`, `avgCadence`, `elevationGainMeters`, `calories`, `trainingLoad`, `intensity`, `source`, `deviceName`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES ('i176132319', 'Afternoon Run', 'Run', 1786889278000, 3226, 3752, 9520.0, 148, 174, 81, 77.0, 842, 62, 77.13892, 'SUUNTO', 'SUUNTO Suunto 5', 'session1', 1786889278000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 9, true)
+
+    val activities = db.query("SELECT * FROM intervals_activities")
+    assertTrue(activities.moveToFirst())
+    assertEquals("i176132319", activities.getString(activities.getColumnIndex("id")))
+    assertEquals(3226L, activities.getLong(activities.getColumnIndex("movingTimeSec")))
+    assertEquals(81, activities.getInt(activities.getColumnIndex("avgCadence")))
+    assertEquals("session1", activities.getString(activities.getColumnIndex("matchedSessionId")))
+    assertTrue(activities.isNull(activities.getColumnIndex("avgSpeedMps")))
+    assertTrue(activities.isNull(activities.getColumnIndex("maxSpeedMps")))
+    assertTrue(activities.isNull(activities.getColumnIndex("recordingTimeSec")))
+    assertTrue(activities.isNull(activities.getColumnIndex("hrLoad")))
+    assertTrue(activities.isNull(activities.getColumnIndex("trimp")))
+    activities.close()
+  }
 }

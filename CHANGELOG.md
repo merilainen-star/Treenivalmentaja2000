@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-16
+
+### Changed
+- **The run line now shows the numbers the runner recognises.** The raw-data screen answered the
+  question it was built for, and the answer was that all three durations are real:
+
+  ```
+  Kello: 5:23 /km (max 4:30 /km) · 9,52 km · nousu 77 m
+  aktiivinen 51:15 · liikkeessä 53:46 · yhteensä 1:02:31
+  syke 148 (max 174) · askeltiheys 162
+  842 kcal · kuormitus 62 · intensiteetti 77 %
+  ```
+
+  The watch's own figures lead, intervals.icu's sit beside them, and none is hidden. Showing only
+  `moving_time` — the one number the runner had never seen — is what made the app disagree with the
+  wrist for no visible reason.
+- **The watch's own duration needs no FIT file.** `average_speed` is anchored to it, so
+  `distance / average_speed` gives it back: 9520 / 3.096 = 3074.9 s = 51:14.9, against a Suunto
+  that reported 51:14.8. `pace` is a *different* speed for the same run — distance over
+  `moving_time` — and the two disagree by the 151 s intervals.icu adds when it recomputes moving
+  time from the stream. Both are m/s despite one being called `pace`.
+- **`icu_recording_time` is the total that matches the watch**: 3751 against 1:02:31 exactly.
+  `elapsed_time` was 3752 and the interval row said 3753, so of the three near-identical totals
+  only this one is the watch's.
+
+### Fixed
+- **Cadence was half.** `average_cadence` is cycles per minute for one leg, so a run at about 162
+  steps per minute was displayed as 81 — a figure no runner would recognise. Proved rather than
+  assumed: `distance / (cadence × 2 × minutes)` reproduces the response's own `average_stride` of
+  1.0899 m exactly, where `× 1` does not. Doubled at display, so the stored value stays the one the
+  service sent.
+- **Pace was truncated where it should round.** 338.87 s/km printed as 5:38 where both the watch and
+  intervals.icu said 5:39 — a one-second gap that looked like a different measurement rather than a
+  different rounding.
+
+### Added
+- Five more fields: `average_speed`, `max_speed`, `icu_recording_time`, `hr_load` and `trimp`,
+  bringing the request to twenty-three of the 183 the schema declares. The first three are what the
+  durations above are built from; the last two are intervals.icu's other load figures, kept because
+  the analytics are the reason to be on this service at all.
+- Room schema version 9 for those columns, by auto migration. The instrumented test proves an
+  activity synced before them gets nulls — `avgSpeedMps` in particular, because without it that
+  activity cannot show the watch's duration until it is fetched again.
+
+### Notes
+- `icu_intensity` came back as **77.13892** — already a percentage, which settles for this account
+  the question the previous entry left open. The fraction branch stays, because one account's data
+  is not the specification and the bound costs nothing.
+- One sub-second disagreement remains and is left alone: 322.98 s/km is shown as 5:23 where the
+  Suunto shows 5:22, because the watch truncates and this app rounds. Rounding is the correct
+  reading of 322.98 and matching both conventions at once is impossible.
+- The screenshot baselines now use that real run's numbers rather than invented ones, since what
+  they pin is precisely the layout those three disagreeing durations forced.
+
 ## [Unreleased] - 2026-08-15 (fourth entry)
 
 ### Added

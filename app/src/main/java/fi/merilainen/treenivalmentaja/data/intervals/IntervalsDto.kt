@@ -28,8 +28,16 @@ internal data class IntervalsActivityDto(
   @Json(name = "start_date") val startDate: String? = null,
   /** Seconds actually moving — what pace is computed from. */
   @Json(name = "moving_time") val movingTime: Int? = null,
-  /** Seconds start to finish, pauses included. */
+  /** Seconds start to finish, pauses included. One more than [icuRecordingTime] in real data. */
   @Json(name = "elapsed_time") val elapsedTime: Int? = null,
+  /**
+   * Seconds the device recorded for — **the field that matches the watch's own total**.
+   *
+   * Measured against a real Suunto run on 2026-08-15: the watch reported 1:02:31 and this came
+   * back as exactly 3751. `elapsed_time` was 3752 and the interval row said 3753, so of the three
+   * near-identical totals this is the one to show.
+   */
+  @Json(name = "icu_recording_time") val icuRecordingTime: Int? = null,
   /**
    * Metres, as the recording device reported them.
    *
@@ -41,9 +49,28 @@ internal data class IntervalsActivityDto(
   val distance: Double? = null,
   /** Metres. See [distance] for why both are fetched. */
   @Json(name = "icu_distance") val icuDistance: Double? = null,
+  /**
+   * Metres per second, and **the one anchored to the watch's own moving time**.
+   *
+   * Measured on a real run: `distance / average_speed` = 9520 / 3.096 = 3074.9 s = 51:14.9, which
+   * is exactly the duration the Suunto reported. `pace` is a different speed for the same run —
+   * `distance / moving_time` — so the two disagree by the 151 s intervals.icu adds when it
+   * recomputes moving time from the stream. This is what lets the app show the numbers the runner
+   * recognises without downloading a FIT file.
+   */
+  @Json(name = "average_speed") val averageSpeed: Double? = null,
+  /** Metres per second. */
+  @Json(name = "max_speed") val maxSpeed: Double? = null,
   @Json(name = "average_heartrate") val averageHeartrate: Int? = null,
   @Json(name = "max_heartrate") val maxHeartrate: Int? = null,
-  /** Steps per minute for a run. A float in the schema, though it reads as a whole number. */
+  /**
+   * **Cycles** per minute, not steps — one leg.
+   *
+   * Measured: 81.228 for a run whose `average_stride` is 1.0899 m, and
+   * `distance / (cadence × 2 × minutes)` reproduces that stride exactly while `× 1` does not. The
+   * runner's own figure is therefore twice this, around 162 spm, and doubling happens at display
+   * so the stored value stays the one the service sent.
+   */
   @Json(name = "average_cadence") val averageCadence: Double? = null,
   @Json(name = "total_elevation_gain") val totalElevationGain: Double? = null,
   /** Kilocalories. Strava's summary endpoint carried none; this one does. */
@@ -62,6 +89,16 @@ internal data class IntervalsActivityDto(
    * and normalised only at the point of display; see `CompletedRunMetrics.intensityPercent`.
    */
   @Json(name = "icu_intensity") val icuIntensity: Double? = null,
+  /**
+   * Heart-rate-derived load, and `hr_load_type` says how — `HRSS` in the data seen so far.
+   *
+   * Equal to [icuTrainingLoad] on a run with no power meter, because that is where the load came
+   * from. Kept separately anyway: they are the same number for a different reason, and a session
+   * with power would separate them.
+   */
+  @Json(name = "hr_load") val hrLoad: Int? = null,
+  /** Training impulse — the classic heart-rate integral, alongside intervals.icu's own load. */
+  val trimp: Double? = null,
   /**
    * Where the activity came from. A documented enum: `STRAVA`, `UPLOAD`, `MANUAL`,
    * `GARMIN_CONNECT`, `OAUTH_CLIENT`, `DROPBOX`, `POLAR`, **`SUUNTO`**, `COROS`, `WAHOO`, `ZWIFT`,

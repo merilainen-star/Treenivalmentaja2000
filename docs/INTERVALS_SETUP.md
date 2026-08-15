@@ -53,8 +53,21 @@ offers, named explicitly in the request so the rest are never sent.
 
 An activity lands under the planned session nearest it in time on the same day, through the **same**
 matcher Oura's workouts go through: the sport has to fit, so a `Run` can claim a running session and
-a `Walk` claims nothing. A matched session shows a "Kello:" line with pace, time, distance and heart
-rate, and below it what the body did and what the session cost.
+a `Walk` claims nothing. A matched session shows four lines:
+
+```
+Kello: 5:23 /km (max 4:30 /km) · 9,52 km · nousu 77 m
+aktiivinen 51:15 · liikkeessä 53:46 · yhteensä 1:02:31
+syke 148 (max 174) · askeltiheys 162
+842 kcal · kuormitus 62 · intensiteetti 77 %
+```
+
+**Three durations, because all three are true.** The watch counts moving time one way and
+intervals.icu recomputes it from the stream and gets about two and a half minutes more; the total
+is the watch's own. Showing one alone is what used to make the app disagree with the wrist for no
+visible reason. The pace and the leading duration are the watch's, recovered from `average_speed`
+without downloading a FIT file — see
+[API_INTEGRATIONS.md](API_INTEGRATIONS.md#the-three-durations-measured).
 
 The three numbers on that last line — calories, training load and intensity — are the ones that make
 an *easy* 5 km distinguishable from a hard one of the same distance and duration. Nothing acts on

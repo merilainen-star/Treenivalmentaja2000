@@ -250,19 +250,27 @@ internal class IntervalsClient(
     internal const val SELF = "0"
 
     /**
-     * The eighteen fields the app reads, of the **183** the `Activity` schema declares.
+     * The twenty-three fields the app reads, of the **183** the `Activity` schema declares.
      *
      * Naming them is not a micro-optimisation: without this the service sends every property of
      * every activity in the range, which for a fortnight of training is a large multiple of what
      * is used. The parameter also drops nulls from the response, per the specification.
      *
-     * `distance` and `icu_distance` are both here because the specification describes neither and
-     * does not say how they differ — see [IntervalsActivityDto.distance].
+     * Three groups, and the split is deliberate. The **watch's own numbers** — `distance`,
+     * `average_speed`, `max_speed`, heart rate, cadence, elevation, calories — are what a runner
+     * recognises, and `average_speed` is the one that reproduces the Suunto's own duration.
+     * **intervals.icu's analysis** — `moving_time`, `icu_recording_time`, `icu_training_load`,
+     * `icu_intensity`, `hr_load`, `trimp` — is richer than anything the watch shows and is kept
+     * beside it rather than instead of it. `distance` and `icu_distance` are both here because
+     * the specification describes neither and does not say how they differ.
      */
     internal const val FIELDS =
-      "id,name,type,start_date,start_date_local,moving_time,elapsed_time," +
-        "distance,icu_distance,average_heartrate,max_heartrate,average_cadence," +
-        "total_elevation_gain,calories,icu_training_load,icu_intensity," +
+      "id,name,type,start_date,start_date_local," +
+        "moving_time,elapsed_time,icu_recording_time," +
+        "distance,icu_distance,average_speed,max_speed," +
+        "average_heartrate,max_heartrate,average_cadence," +
+        "total_elevation_gain,calories," +
+        "icu_training_load,icu_intensity,hr_load,trimp," +
         "source,device_name"
 
     internal const val OFFLINE = "Intervals.icu-tietojen haku vaatii verkkoyhteyden."

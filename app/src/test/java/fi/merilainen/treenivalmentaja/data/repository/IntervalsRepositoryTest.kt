@@ -314,7 +314,9 @@ class IntervalsRepositoryTest {
     val metrics = repository.observeMatchedRunMetrics().first().getValue("session-run")
 
     assertEquals(6.2, metrics.distanceKm!!, 0.001)
-    assertEquals("6:07 /km", metrics.paceText)
+    // 3226 s over 6.2 km is 367.7 s/km, rounded — the fixture carries no average_speed, so the
+    // moving time leads.
+    assertEquals("6:08 /km", metrics.paceText)
     assertEquals(78, metrics.trainingLoad)
     assertEquals(540, metrics.calories)
   }

@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 8 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 9 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -177,7 +177,12 @@ The order of priority is:
   - `distanceMeters` (Double?)
   - `avgHeartRate` (Int?), `maxHeartRate` (Int?) — absent without a sensor
   - `elevationGainMeters` (Double?)
-  - `avgCadence` (Int?) — steps per minute
+  - `recordingTimeSec` (Long?) — `icu_recording_time`, the total that matches the watch
+  - `avgSpeedMps` (Double?) — the watch's own average speed. `distanceMeters / avgSpeedMps` gives
+    back the watch's own duration, which is why the speed is stored and the duration is not
+  - `maxSpeedMps` (Double?)
+  - `avgCadence` (Int?) — **cycles** per minute as the service sent it, one leg. Doubled into steps
+    at display, never here
   - `calories` (Int?) — present here, where Strava's summary endpoint carried none
   - `trainingLoad` (Int?) — intervals.icu's own `icu_training_load`
   - `intensity` (Double?) — `icu_intensity`, **stored exactly as the service sent it**. Its scale is
@@ -186,6 +191,7 @@ The order of priority is:
   - `source` (String?) — a documented enum: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … Stored
     because it answers "did this come off the watch", **never filtered on**: a run uploaded by hand
     is still that run
+  - `hrLoad` (Int?), `trimp` (Double?) — intervals.icu's other two load figures
   - `deviceName` (String?) — kept for diagnostics, shown nowhere
   - `fetchedAtUtc` (Long)
 - **Nullability:** The same rule as the Oura tables. A treadmill run has no distance, a run without
@@ -252,6 +258,10 @@ Version 8 is additive again: `avgCadence` and `intensity` on `intervals_activiti
 migration. An activity stored before them keeps its values and gets nulls — not a zero cadence,
 which would read as a runner who never took a step.
 
+Version 9 adds `recordingTimeSec`, `avgSpeedMps`, `maxSpeedMps`, `hrLoad` and `trimp`, likewise by
+auto migration. `avgSpeedMps` is the one that matters: an activity synced before it cannot show the
+watch's own duration until it is fetched again, and gets a null rather than a zero speed.
+
 The API key and the OAuth tokens, incidentally, never touched the schema at all. They live in
 encrypted `SharedPreferences` rather than in Room
 ([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
@@ -273,7 +283,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-`app/schemas/` holds `3.json` through `8.json`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `9.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

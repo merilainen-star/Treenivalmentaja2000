@@ -39,6 +39,9 @@ internal object IntervalsMappers {
       startTimeUtc = start,
       movingTimeSec = moving,
       elapsedTimeSec = elapsedTime?.takeIf { it > 0 }?.toLong(),
+      recordingTimeSec = icuRecordingTime?.takeIf { it > 0 }?.toLong(),
+      avgSpeedMps = averageSpeed?.takeIf { it > 0.0 },
+      maxSpeedMps = maxSpeed?.takeIf { it > 0.0 },
       // `icu_distance` first: it is the service's own field for its own figure. Neither it nor
       // `distance` is described in the specification, so this is a stated preference with a
       // fallback rather than a claim about which is authoritative.
@@ -51,6 +54,8 @@ internal object IntervalsMappers {
       calories = calories?.takeIf { it > 0 },
       trainingLoad = icuTrainingLoad?.takeIf { it > 0 },
       intensity = icuIntensity?.takeIf { it > 0.0 },
+      hrLoad = hrLoad?.takeIf { it > 0 },
+      trimp = trimp?.takeIf { it > 0.0 },
       source = source?.takeIf { it.isNotBlank() },
       deviceName = deviceName?.takeIf { it.isNotBlank() },
       matchedSessionId = null,

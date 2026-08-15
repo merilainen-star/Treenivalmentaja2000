@@ -47,6 +47,7 @@ import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
+import fi.merilainen.treenivalmentaja.domain.formatDuration
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -436,14 +437,25 @@ fun RunMetricsRow(
     compact: Boolean = false,
 ) {
     val finnish = Locale("fi", "FI")
-    val distance = metrics.distanceKm?.let { String.format(finnish, "%.1f km", it) }
+    val distance = metrics.distanceKm?.let { String.format(finnish, "%.2f km", it) }
 
-    // How the running itself went.
+    // How fast, and how far. The watch's own pace leads.
     val effort = buildList {
-        metrics.paceText?.let { add(it) }
-        add("${metrics.movingMin} min")
+        metrics.paceText?.let { pace ->
+            val max = metrics.maxPaceText
+            add(if (max != null && !compact) "$pace (max $max)" else pace)
+        }
         distance?.let { add(it) }
+        if (compact) add(metrics.primaryDurationSec.formatDuration())
         if (!compact) metrics.elevationGainMeters?.let { add("nousu $it m") }
+    }
+    // The three durations, side by side. They differ for real reasons — the watch counts moving
+    // time one way and intervals.icu recomputes it another — and showing one alone is what made
+    // the app disagree with the wrist for no visible reason.
+    val durations = buildList {
+        metrics.activeDurationSec?.let { add("aktiivinen ${it.formatDuration()}") }
+        add("liikkeessä ${metrics.movingTimeSec.formatDuration()}")
+        metrics.recordingTimeSec?.let { add("yhteensä ${it.formatDuration()}") }
     }
     // What the body was doing while it happened.
     val body = buildList {
@@ -451,9 +463,9 @@ fun RunMetricsRow(
             val max = metrics.maxHeartRate
             add(if (max != null) "syke $avg (max $max)" else "syke $avg")
         }
-        metrics.avgCadence?.let { add("askeltiheys $it") }
+        metrics.stepsPerMinute?.let { add("askeltiheys $it") }
     }
-    // What it cost — the three numbers that make a hard 5 km distinguishable from an easy one.
+    // What it cost — the numbers that make a hard 5 km distinguishable from an easy one.
     val cost = buildList {
         metrics.calories?.let { add("$it kcal") }
         metrics.trainingLoad?.let { add("kuormitus $it") }
@@ -477,19 +489,14 @@ fun RunMetricsRow(
         )
         // Each line is drawn only when it has something in it — a treadmill run with no strap has
         // no body line at all, and an empty label would be worse than its absence.
-        if (body.isNotEmpty()) {
-            Text(
-                text = body.joinToString(" · "),
-                style = style,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (cost.isNotEmpty()) {
-            Text(
-                text = cost.joinToString(" · "),
-                style = style,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        listOf(durations, body, cost).forEach { line ->
+            if (line.isNotEmpty()) {
+                Text(
+                    text = line.joinToString(" · "),
+                    style = style,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
