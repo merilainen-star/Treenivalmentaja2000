@@ -46,6 +46,7 @@ fun IntervalsCard(
   onTestApiKey: () -> Unit = {},
   onClearApiKey: () -> Unit = {},
   onDismissFailure: () -> Unit = {},
+  onOpenRawData: () -> Unit = {},
 ) {
   Card(
     modifier = Modifier.fillMaxWidth(),
@@ -82,7 +83,40 @@ fun IntervalsCard(
           color = MaterialTheme.colorScheme.error,
         )
       }
+
+      // Offered only once there is a key to fetch with, and phrased so it reads as a tool rather
+      // than as somewhere to go and look at training.
+      if (state != IntervalsConnectionState.NotConfigured) {
+        RawDataEntry(onOpenRawData)
+      }
     }
+  }
+}
+
+/**
+ * The way in to the raw-response screen.
+ *
+ * Here rather than behind a hidden gesture or a debug build flag, for the reason the Oura
+ * diagnostics section is: the person who needs it is the only person who has this app, and a tool
+ * that answers "what did the service actually send" is worth nothing if it takes a rebuild to
+ * reach. It is labelled plainly so it is not mistaken for a feature.
+ */
+@Composable
+private fun RawDataEntry(onOpen: () -> Unit) {
+  HorizontalDivider()
+  Text(
+    text = "Kehitystyökalu",
+    style = MaterialTheme.typography.titleMedium,
+  )
+  Text(
+    text =
+      "Näyttää Intervals.icu:n vastauksen sellaisenaan, ilman kenttärajausta. Hyödyllinen kun " +
+        "haluaa tietää mitä palvelu oikeasti palauttaa — ei tallenna mitään.",
+    style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+  )
+  OutlinedButton(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+    Text("Näytä raakadata")
   }
 }
 

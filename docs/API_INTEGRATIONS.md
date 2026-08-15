@@ -268,6 +268,25 @@ An unauthenticated request and one with a wrong key were both fired at the real 
 2026-08-15. **Both answer `401`** — the service does not distinguish "no credentials" from "bad
 credentials", so the app's message for that case has to cover both, and it does.
 
+### Endpoints used
+
+| Endpoint | For |
+| --- | --- |
+| `GET /api/v1/athlete/0/activities` | the sync, with `fields` naming eighteen columns |
+| `GET /api/v1/athlete/0/activities` | the raw-data screen, with **no** `fields`, so all 183 arrive |
+| `GET /api/v1/activity/{id}` | one activity in full on the raw-data screen, `intervals=true` |
+
+### The raw-data screen
+
+`data/intervals/IntervalsClient.fetchRaw` returns the response body as text and never decodes it.
+What reaches the screen is the bytes the server sent, with whitespace inserted for readability by
+`prettyPrintJson` — which only ever *inserts* whitespace, and deliberately does not go through
+`JSONObject`, whose re-parse would reorder keys, reformat numbers and drop duplicate keys. All
+three would corrupt exactly what the screen exists to show.
+
+The `Authorization` header is attached inside the client and recorded nowhere: the displayed
+request line is built from the URL's path and query, neither of which can carry the credential.
+
 ### Missing data
 
 The same rule as Oura, for the same reason: a treadmill run may have no distance, a run without a

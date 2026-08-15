@@ -53,6 +53,13 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val diagnosing by viewModel.ouraDiagnosing.collectAsState()
     val intervalsState by viewModel.intervalsState.collectAsState()
     val intervalsSyncFailure by viewModel.intervalsSyncFailure.collectAsState()
+    val rawResponse by viewModel.rawResponse.collectAsState()
+    val rawLoading by viewModel.rawLoading.collectAsState()
+    val rawError by viewModel.rawError.collectAsState()
+    val rawActivities by viewModel.rawActivityRefs.collectAsState()
+
+    /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
+    var rawDataOpen by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -160,6 +167,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onTestIntervalsApiKey = viewModel::testIntervalsApiKey,
         onClearIntervalsApiKey = viewModel::clearIntervalsApiKey,
         onDismissIntervalsFailure = viewModel::dismissIntervalsFailure,
+        onOpenIntervalsRawData = { rawDataOpen = true },
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -177,6 +185,23 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onResetSampleData = viewModel::resetSampleData,
         onCheckUpdate = viewModel::checkForUpdate,
     )
+
+    if (rawDataOpen) {
+        IntervalsRawDataSheet(
+            response = rawResponse,
+            loading = rawLoading,
+            error = rawError,
+            activities = rawActivities,
+            onFetchActivities = viewModel::fetchRawActivities,
+            onFetchActivity = viewModel::fetchRawActivity,
+            onDismiss = {
+                rawDataOpen = false
+                // Dropped on close rather than kept: a response is a moment's answer, and one
+                // reopened days later would be read as current.
+                viewModel.clearRawResponse()
+            },
+        )
+    }
 
     importFeedback?.let { feedback ->
         ImportFeedbackDialog(feedback, onDismiss = viewModel::dismissImportFeedback)
@@ -205,6 +230,7 @@ fun SettingsScreenContent(
     onTestIntervalsApiKey: () -> Unit = {},
     onClearIntervalsApiKey: () -> Unit = {},
     onDismissIntervalsFailure: () -> Unit = {},
+    onOpenIntervalsRawData: () -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -313,6 +339,7 @@ fun SettingsScreenContent(
             onTestApiKey = onTestIntervalsApiKey,
             onClearApiKey = onClearIntervalsApiKey,
             onDismissFailure = onDismissIntervalsFailure,
+            onOpenRawData = onOpenIntervalsRawData,
         )
 
         Card(

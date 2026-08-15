@@ -12,8 +12,8 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,744,843 B (19.78 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 428 tests, 0 failures, 0 errors |
+| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,777,611 B (19.82 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 449 tests, 0 failures, 0 errors |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug` | 50 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 39 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
@@ -91,6 +91,11 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   an observable row. **A real account is connected and syncing**, confirmed 2026-08-15; what
   remains unchecked is whether every displayed number matches intervals.icu's own interface for
   the same activity, and two undocumented fields are read on a stated assumption.
+- **A raw-data diagnostics screen** for intervals.icu, in Settings. Fetches with **no** `fields`
+  filter so all 183 fields arrive, returns the response body as text without parsing it, and shows
+  it with whitespace-only pretty-printing. Also fetches one activity in full from the documented
+  single-activity endpoint. The API key cannot reach the screen or the clipboard, which tests
+  assert rather than assume.
   This replaced a Strava integration that lived for one day: Strava paywalled its API in June 2026.
   Suunto's own API was ruled out first — its FAQ restricts access to organisations and says
   outright that personal use is not provided for.

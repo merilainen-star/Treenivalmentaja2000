@@ -54,6 +54,12 @@ The app handles personal health data and training schedules. Threats include una
   than the Strava OAuth flow it replaced, not merely a different one. The key lives under its own
   Android Keystore alias in its own preferences file, is excluded from backup and device transfer,
   is never logged, and is never redisplayed in the UI once saved.
+- **The raw-data diagnostics screen is the one place this had to be thought about twice**, because
+  it exists to be read and copied. The request line it displays is built from the URL's path and
+  query, which cannot carry the credential; the key travels in an `Authorization` header that is
+  attached inside the client and recorded in no field that reaches a screen, a clipboard or a log.
+  The copy button puts the response body on the clipboard and nothing else.
+  `IntervalsClientTest` and `IntervalsRawResponseTest` assert all of this rather than trusting it.
 
 ## Backend Attack Surface
 There is none. The MVP has no server-side component, no Firebase project, and no remote token

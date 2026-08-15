@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-15 (fourth entry)
+
+### Added
+- **A raw-data screen for intervals.icu** — *Asetukset → Intervals.icu → Kehitystyökalu → Näytä
+  raakadata*. It shows the response body as the server sent it, with a button to copy the JSON.
+  It exists to answer a specific question: the watch reports a 51:14.8 run with 11:16.5 of pause
+  and 1:02:31 total, intervals.icu shows 53:46 moving time, and the app shows a third figure again.
+  Guessing which field is which would be the wrong way to settle that.
+- Two things make it a diagnostics tool rather than a second way to read training:
+  **it sends no `fields` parameter**, so all 183 fields arrive instead of the eighteen the sync
+  asks for — a duration field the app does not currently read is therefore *visible* — and
+  **nothing is parsed**. The bytes are kept as text from the socket to the screen; no DTO is
+  involved, so no field can be dropped, renamed, converted or rounded on the way.
+- The documented `GET /api/v1/activity/{id}` is offered too, with `intervals=true`, so one activity
+  can be inspected in full including its lap breakdown. Pick it from a list of what has been synced.
+
+### Notes
+- **Pretty-printing only inserts whitespace.** The obvious implementation,
+  `JSONObject(body).toString(2)`, is the wrong one here: re-parsing reorders keys, can turn `1.0`
+  into `1` or lose the last digits of a large integer, and silently drops a duplicate key. On this
+  screen every one of those would look like a finding about intervals.icu rather than a bug in the
+  printer. `prettyPrintJson` walks the text and inserts newlines and indentation between tokens,
+  copying string contents through untouched — including escaped quotes, which is why it tracks
+  them. A body that is not JSON at all comes back unchanged rather than mangled.
+- **The API key cannot reach the screen or the clipboard.** The displayed request line is built
+  from the URL's path and query, neither of which can carry a credential — it travels in an
+  `Authorization` header attached inside the client and recorded nowhere. The copy button takes the
+  response body alone, so the endpoint line and status are not pasted along with it and what lands
+  on the clipboard is JSON that parses. Both properties are asserted by tests rather than assumed.
+- The body is drawn one line per row in a `LazyColumn` rather than as one enormous `Text`, so a
+  response of any size renders without laying out every glyph at once.
+- **Nothing about the training logic changed.** Which duration the app uses, which pace it shows,
+  how a session is matched — all untouched. This step is only about being able to see the data.
+
 ## [Unreleased] - 2026-08-15 (third entry, after the first real sync)
 
 ### Added

@@ -67,6 +67,32 @@ your own training, not something a watch recording decides — see
 Both an Oura line and a watch line can appear on one session. That is deliberate: the ring and the
 watch recorded the same run, and merging them would hide which device said what.
 
+## Looking at the raw response
+
+**Asetukset → Intervals.icu → Kehitystyökalu → Näytä raakadata.**
+
+A diagnostics tool, not a way to read training. It shows the response body **as the server sent
+it** — no field filter, no parsing, no unit conversion — so a field this app does not use is
+visible there. That is the point: when a number on a session card disagrees with the watch, this is
+how to find out what intervals.icu actually returned.
+
+Two things it does differently from the ordinary sync:
+
+- **No `fields` parameter.** The sync names eighteen fields and gets eighteen back; this asks for
+  none and gets all 183 per activity. A week is used rather than a fortnight, because that is
+  already a long document.
+- **Nothing is stored.** The response is held in memory for as long as the sheet is open and
+  discarded when it closes.
+
+It offers the activities list, and — through the documented `GET /api/v1/activity/{id}` — any one
+activity in full, with `intervals=true` so the lap breakdown comes too.
+
+**Kopioi JSON leikepöydälle** copies the body alone. The endpoint line, the status and the size are
+shown above it but are deliberately not part of what is copied, so what lands on the clipboard is
+JSON that parses. **The API key cannot appear here**: the request line is built from path and query,
+and the credential travels in an `Authorization` header that is never recorded, displayed, copied
+or logged.
+
 ## Notes
 
 - **Re-fetching is safe.** Every sync covers a window that overlaps the last one, because an

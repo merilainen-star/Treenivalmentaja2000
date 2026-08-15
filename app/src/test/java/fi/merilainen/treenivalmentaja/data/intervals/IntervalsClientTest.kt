@@ -8,6 +8,7 @@ import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -38,7 +39,9 @@ class IntervalsClientTest {
   @Before
   fun start() {
     server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-    server.createContext("/api/v1/athlete/0/activities") { exchange: HttpExchange ->
+    // Everything, not just the list path: the diagnostics fetch also calls the single-activity
+    // endpoint, and a test server that 404s it would prove nothing about either.
+    server.createContext("/") { exchange: HttpExchange ->
       lastPath = exchange.requestURI.path
       lastQuery = exchange.requestURI.query
       lastAuthorization = exchange.requestHeaders.getFirst("Authorization")
@@ -260,5 +263,98 @@ class IntervalsClientTest {
     body = "[]"
 
     assertEquals(0, client().testKey())
+  }
+
+  // ------------------------------------------------------------------ raw diagnostics
+
+  /**
+   * The whole reason the raw fetch is a separate method: it must **not** send `fields`.
+   *
+   * The ordinary request names eighteen fields and gets eighteen back. Naming them here would hide
+   * exactly what the diagnostics screen exists to find — a field the app is not already asking
+   * for, such as a duration that matches the watch when the one on screen does not.
+   */
+  @Test
+  fun `the raw activities request sends no field filter`() = runTest {
+    client().rawActivities(LocalDate.of(2026, 8, 8), LocalDate.of(2026, 8, 15))
+
+    val query = lastQuery!!
+    assertFalse(query, query.contains("fields"))
+    assertTrue(query, query.contains("oldest=2026-08-08"))
+    assertTrue(query, query.contains("newest=2026-08-15"))
+  }
+
+  /** The body is returned as text — nothing is parsed, so nothing can be dropped or renamed. */
+  @Test
+  fun `the raw body is returned exactly as the server sent it`() = runTest {
+    body = """[{"id":"i1","undocumented_field":42,"moving_time":3226,"weird":null}]"""
+
+    val raw = client().rawActivities(LocalDate.of(2026, 8, 8), LocalDate.of(2026, 8, 15))
+
+    assertEquals(body, raw.body)
+    assertEquals(200, raw.status)
+    // A field no DTO in this app declares still arrives, which is the point.
+    assertTrue(raw.body, raw.body.contains("undocumented_field"))
+  }
+
+  /** On this screen the status *is* the finding, so a failure is returned rather than thrown. */
+  @Test
+  fun `a raw fetch reports an error status with its body instead of throwing`() = runTest {
+    status = 401
+    body = """{"message":"Unauthorized"}"""
+
+    val raw = client().rawActivities(LocalDate.of(2026, 8, 8), LocalDate.of(2026, 8, 15))
+
+    assertEquals(401, raw.status)
+    assertFalse(raw.isSuccess)
+    assertTrue(raw.body, raw.body.contains("Unauthorized"))
+  }
+
+  /**
+   * The credential test, at the layer that actually holds the key. The recorded request line is
+   * built from path and query; the key travels in a header and is written down nowhere.
+   */
+  @Test
+  fun `the recorded endpoint never contains the api key`() = runTest {
+    val raw =
+      IntervalsClient(
+          apiKeys = { "super-secret-key-value" },
+          baseUrl = "http://127.0.0.1:${server.address.port}",
+        )
+        .rawActivities(LocalDate.of(2026, 8, 8), LocalDate.of(2026, 8, 15))
+
+    assertFalse(raw.endpoint, raw.endpoint.contains("super-secret-key-value"))
+    assertFalse(raw.endpoint, raw.endpoint.contains("Authorization", ignoreCase = true))
+    assertFalse(raw.endpoint, raw.endpoint.contains("Basic", ignoreCase = true))
+    // And the request really was authenticated, so this is not passing by not trying.
+    assertTrue(lastAuthorization!!.startsWith("Basic "))
+  }
+
+  /**
+   * The documented single-activity endpoint, `GET /api/v1/activity/{id}` — asked for with
+   * `intervals=true`, because the lap breakdown is the sort of thing a summary omits and this
+   * endpoint exists here to show more than the list does.
+   */
+  @Test
+  fun `one activity is fetched from the documented single-activity endpoint`() = runTest {
+    body = """{"id":"i84461234","laps":[]}"""
+
+    val raw = client().rawActivity("i84461234")
+
+    assertEquals("/api/v1/activity/i84461234", lastPath)
+    assertTrue(lastQuery!!, lastQuery!!.contains("intervals=true"))
+    assertEquals(body, raw.body)
+    assertTrue(raw.endpoint, raw.endpoint.startsWith("GET /api/v1/activity/i84461234"))
+  }
+
+  @Test
+  fun `a raw fetch without a key is a configuration problem`() = runTest {
+    val thrown =
+      runCatching {
+          client(key = null).rawActivities(LocalDate.of(2026, 8, 8), LocalDate.of(2026, 8, 15))
+        }
+        .exceptionOrNull()
+
+    assertTrue(thrown.toString(), thrown is IntervalsNotConfiguredException)
   }
 }

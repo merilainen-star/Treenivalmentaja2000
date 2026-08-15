@@ -6,6 +6,7 @@ import com.squareup.moshi.JsonEncodingException
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import java.io.IOException
 import java.time.LocalDate
 import java.util.Base64
@@ -83,6 +84,91 @@ internal class IntervalsClient(
   }
 
   private fun activitiesUrl(): HttpUrl = "$baseUrl/api/v1/athlete/$SELF/activities".toHttpUrl()
+
+  // ------------------------------------------------------------------ diagnostics
+
+  /**
+   * The activities response **exactly as the server sends it**, for the diagnostics screen.
+   *
+   * Two things make this different from [activities], and both are the point:
+   *
+   * 1. **No `fields` parameter.** The ordinary request names eighteen fields and gets eighteen
+   *    back; this one names none, so all 183 arrive. The whole reason to look at raw data is to
+   *    find something the app is not already asking for — a duration field that matches the
+   *    watch, say — and filtering the response would hide precisely that.
+   * 2. **No parsing.** The body is returned as text. Nothing is decoded into a DTO, so nothing can
+   *    be dropped, renamed or reformatted on the way to the screen.
+   *
+   * A non-200 is returned rather than thrown, because on this screen the status *is* the finding.
+   */
+  suspend fun rawActivities(from: LocalDate, to: LocalDate): IntervalsRawResponse =
+    fetchRaw(
+      activitiesUrl()
+        .newBuilder()
+        .addQueryParameter("oldest", from.toString())
+        .addQueryParameter("newest", to.toString())
+        .build()
+    )
+
+  /**
+   * One activity in full, from the documented `GET /api/v1/activity/{id}`.
+   *
+   * `intervals=true` is passed because the parameter exists for it and the lap and interval
+   * breakdown is exactly the kind of thing a summary omits — this endpoint is here to show more
+   * than the list does, so asking for less would waste the trip.
+   */
+  suspend fun rawActivity(activityId: String): IntervalsRawResponse =
+    fetchRaw(
+      "$baseUrl/api/v1/activity/$activityId"
+        .toHttpUrl()
+        .newBuilder()
+        .addQueryParameter("intervals", "true")
+        .build()
+    )
+
+  /**
+   * One GET whose status and body are both reported, whatever they are.
+   *
+   * **The returned [IntervalsRawResponse.endpoint] is built from the URL alone.** The
+   * `Authorization` header is attached to the request and never recorded anywhere that reaches a
+   * screen, a clipboard or a log — the API key must not be able to leak through a diagnostics
+   * feature, which is the one place someone is likely to copy the contents and paste them
+   * somewhere else.
+   */
+  private suspend fun fetchRaw(url: HttpUrl): IntervalsRawResponse {
+    val key = apiKeys.apiKey()?.takeIf { it.isNotBlank() } ?: throw IntervalsNotConfiguredException()
+    // Path and query only: `HttpUrl.encodedPath` and `query` cannot contain a credential, because
+    // the credential travels in a header.
+    val line = "GET ${url.encodedPath}" + (url.query?.let { "?$it" } ?: "")
+    return withContext(Dispatchers.IO) {
+      val request =
+        Request.Builder()
+          .url(url)
+          .header("Authorization", basic(key))
+          .header("Accept", "application/json")
+          .build()
+      val response =
+        try {
+          calls.newCall(request).execute()
+        } catch (e: IOException) {
+          throw IntervalsUnavailableException(OFFLINE)
+        }
+      response.use {
+        val body =
+          try {
+            it.body?.string().orEmpty()
+          } catch (e: IOException) {
+            throw IntervalsUnavailableException(OFFLINE)
+          }
+        IntervalsRawResponse(
+          endpoint = line,
+          status = it.code,
+          body = body,
+          fetchedAtUtc = System.currentTimeMillis(),
+        )
+      }
+    }
+  }
 
   private fun decode(body: String): List<IntervalsActivityDto> =
     try {

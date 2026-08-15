@@ -7,6 +7,8 @@ import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
+import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
+import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import java.time.LocalDate
@@ -66,6 +68,39 @@ class IntervalsRepository internal constructor(
             ?.retryAfterSeconds,
       )
     }
+
+  /**
+   * The activities response as the server sends it, for the diagnostics screen. **Stores nothing.**
+   *
+   * Separate from [sync] on purpose: that one asks eighteen named fields and writes rows, this one
+   * asks for everything and writes nothing. A diagnostics call that quietly changed the database
+   * would make the screen a source of the very confusion it exists to resolve.
+   */
+  suspend fun fetchRawActivities(from: LocalDate, to: LocalDate): IntervalsRawResponse =
+    client.rawActivities(from, to)
+
+  /** One activity in full, likewise stored nowhere. */
+  suspend fun fetchRawActivity(activityId: String): IntervalsRawResponse =
+    client.rawActivity(activityId)
+
+  /**
+   * The activities already synced, newest first, for the diagnostics picker.
+   *
+   * Read from the database rather than fetched, so choosing which activity to inspect costs no
+   * request. These are by definition the ones the app knows about, which is also the honest set to
+   * offer: an activity missing from here is itself a finding.
+   */
+  suspend fun recentActivityRefs(fromUtc: Long, toUtc: Long): List<IntervalsActivityRef> =
+    dao.getActivitiesBetween(fromUtc, toUtc)
+      .sortedByDescending { it.startTimeUtc }
+      .map {
+        IntervalsActivityRef(
+          id = it.id,
+          startTimeUtc = it.startTimeUtc,
+          sportType = it.sportType,
+          distanceMeters = it.distanceMeters,
+        )
+      }
 
   /**
    * Ties activities to the sessions they answer, and stores the result.

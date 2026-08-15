@@ -22,9 +22,12 @@ import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnection
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
+import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsSyncResult
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
+import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
+import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
@@ -470,6 +473,82 @@ class WorkoutViewModel(
   private val _intervalsSyncFailure = MutableStateFlow<String?>(null)
   val intervalsSyncFailure: StateFlow<String?> = _intervalsSyncFailure.asStateFlow()
 
+  // ------------------------------------------------------------------ raw-data diagnostics
+
+  /**
+   * The last raw response fetched from intervals.icu, or `null` before anything has been.
+   *
+   * Held here and nowhere else: nothing about this reaches the database, because a diagnostics
+   * call that quietly wrote rows would make the screen a source of the confusion it exists to
+   * resolve.
+   */
+  private val _rawResponse = MutableStateFlow<IntervalsRawResponse?>(null)
+  val rawResponse: StateFlow<IntervalsRawResponse?> = _rawResponse.asStateFlow()
+
+  private val _rawLoading = MutableStateFlow(false)
+  val rawLoading: StateFlow<Boolean> = _rawLoading.asStateFlow()
+
+  /** A network failure, which has no HTTP status to show and so needs saying in words. */
+  private val _rawError = MutableStateFlow<String?>(null)
+  val rawError: StateFlow<String?> = _rawError.asStateFlow()
+
+  /** The activities available to inspect one at a time, newest first. */
+  private val _rawActivityRefs = MutableStateFlow<List<IntervalsActivityRef>>(emptyList())
+  val rawActivityRefs: StateFlow<List<IntervalsActivityRef>> = _rawActivityRefs.asStateFlow()
+
+  /**
+   * Fetches the activities list unfiltered — every field, not the eighteen the sync asks for.
+   *
+   * A week rather than the sync's fortnight: this response carries all 183 fields per activity, so
+   * a shorter range keeps it to something a person can actually read.
+   */
+  fun fetchRawActivities() {
+    val repository = intervalsRepository ?: return
+    if (_rawLoading.value) return
+    viewModelScope.launch {
+      _rawLoading.value = true
+      _rawError.value = null
+      val today = LocalDate.now()
+      try {
+        _rawResponse.value =
+          repository.fetchRawActivities(from = today.minusDays(RAW_DAYS), to = today)
+      } catch (e: IntervalsException) {
+        _rawResponse.value = null
+        _rawError.value = e.message
+      }
+      // Offered after the list has been fetched, so the picker is never empty for want of asking.
+      val zone = ZoneId.systemDefault()
+      _rawActivityRefs.value =
+        repository.recentActivityRefs(
+          fromUtc = today.minusDays(RAW_DAYS).atStartOfDay(zone).toInstant().toEpochMilli(),
+          toUtc = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+      _rawLoading.value = false
+    }
+  }
+
+  /** One activity in full, from the documented single-activity endpoint. */
+  fun fetchRawActivity(activityId: String) {
+    val repository = intervalsRepository ?: return
+    if (_rawLoading.value) return
+    viewModelScope.launch {
+      _rawLoading.value = true
+      _rawError.value = null
+      try {
+        _rawResponse.value = repository.fetchRawActivity(activityId)
+      } catch (e: IntervalsException) {
+        _rawResponse.value = null
+        _rawError.value = e.message
+      }
+      _rawLoading.value = false
+    }
+  }
+
+  fun clearRawResponse() {
+    _rawResponse.value = null
+    _rawError.value = null
+  }
+
   /**
    * What the watch recorded for each session that was actually done, keyed by session id — pace
    * included, which is the measurement Oura does not carry.
@@ -750,6 +829,14 @@ class WorkoutViewModel(
 
     /** The advice rule reads today and yesterday; a couple of days is margin, not a window. */
     private const val ADVICE_DAYS_BACK = 3L
+
+    /**
+     * How far back the raw-data screen reaches.
+     *
+     * Shorter than [SYNC_DAYS] on purpose: that request names eighteen fields, this one names none
+     * and gets all 183 per activity, so a week is already a long document to read.
+     */
+    private const val RAW_DAYS = 7L
 
     /** Statuses that describe a closed row and are never drawn on the Today/Week screens. */
     private val HIDDEN_STATUSES = setOf(SessionStatus.RESCHEDULED, SessionStatus.CANCELLED)
