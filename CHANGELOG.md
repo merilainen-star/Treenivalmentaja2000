@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-15 (later the same day)
+
+### Changed
+- **Strava is gone; the watch's runs now come from intervals.icu.** Strava paywalled its API in
+  June 2026 — developer access requires an active subscription — so the integration that shipped
+  hours earlier was removed entirely rather than left to rot. Nothing about it survives: no
+  package, no card, no callback activity, no exported component, no table.
+- Suunto's **own** API was ruled out before intervals.icu was chosen. Its developer FAQ says
+  access is for "companies/organizations" and that "we do not provide this for personal use", so a
+  one-person training app does not qualify however good the data is.
+
+### Added
+- **Intervals.icu, with a personal API key rather than OAuth.** Paste the key from intervals.icu's
+  Developer Settings into **Asetukset → Intervals.icu** and press *Tallenna avain*; the app tests
+  it immediately and there is a **Testaa yhteys** button underneath for checking again later. See
+  [INTERVALS_SETUP.md](docs/INTERVALS_SETUP.md).
+  This is a *smaller* thing than the OAuth flow it replaces, not merely a different one: no browser
+  round trip, no `state` to validate, no refresh token that must not be spent twice, and **no
+  exported activity at all** — `OuraCallbackActivity` is once again the app's only exported
+  component. The key is held under its own Android Keystore alias, excluded from backup, never
+  logged, and never redisplayed once saved.
+- **Two measurements Strava never gave us**: `calories`, which Strava's summary endpoint omitted
+  entirely, and `icu_training_load` — intervals.icu's own load figure for the activity. The session
+  line now reads `Kello: 6:07 /km · 38 min · 6,2 km · syke 148 (max 171) · 540 kcal · kuormitus 78`.
+  Labelled "Kello" rather than by the service, because the reader cares that it is the watch's own
+  recording; which pipe it travelled down is plumbing.
+- Room schema version 7: `intervals_activities` in, `strava_activities` out, by an auto migration
+  with a `@DeleteTable` spec. An instrumented test runs it against a version-6 database holding a
+  plan, an Oura summary **and** a Strava row, and checks that the neighbours survive untouched, the
+  new table takes a string id, and the old table is really gone.
+
+### Notes
+- The activity id is a **string** here (`i84461234`) where Strava's was a number, and that id is
+  what makes the sync idempotent: rows are upserted on it, so the deliberately overlapping fetch
+  window rewrites rows instead of duplicating them. Nothing compares start times or distances to
+  guess whether two records are the same activity.
+- The request names the fifteen fields the app reads, of the **183** the `Activity` schema
+  declares, so the rest are never sent.
+- `pace` exists in the API and is deliberately **not** read: its unit is undocumented, and a number
+  whose unit is a guess is worse than one computed from two that are known.
+- `source` is stored (`SUUNTO`, `MANUAL`, `UPLOAD`, …) and never filtered on. A run uploaded by
+  hand is still that run.
+- Measured against the real service before writing the error handling: both an unauthenticated
+  request and one with a wrong key answer **401**, so the app's message for that case covers both.
+- **No real intervals.icu account has been connected yet.** The tests run against a local
+  `com.sun.net.httpserver`, so what is verified is this app's behaviour rather than that
+  intervals.icu's answers match the shapes it expects — the same position the Oura client was in
+  before its first real login.
+- The specification is vendored at
+  [`docs/api/intervals-icu-openapi.json`](docs/api/intervals-icu-openapi.json), fetched from the
+  service's own `/api/v1/docs`, so every field name and type above was read rather than remembered.
+
 ## [Unreleased] - 2026-08-15
 
 ### Added

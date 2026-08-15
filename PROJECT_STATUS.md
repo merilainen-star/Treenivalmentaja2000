@@ -12,16 +12,22 @@ Every number below was measured on this commit, not carried over from a previous
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,761,315 B (19.80 MiB) |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 406 tests, 0 failures, 0 errors |
+| Build | `./gradlew clean :app:assembleDebug` | Success — `app-debug.apk`, 20,744,843 B (19.78 MiB) |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 419 tests, 0 failures, 0 errors |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug` | 46 comparisons, 0 changed |
 | Lint | `./gradlew :app:lintDebug` | 0 errors, 41 warnings |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 37 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest` | 38 tests, 0 failures, 0 errors, on `treeni-test` (AVD, Android 16) |
 
-The Strava client and the readiness rule together cost **98,472 B (+0.48%)** over the previous
-clean build: 20,662,843 B before, 20,761,315 B after. No new dependency — OkHttp, Moshi and Room
-were all already in the APK, and the token store uses platform crypto rather than a library, so the
-whole figure is this app's own code.
+Replacing the Strava client with the intervals.icu one **shrank** the APK by 16,472 B — 20,761,315 B
+before, 20,744,843 B after — which is the clearest measure of how much smaller a personal API key is
+than an OAuth flow: gone are the authorization-URL builder, the redirect parser, the token
+exchange and refresh service, the `Authenticator`, the connection state machine's five states and
+an exported callback activity, replaced by one Basic-auth header.
+
+The Strava client and the readiness rule together had cost **98,472 B (+0.48%)** over the build
+before them: 20,662,843 B to 20,761,315 B. No new dependency in either direction — OkHttp, Moshi
+and Room were already in the APK and the key store uses platform crypto rather than a library, so
+every figure here is this app's own code.
 
 Before that, the whole Oura milestone cost **164,928 B (+0.80%)**: 20,497,915 B
 without any of it, 20,662,843 B with all of it. The week view, the unmatched-workout list and the
@@ -61,7 +67,7 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 
 - **UI shell.** Bottom navigation, splash screen, Today, Week and Settings.
 - **Room persistence.** `TrainingPlan`, `WorkoutSession`, `SessionEvent`, `OuraDailySummary`,
-  `OuraWorkout` and `StravaActivity` entities, DAOs and `AppDatabase` at schema version 6.
+  `OuraWorkout` and `IntervalsActivity` entities, DAOs and `AppDatabase` at schema version 7.
   `WorkoutViewModel` observes a Room `Flow`.
 - **Session state machine.** All nine statuses with a validated transition table; a forbidden
   transition is rejected and writes nothing.
@@ -75,13 +81,18 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
 - **Deterministic training engine.** `TrainingEngine` handles missed sessions, plan shifting,
   illness pause (`markSick`) and the graduated return (`markRecovered`), wired to the Today
   screen's buttons and run at startup.
-- **Strava.** `data/strava` reads `/api/v3/athlete/activities` between two dates, pages by page
-  number, and stores `strava_activities`. OAuth2 with credentials typed into Settings and tokens
-  under their own Keystore key; **no PKCE**, because Strava's token endpoint accepts no verifier,
-  so `state` carries the whole burden. Runs match to planned sessions through the same use case
-  Oura's workouts go through, and a matched run shows a pace line Oura cannot supply. 37 unit tests
-  against a local `com.sun.net.httpserver`. **No real account has been connected yet** — what is
-  verified is the client, not that Strava's answers match the shapes it expects.
+- **Intervals.icu.** `data/intervals` reads `/api/v1/athlete/0/activities` between two dates and
+  stores `intervals_activities`. HTTP Basic with a personal API key typed into Settings and held
+  under its own Keystore alias — no OAuth, no callback activity, no refresh token, and no exported
+  component. Runs match to planned sessions through the same use case Oura's workouts go through,
+  and a matched session shows pace, calories and intervals.icu's own training load, none of which
+  Oura carries. The sync is idempotent on the service's activity id. 50 unit tests against a local
+  `com.sun.net.httpserver`, including a Robolectric pass over the whole path from HTTP response to
+  an observable row. **No real account has been connected yet** — what is verified is the client,
+  not that intervals.icu's answers match the shapes it expects.
+  This replaced a Strava integration that lived for one day: Strava paywalled its API in June 2026.
+  Suunto's own API was ruled out first — its FAQ restricts access to organisations and says
+  outright that personal use is not provided for.
 - **Readiness advice.** `ReadinessAdviceUseCase` turns a poor readiness reading into a question on
   the Today screen — shift the programme, or start today lighter — and never into an action. Both
   buttons call operations that already existed, and a day the ring was not worn produces no card
@@ -90,8 +101,10 @@ Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separa
   `BOOT_COMPLETED`, `MY_PACKAGE_REPLACED` and `TIMEZONE_CHANGED`, with a notification-permission
   check in Settings.
 - **Room migrations.** `exportSchema = true`, schemas committed under `app/schemas/`, and
-  `MIGRATION_3_4` (hand-written) plus the 4 → 5 and 5 → 6 auto migrations each covered by an
-  instrumented test that runs it against a populated database of the older version. There is deliberately **no**
+  `MIGRATION_3_4` (hand-written) plus the 4 → 5, 5 → 6 and 6 → 7 auto migrations each covered by an
+  instrumented test that runs it against a populated database of the older version. 6 → 7 is the
+  first that drops a table, declared with a `@DeleteTable` spec so Room knows the removal is
+  deliberate rather than a rename. There is deliberately **no**
   `fallbackToDestructiveMigration`: a missing migration now fails loudly instead of silently
   emptying the database.
 - **A scrollable calendar rather than a fixed week.** It opens on today and runs four weeks either

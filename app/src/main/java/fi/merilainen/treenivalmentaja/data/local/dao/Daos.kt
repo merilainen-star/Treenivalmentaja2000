@@ -7,8 +7,8 @@ import androidx.room.Query
 import androidx.room.Update
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
-import fi.merilainen.treenivalmentaja.data.local.entity.StravaActivityEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -202,22 +202,28 @@ interface OuraDao {
 }
 
 @Dao
-interface StravaDao {
+interface IntervalsDao {
 
-  /** `REPLACE` is safe for the reason it is on the Oura tables: nothing references these rows. */
+  /**
+   * `REPLACE` is safe for the reason it is on the Oura tables: nothing references these rows.
+   *
+   * It is also what makes the sync idempotent. The primary key is intervals.icu's own activity id,
+   * so re-fetching an overlapping window rewrites the same rows rather than duplicating them —
+   * dedup by identity, never by comparing a start time and a distance.
+   */
   @Insert(onConflict = OnConflictStrategy.REPLACE)
-  suspend fun upsertActivities(activities: List<StravaActivityEntity>)
+  suspend fun upsertActivities(activities: List<IntervalsActivityEntity>)
 
-  @Query("SELECT * FROM strava_activities WHERE startTimeUtc BETWEEN :fromUtc AND :toUtc")
-  suspend fun getActivitiesBetween(fromUtc: Long, toUtc: Long): List<StravaActivityEntity>
+  @Query("SELECT * FROM intervals_activities WHERE startTimeUtc BETWEEN :fromUtc AND :toUtc")
+  suspend fun getActivitiesBetween(fromUtc: Long, toUtc: Long): List<IntervalsActivityEntity>
 
   /** Same shape as the Oura matcher write: only the link, never the whole row. */
-  @Query("UPDATE strava_activities SET matchedSessionId = :sessionId WHERE id = :activityId")
-  suspend fun setMatchedSession(activityId: Long, sessionId: String?)
+  @Query("UPDATE intervals_activities SET matchedSessionId = :sessionId WHERE id = :activityId")
+  suspend fun setMatchedSession(activityId: String, sessionId: String?)
 
   /** Every activity tied to any session, for the screens that draw a list of them. */
-  @Query("SELECT * FROM strava_activities WHERE matchedSessionId IS NOT NULL")
-  fun observeMatchedActivities(): Flow<List<StravaActivityEntity>>
+  @Query("SELECT * FROM intervals_activities WHERE matchedSessionId IS NOT NULL")
+  fun observeMatchedActivities(): Flow<List<IntervalsActivityEntity>>
 
-  @Query("DELETE FROM strava_activities") suspend fun clearActivities()
+  @Query("DELETE FROM intervals_activities") suspend fun clearActivities()
 }

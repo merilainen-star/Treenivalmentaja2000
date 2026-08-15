@@ -20,10 +20,11 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.repository.OuraRepository
 import fi.merilainen.treenivalmentaja.data.repository.OuraSyncResult
-import fi.merilainen.treenivalmentaja.data.repository.StravaRepository
-import fi.merilainen.treenivalmentaja.data.strava.StravaConnection
-import fi.merilainen.treenivalmentaja.data.strava.StravaConnectionState
-import fi.merilainen.treenivalmentaja.domain.StravaRunMetrics
+import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnection
+import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
+import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
+import fi.merilainen.treenivalmentaja.data.repository.IntervalsSyncResult
+import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
@@ -120,8 +121,8 @@ class WorkoutViewModel(
   private val loadExerciseGuideUseCase: LoadExerciseGuideUseCase,
   private val ouraConnection: OuraConnection,
   private val ouraRepository: OuraRepository,
-  private val stravaConnection: StravaConnection? = null,
-  private val stravaRepository: StravaRepository? = null,
+  private val intervalsConnection: IntervalsConnection? = null,
+  private val intervalsRepository: IntervalsRepository? = null,
   private val readinessAdviceUseCase: ReadinessAdviceUseCase = ReadinessAdviceUseCase(),
 ) : ViewModel() {
 
@@ -370,77 +371,85 @@ class WorkoutViewModel(
     viewModelScope.launch { ouraConnection.dismissFailure() }
   }
 
-  // ------------------------------------------------------------------ Strava
+  // ------------------------------------------------------------------ intervals.icu
 
   /**
-   * Whether Strava is connected, being connected, or cannot be.
+   * Whether an intervals.icu key is stored, and what the last test of it said.
    *
    * The connection is nullable on the constructor so the existing unit tests, which have no
    * Keystore to build a real one against, keep constructing the ViewModel; a missing connection
    * reads as NotConfigured, which is also true.
    */
-  val stravaState: StateFlow<StravaConnectionState> =
-    stravaConnection?.state
-      ?: MutableStateFlow<StravaConnectionState>(StravaConnectionState.NotConfigured).asStateFlow()
+  val intervalsState: StateFlow<IntervalsConnectionState> =
+    intervalsConnection?.state
+      ?: MutableStateFlow<IntervalsConnectionState>(IntervalsConnectionState.NotConfigured)
+        .asStateFlow()
 
-  private val _stravaAuthorizationUrl = MutableStateFlow<String?>(null)
-  val stravaAuthorizationUrl: StateFlow<String?> = _stravaAuthorizationUrl.asStateFlow()
-
-  /** Starts a login. The screen opens whatever lands in [stravaAuthorizationUrl]. */
-  fun connectStrava() {
-    val connection = stravaConnection ?: return
-    viewModelScope.launch { _stravaAuthorizationUrl.value = connection.beginAuthorization() }
+  /** Stores the key pasted from intervals.icu's settings page, then checks that it works. */
+  fun saveIntervalsApiKey(key: String) {
+    val connection = intervalsConnection ?: return
+    viewModelScope.launch {
+      if (connection.saveApiKey(key)) {
+        // Tested immediately rather than at the next sync. A key pasted with a character missing
+        // would otherwise look accepted and then quietly fetch nothing.
+        connection.testKey()
+        syncIntervals()
+      }
+    }
   }
 
-  fun stravaAuthorizationOpened() {
-    _stravaAuthorizationUrl.value = null
+  fun testIntervalsApiKey() {
+    val connection = intervalsConnection ?: return
+    viewModelScope.launch { connection.testKey() }
   }
 
-  fun stravaAuthorizationFailedToOpen() {
-    _stravaAuthorizationUrl.value = null
-    stravaConnection?.let { viewModelScope.launch { it.cancelAuthorization() } }
+  /** Forgets the key and the cached activities. The training plan is untouched. */
+  fun clearIntervalsApiKey() {
+    val connection = intervalsConnection ?: return
+    viewModelScope.launch { connection.clearApiKey() }
   }
 
-  fun saveStravaCredentials(clientId: String, clientSecret: String) {
-    val connection = stravaConnection ?: return
-    viewModelScope.launch { connection.saveCredentials(clientId, clientSecret) }
-  }
-
-  fun forgetStravaCredentials() {
-    val connection = stravaConnection ?: return
-    viewModelScope.launch { connection.forgetCredentials() }
-  }
-
-  fun disconnectStrava() {
-    val connection = stravaConnection ?: return
-    viewModelScope.launch { connection.disconnect() }
-  }
-
-  fun dismissStravaFailure() {
-    val connection = stravaConnection ?: return
+  fun dismissIntervalsFailure() {
+    val connection = intervalsConnection ?: return
     viewModelScope.launch { connection.dismissFailure() }
   }
 
   /**
-   * Fetches the last few days from Strava now. Called beside [syncOura] when a screen appears,
-   * and just as deliberately quiet — this runs without anyone asking for it.
+   * Fetches the last few days from intervals.icu now. Called beside [syncOura] when a screen
+   * appears, and just as deliberately quiet — this runs without anyone asking for it, so a network
+   * that is not there must not produce a dialog.
+   *
+   * The window overlaps every previous one on purpose: an activity can reach intervals.icu late,
+   * and re-fetching is free of consequence because rows are keyed on the service's own activity id
+   * and upserted.
    */
-  fun syncStrava() {
-    val repository = stravaRepository ?: return
-    if (stravaState.value != StravaConnectionState.Connected) return
-    if (_stravaSyncing.value) return
+  fun syncIntervals() {
+    val repository = intervalsRepository ?: return
+    if (intervalsState.value == IntervalsConnectionState.NotConfigured) return
+    if (_intervalsSyncing.value) return
     viewModelScope.launch {
-      _stravaSyncing.value = true
+      _intervalsSyncing.value = true
       val today = LocalDate.now()
-      repository.sync(from = today.minusDays(SYNC_DAYS), to = today, zone = ZoneId.systemDefault())
-      matchStravaActivities(today)
-      _stravaSyncing.value = false
+      _intervalsSyncFailure.value =
+        when (
+          val result =
+            repository.sync(
+              from = today.minusDays(SYNC_DAYS),
+              to = today,
+              zone = ZoneId.systemDefault(),
+            )
+        ) {
+          is IntervalsSyncResult.Success -> null
+          is IntervalsSyncResult.Failure -> result.message
+        }
+      matchIntervalsActivities(today)
+      _intervalsSyncing.value = false
     }
   }
 
   /** The same pairing run the Oura workouts get, over the same window. */
-  private suspend fun matchStravaActivities(today: LocalDate) {
-    val stravaRepository = stravaRepository ?: return
+  private suspend fun matchIntervalsActivities(today: LocalDate) {
+    val intervalsRepository = intervalsRepository ?: return
     val from = today.minusDays(SYNC_DAYS).atStartOfDay(ZoneId.systemDefault()).toInstant()
     val to = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
     val earliest = today.minusDays(SYNC_DAYS)
@@ -452,18 +461,22 @@ class WorkoutViewModel(
           date != null && !date.isBefore(earliest) && !date.isAfter(today)
         }
         .map { PlannedSession(id = it.id, scheduledAtUtc = it.remindAtUtc, type = it.type) }
-    stravaRepository.matchActivities(sessions, from.toEpochMilli(), to.toEpochMilli())
+    intervalsRepository.matchActivities(sessions, from.toEpochMilli(), to.toEpochMilli())
   }
 
-  private val _stravaSyncing = MutableStateFlow(false)
+  private val _intervalsSyncing = MutableStateFlow(false)
+
+  /** The last sync's failure, or `null`. Shown on the card as a footnote, never as a dialog. */
+  private val _intervalsSyncFailure = MutableStateFlow<String?>(null)
+  val intervalsSyncFailure: StateFlow<String?> = _intervalsSyncFailure.asStateFlow()
 
   /**
-   * What Strava recorded for each session that was actually done, keyed by session id — pace
+   * What the watch recorded for each session that was actually done, keyed by session id — pace
    * included, which is the measurement Oura does not carry.
    */
-  val stravaRunMetrics: StateFlow<Map<String, StravaRunMetrics>> =
-    (stravaRepository?.observeMatchedRunMetrics()
-        ?: MutableStateFlow(emptyMap<String, StravaRunMetrics>()))
+  val runMetrics: StateFlow<Map<String, CompletedRunMetrics>> =
+    (intervalsRepository?.observeMatchedRunMetrics()
+        ?: MutableStateFlow(emptyMap<String, CompletedRunMetrics>()))
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
   // ------------------------------------------------------------------ readiness advice
@@ -755,8 +768,8 @@ class WorkoutViewModel(
           application.loadExerciseGuideUseCase,
           application.ouraConnection,
           application.ouraRepository,
-          application.stravaConnection,
-          application.stravaRepository,
+          application.intervalsConnection,
+          application.intervalsRepository,
         )
       }
     }

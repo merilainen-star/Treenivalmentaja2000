@@ -43,16 +43,17 @@ The app handles personal health data and training schedules. Threats include una
 - All external communication enforces HTTPS.
 
 ## Exported Android Components
-- `OuraCallbackActivity` (`treenivalmentaja://oauth2callback`) and `StravaCallbackActivity`
-  (`treenivalmentaja://localhost/strava`) are the **only** exported components in the app. They
-  have to be: a browser starts them. Each therefore acts on nothing it is given — it forwards the
-  URI to its connection object, which discards anything whose `state` is not the exact value this
-  device generated for a login it actually started. A forged redirect produces a visible refusal
-  and no token exchange, which `OuraConnectionTest` and `StravaConnectionTest` hold in place.
-- The Strava flow has **no PKCE**, because Strava's token endpoint accepts no `code_verifier` and
-  authenticates the exchange with the client secret instead. That puts the whole burden of tying a
-  redirect to a real request on `state`, which is why `StravaOAuth.readRedirect` checks it before
-  it so much as looks at the code.
+- `OuraCallbackActivity` (`treenivalmentaja://oauth2callback`) is once again the **only** exported
+  component in the app. It has to be: a browser starts it. It therefore acts on nothing it is
+  given — it forwards the URI to `OuraConnection`, which discards anything whose `state` is not the
+  exact value this device generated for a login it actually started. A forged redirect produces a
+  visible refusal and no token exchange, which `OuraConnectionTest` holds in place.
+- **The intervals.icu integration adds no exported surface at all.** It authenticates with a
+  personal API key over HTTP Basic, so there is no browser round trip, no callback activity, no
+  `state` to validate and no refresh token that could be spent twice — a smaller attack surface
+  than the Strava OAuth flow it replaced, not merely a different one. The key lives under its own
+  Android Keystore alias in its own preferences file, is excluded from backup and device transfer,
+  is never logged, and is never redisplayed in the UI once saved.
 
 ## Backend Attack Surface
 There is none. The MVP has no server-side component, no Firebase project, and no remote token

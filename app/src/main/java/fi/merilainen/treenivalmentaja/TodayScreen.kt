@@ -46,7 +46,7 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
-import fi.merilainen.treenivalmentaja.domain.StravaRunMetrics
+import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -74,8 +74,8 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val syncFailure by viewModel.lastSyncFailure.collectAsState()
     val completedMetrics by viewModel.completedMetrics.collectAsState()
     val unmatched by viewModel.unmatchedToday.collectAsState()
-    val stravaState by viewModel.stravaState.collectAsState()
-    val stravaMetrics by viewModel.stravaRunMetrics.collectAsState()
+    val intervalsState by viewModel.intervalsState.collectAsState()
+    val runMetrics by viewModel.runMetrics.collectAsState()
     val advice by viewModel.readinessAdvice.collectAsState()
 
     // On every **resume**, not merely on first composition.
@@ -84,9 +84,9 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     // the background since morning never fetched again: the workout recorded at 07:38 was not there
     // when the screen was composed, and nothing asked afterwards. Coming back to the app is exactly
     // when the answer is likely to have changed. A disconnected Oura makes it a no-op.
-    LifecycleResumeEffect(ouraState, stravaState) {
+    LifecycleResumeEffect(ouraState, intervalsState) {
         viewModel.syncOura()
-        viewModel.syncStrava()
+        viewModel.syncIntervals()
         onPauseOrDispose {}
     }
 
@@ -110,7 +110,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         syncFailure = syncFailure,
         completedMetrics = completedMetrics,
         unmatchedWorkouts = unmatched,
-        stravaMetrics = stravaMetrics,
+        runMetrics = runMetrics,
         readinessAdvice = advice,
         onShiftProgramme = viewModel::shiftProgrammeForward,
         onStartLighter = viewModel::startTodayLighter,
@@ -138,7 +138,7 @@ fun TodayScreenContent(
     syncFailure: String? = null,
     completedMetrics: Map<String, CompletedSessionMetrics> = emptyMap(),
     unmatchedWorkouts: List<CompletedSessionMetrics> = emptyList(),
-    stravaMetrics: Map<String, StravaRunMetrics> = emptyMap(),
+    runMetrics: Map<String, CompletedRunMetrics> = emptyMap(),
     readinessAdvice: ReadinessAdvice = ReadinessAdvice.None,
     onShiftProgramme: () -> Unit = {},
     onStartLighter: () -> Unit = {},
@@ -187,7 +187,7 @@ fun TodayScreenContent(
                     onMoveToTomorrow = { onMoveToTomorrow(workout.id) },
                     onExerciseClick = onExerciseClick,
                     completed = completedMetrics[workout.id],
-                    strava = stravaMetrics[workout.id],
+                    run = runMetrics[workout.id],
                 )
             }
         } else {
@@ -411,15 +411,20 @@ fun CompletedMetricsRow(
 }
 
 /**
- * What Strava recorded for a run, under the session it belongs to.
+ * What the watch recorded for a session, under the session it belongs to.
  *
- * Prefixed "Strava" because Oura's line sits right above it and the two describe the same session
+ * Labelled "Kello" because Oura's line sits right above it and the two describe the same session
  * from different devices — without the label, two duration figures a minute apart read as a bug.
+ * The label names the *device*, not the service the data travelled through: the reader cares that
+ * this is the watch's own recording, and intervals.icu is plumbing they should not have to think
+ * about while reading a training log.
+ *
  * Pace leads: it is the measurement this integration exists for, and the one Oura cannot supply.
+ * Training load comes last because it is the least familiar number here.
  */
 @Composable
-fun StravaMetricsRow(
-    metrics: StravaRunMetrics,
+fun RunMetricsRow(
+    metrics: CompletedRunMetrics,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
 ) {
     val parts = buildList {
@@ -430,10 +435,12 @@ fun StravaMetricsRow(
             val max = metrics.maxHeartRate
             add(if (max != null) "syke $avg (max $max)" else "syke $avg")
         }
+        metrics.calories?.let { add("$it kcal") }
         metrics.elevationGainMeters?.let { add("nousu $it m") }
+        metrics.trainingLoad?.let { add("kuormitus $it") }
     }
     Text(
-        text = "Strava: ${parts.joinToString(" · ")}",
+        text = "Kello: ${parts.joinToString(" · ")}",
         style = style,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -446,7 +453,7 @@ fun WorkoutCardToday(
     onMoveToTomorrow: () -> Unit,
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
-    strava: StravaRunMetrics? = null,
+    run: CompletedRunMetrics? = null,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -494,9 +501,9 @@ fun WorkoutCardToday(
             // Its own line under Oura's rather than merged into it. The ring and the watch record
             // the same run separately, and averaging or picking between two measurements of the
             // same thing would hide which device said what.
-            strava?.let {
+            run?.let {
                 Spacer(modifier = Modifier.height(4.dp))
-                StravaMetricsRow(it)
+                RunMetricsRow(it)
             }
 
             Spacer(modifier = Modifier.height(12.dp))

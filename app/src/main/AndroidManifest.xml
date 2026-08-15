@@ -52,23 +52,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Same posture as OuraCallbackActivity: exported so a browser can start it, trusted for
-             nothing. The host is `localhost` because Strava validates the redirect's host against
-             the application's Authorization Callback Domain — see data/strava/StravaOAuth.kt. -->
-        <activity
-            android:name=".StravaCallbackActivity"
-            android:exported="true"
-            android:launchMode="singleTask"
-            android:noHistory="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="treenivalmentaja" android:host="localhost" android:path="/strava" />
-            </intent-filter>
-        </activity>
-
         <receiver android:name=".data.alarm.ReminderReceiver" android:exported="false" />
         <receiver android:name=".data.alarm.ActionReceiver" android:exported="false" />
         <receiver android:name=".data.alarm.BootReceiver" android:exported="false">

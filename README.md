@@ -22,8 +22,9 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 - Oura: connect from the phone, a readiness reading on Today, and what Oura recorded for a finished
   session — duration, distance, calories, heart rate — under what the plan asked for
   ([docs](docs/API_INTEGRATIONS.md))
-- Strava: connect from the phone, and a matched run shows its pace, moving time, distance, heart
-  rate and climb — the telemetry Oura does not carry ([setup](docs/STRAVA_SETUP.md))
+- Intervals.icu: paste a personal API key and the Suunto watch's own recordings arrive — a matched
+  run shows pace, moving time, distance, heart rate, climb and training load, the telemetry Oura
+  does not carry ([setup](docs/INTERVALS_SETUP.md))
 - A morning question when readiness was poor and a session went undone: shift the programme, or
   start lighter. Asked from a measurement, never acted on by itself
   ([docs](docs/TRAINING_ENGINE.md#readiness-advice--asking-never-acting))
@@ -126,11 +127,12 @@ has been entered in the app.
   already be asked to do by hand.
 - Workouts recorded on another device and synced into Oura do not arrive through its workout
   collection, so they appear only in the day's scores. Measured, not assumed —
-  [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md). This is what the Strava integration exists to
-  work around: a watch-tracked run reaches the app through Strava instead.
-- **Strava has not been connected to a real account yet.** Its client is covered by unit tests
-  against a local HTTP server, the same way Oura's was before its first real login, so what is
-  verified is this app's behaviour rather than that Strava's answers match the shapes it expects.
+  [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md). This is what the intervals.icu integration exists
+  to work around: a watch-tracked run reaches the app from there instead.
+- **Intervals.icu has not been connected to a real account yet.** Its client is covered by unit
+  tests against a local HTTP server, the same way Oura's was before its first real login, so what is
+  verified is this app's behaviour rather than that intervals.icu's answers match the shapes it
+  expects.
 - Oura publishes a workout to the API some time after the app shows it, so today's session may
   appear only later.
 - No test taps through a screen: the captures pin what each state looks like, not what happens

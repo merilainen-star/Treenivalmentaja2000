@@ -12,6 +12,6 @@
          restored install simply asks to connect Oura again.
          See data/oura/OuraTokenStore.kt. -->
     <exclude domain="sharedpref" path="oura_tokens.xml"/>
-    <!-- Same reasoning, Strava's key. See data/strava/StravaTokenStore.kt. -->
-    <exclude domain="sharedpref" path="strava_tokens.xml"/>
+    <!-- Same reasoning, the intervals.icu API key. See data/intervals/IntervalsApiKeyStore.kt. -->
+    <exclude domain="sharedpref" path="intervals_credentials.xml"/>
 </full-backup-content>

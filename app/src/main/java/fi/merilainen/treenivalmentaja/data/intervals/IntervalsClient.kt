@@ -1,0 +1,194 @@
+package fi.merilainen.treenivalmentaja.data.intervals
+
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.JsonDataException
+import com.squareup.moshi.JsonEncodingException
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import java.io.IOException
+import java.time.LocalDate
+import java.util.Base64
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.OkHttpClient
+import okhttp3.Request
+
+/**
+ * Reads the athlete's activities from intervals.icu.
+ *
+ * One endpoint and no pagination: `GET /api/v1/athlete/{id}/activities` returns the whole date
+ * range in one array, in descending date order. `oldest` is required by the specification and
+ * `newest` defaults to now.
+ *
+ * **Authentication is HTTP Basic with the literal username `API_KEY`** and the personal key as the
+ * password — the specification says so in as many words ("Username is API_KEY, Password is your
+ * API key found in /settings"). There is no OAuth here on purpose: this is a single-user app, and
+ * an authorization-code flow with a browser round trip, a callback activity and refresh-token
+ * rotation would be three moving parts serving one person's own key.
+ *
+ * `internal` because its DTOs are: nothing outside the data layer sees intervals.icu's field
+ * names, and what leaves this package are Room rows built by [IntervalsMappers].
+ *
+ * @param baseUrl overridden in tests.
+ */
+internal class IntervalsClient(
+  private val apiKeys: IntervalsApiKeySource,
+  private val baseUrl: String = BASE_URL,
+  private val calls: Call.Factory = defaultCallFactory(),
+) {
+
+  /**
+   * Every activity between two dates, whatever its sport.
+   *
+   * Filtering to runs is the caller's decision — rows are stored as they arrive, sport included,
+   * the way Oura's free-form `activity` is. The dates are local ISO-8601, which is what the
+   * parameters are documented to take.
+   */
+  suspend fun activities(from: LocalDate, to: LocalDate): List<IntervalsActivityDto> {
+    val url =
+      activitiesUrl()
+        .newBuilder()
+        .addQueryParameter("oldest", from.toString())
+        .addQueryParameter("newest", to.toString())
+        .addQueryParameter("fields", FIELDS)
+        .build()
+    return decode(get(url))
+  }
+
+  /**
+   * Proves a key works, by making the same request the sync makes and asking for one activity.
+   *
+   * Deliberately not `/athlete/{id}/profile`: a key that works for the profile endpoint has not
+   * been shown to work for the one the app actually depends on. Returning the count rather than
+   * the rows keeps this from looking like a way to fetch data.
+   *
+   * @return how many activities came back — 0 is a success, not a failure. A new athlete has none.
+   */
+  suspend fun testKey(): Int {
+    val url =
+      activitiesUrl()
+        .newBuilder()
+        // A year back rather than a week: an athlete who has not trained recently still gets a
+        // reassuring answer, and `limit` keeps it to one row either way.
+        .addQueryParameter("oldest", LocalDate.now().minusYears(1).toString())
+        .addQueryParameter("limit", "1")
+        .addQueryParameter("fields", "id")
+        .build()
+    return decode(get(url)).size
+  }
+
+  private fun activitiesUrl(): HttpUrl = "$baseUrl/api/v1/athlete/$SELF/activities".toHttpUrl()
+
+  private fun decode(body: String): List<IntervalsActivityDto> =
+    try {
+      adapter.fromJson(body)?.filterNotNull()
+    } catch (e: JsonEncodingException) {
+      // What a non-JSON body — a proxy's error page, say — lands on.
+      throw IntervalsUnavailableException(UNREADABLE)
+    } catch (e: JsonDataException) {
+      throw IntervalsUnavailableException(UNREADABLE)
+    } catch (e: IOException) {
+      throw IntervalsUnavailableException(UNREADABLE)
+    } ?: throw IntervalsUnavailableException(UNREADABLE)
+
+  /**
+   * One GET, and the same reading of what went wrong every time.
+   *
+   * The status is checked before the body is trusted, because a failing service is under no
+   * obligation to answer in JSON.
+   */
+  private suspend fun get(url: HttpUrl): String {
+    val key = apiKeys.apiKey()?.takeIf { it.isNotBlank() } ?: throw IntervalsNotConfiguredException()
+    return withContext(Dispatchers.IO) {
+      val request =
+        Request.Builder()
+          .url(url)
+          .header("Authorization", basic(key))
+          .header("Accept", "application/json")
+          .build()
+      val response =
+        try {
+          calls.newCall(request).execute()
+        } catch (e: IOException) {
+          throw IntervalsUnavailableException(OFFLINE)
+        }
+      response.use {
+        when (val code = it.code) {
+          200 -> Unit
+          401 -> throw IntervalsAuthException()
+          403 -> throw IntervalsForbiddenException()
+          // The service's own number when it sends one, rather than a guess of ours dressed up as
+          // its instruction.
+          429 ->
+            throw IntervalsRateLimitException(
+              it.header("Retry-After")?.trim()?.toLongOrNull()?.takeIf { seconds -> seconds > 0 }
+            )
+          400, 422 -> throw IntervalsRequestException(code)
+          else -> throw IntervalsUnavailableException("Intervals.icu vastasi HTTP $code.")
+        }
+        try {
+          it.body?.string() ?: throw IntervalsUnavailableException(UNREADABLE)
+        } catch (e: IOException) {
+          throw IntervalsUnavailableException(OFFLINE)
+        }
+      }
+    }
+  }
+
+  /**
+   * `Basic base64(API_KEY:<key>)`.
+   *
+   * Built here rather than with OkHttp's `Credentials.basic`, which encodes with ISO-8859-1 by
+   * default; the key is ASCII either way, but the encoding of a credential should not be an
+   * assumption about the key's alphabet.
+   */
+  private fun basic(key: String): String =
+    "Basic " + Base64.getEncoder().encodeToString("$USERNAME:$key".toByteArray(Charsets.UTF_8))
+
+  companion object {
+
+    const val BASE_URL = "https://intervals.icu"
+
+    /** The literal username the specification requires. Not a placeholder for the athlete's name. */
+    internal const val USERNAME = "API_KEY"
+
+    /**
+     * `0` means "the athlete this key belongs to", which is documented and saves storing an id the
+     * user would otherwise have to look up and paste alongside the key.
+     */
+    internal const val SELF = "0"
+
+    /**
+     * The dozen fields the app reads, of the **183** the `Activity` schema declares.
+     *
+     * Naming them is not a micro-optimisation: without this the service sends every property of
+     * every activity in the range, which for a fortnight of training is a large multiple of what
+     * is used. The parameter also drops nulls from the response, per the specification.
+     */
+    internal const val FIELDS =
+      "id,name,type,start_date,start_date_local,moving_time,elapsed_time,distance," +
+        "average_heartrate,max_heartrate,total_elevation_gain,calories,icu_training_load," +
+        "source,device_name"
+
+    internal const val OFFLINE = "Intervals.icu-tietojen haku vaatii verkkoyhteyden."
+
+    internal const val UNREADABLE = "Intervals.icu-vastausta ei voitu lukea."
+
+    private val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+
+    private val adapter: JsonAdapter<List<IntervalsActivityDto?>> =
+      moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsActivityDto::class.java))
+
+    /** Matched to the other clients in this app: a few kilobytes over a phone connection. */
+    private fun defaultCallFactory(): Call.Factory =
+      OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+  }
+}

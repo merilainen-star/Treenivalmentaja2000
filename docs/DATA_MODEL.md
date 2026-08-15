@@ -150,31 +150,42 @@ The order of priority is:
     recorded. Added in schema version 5 by an auto migration.
 - **Lifecycle:** Synced via WorkManager. Immutable once fetched. Cleared on Oura disconnect.
 
-### 6. Strava Activity (`StravaActivity`)
-- **Table:** `strava_activities`
-- **Purpose:** Represents an activity read from Strava — the running telemetry Oura does not carry.
-  Added in schema version 6.
-- **Primary Key:** `id` (Long — Strava's own activity id, so a re-fetch overwrites itself)
+### 6. Intervals.icu Activity (`IntervalsActivity`)
+- **Table:** `intervals_activities`
+- **Purpose:** Represents an activity read from intervals.icu, where the Suunto watch's recordings
+  arrive — the running telemetry Oura does not carry. Added in schema version 7, replacing the
+  `strava_activities` table of version 6.
+- **Primary Key:** `id` (**String** — intervals.icu's own activity id, e.g. `i84461234`). A string
+  rather than the number Strava used, and what makes the sync idempotent: a re-fetched activity
+  overwrites itself instead of arriving twice. Nothing compares start times or distances to guess
+  whether two records are the same activity.
 - **Relationships:** Matches to `WorkoutSession` via `matchedSessionId` (String?, indexed), filled
   by the **same** `MatchOuraWorkoutsUseCase` the Oura workouts go through — same day, nearest in
-  time, one-to-one, and the sport has to fit. A session can hold an Oura workout *and* a Strava
+  time, one-to-one, and the sport has to fit. A session can hold an Oura workout *and* a watch
   activity at once: two devices recorded the same run, and the screens show both lines rather than
   choosing between them.
 - **Fields:**
-  - `name` (String?) — the activity's title on Strava, e.g. "Aamulenkki"
-  - `sportType` (String) — Strava's closed enum, e.g. `Run`, `TrailRun`, `WeightTraining`
+  - `name` (String?) — the activity's title, e.g. "Aamulenkki"
+  - `sportType` (String) — e.g. `Run`, `TrailRun`, `WeightTraining`. The API declares no enum for
+    it, so the app does not treat it as one.
   - `startTimeUtc` (Long)
   - `movingTimeSec` (Long) — **pace is computed from this**, not from elapsed time
   - `elapsedTimeSec` (Long?)
   - `distanceMeters` (Double?)
   - `avgHeartRate` (Int?), `maxHeartRate` (Int?) — absent without a sensor
   - `elevationGainMeters` (Double?)
+  - `calories` (Int?) — present here, where Strava's summary endpoint carried none
+  - `trainingLoad` (Int?) — intervals.icu's own `icu_training_load`
+  - `source` (String?) — a documented enum: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … Stored
+    because it answers "did this come off the watch", **never filtered on**: a run uploaded by hand
+    is still that run
+  - `deviceName` (String?) — kept for diagnostics, shown nowhere
   - `fetchedAtUtc` (Long)
 - **Nullability:** The same rule as the Oura tables. A treadmill run has no distance, a run without
-  a strap has no heart rate, and neither becomes a zero. Calories are deliberately **not** stored:
-  Strava's summary endpoint does not carry them, and fetching each activity's detail to add a
-  number nothing decides on would spend the rate budget for nothing.
-- **Lifecycle:** Synced when Tänään or Viikko opens. Cleared on Strava disconnect.
+  a strap has no heart rate, a flat run reports zero climb, and none of those becomes a zero on
+  screen.
+- **Lifecycle:** Synced when Tänään or Viikko opens, over a window that overlaps the previous one
+  because an activity can arrive late. Cleared when the API key is removed.
 
 ## Rescheduling and the session chain
 Moving a session never edits `scheduledDate` in place:
@@ -218,10 +229,20 @@ A consequence worth stating, because it is easy to assume otherwise: the Oura ta
 version 4 with no writer at all. Wiring up the Oura integration filled them without moving the
 version, exactly as expected — the tables were already the right shape. Version 5 came later and for
 a different reason: three new **columns** on `oura_workouts` (`distanceMeters`, `avgHeartRate`,
-`maxHeartRate`), added by an auto migration.
+`maxHeartRate`), added by an auto migration. Version 6 added the whole `strava_activities` table,
+likewise by an auto migration — a new table is as additive as a new nullable column.
 
-The OAuth tokens, incidentally, never touched the schema at all. They live in encrypted
-`SharedPreferences` rather than in Room
+Version 7 is the first that **removes** something: `strava_activities` goes and
+`intervals_activities` arrives, because Strava paywalled its API and the watch data now comes
+through intervals.icu. A drop is still an auto migration when it is *declared* — the `@DeleteTable`
+spec on `AppDatabase.DropStravaActivities` is what tells Room the table is meant to go rather than
+to be renamed with its rows carried across. Without it Room refuses to generate the migration at
+all, which is the right default: a table present in one schema and absent from the next is
+genuinely ambiguous. Nothing was lost by the drop — Strava was never connected to a real account,
+so the table has always been empty on every device.
+
+The API key and the OAuth tokens, incidentally, never touched the schema at all. They live in
+encrypted `SharedPreferences` rather than in Room
 ([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
 
 **There is no `fallbackToDestructiveMigration`, on purpose.** With it, a schema change lacking a
@@ -241,7 +262,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-`app/schemas/` holds `3.json` through `6.json`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `7.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

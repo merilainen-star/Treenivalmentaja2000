@@ -23,6 +23,8 @@ Individuals following a progressive training programme who want an adaptive, con
 - Provide buttons to complete, skip, lighten, or reschedule a session.
 - Handle illness mode (pause and gradual return).
 - Sync data from Oura API V2 (implemented).
+- Read the watch's own activities from intervals.icu, for the pace and load Oura does not carry
+  (implemented — see [INTERVALS_SETUP.md](INTERVALS_SETUP.md)).
 - Match imported Oura workouts to planned sessions (implemented — same day, nearest in time, and
   the activity must fit; a match attaches Oura's numbers and does not complete the session).
 - Import/Export training plans (JSON Treenivalmentaja Schema v1).
@@ -50,7 +52,7 @@ Individuals following a progressive training programme who want an adaptive, con
 ## Excluded Scope (Out of MVP)
 - Remote AI advisor (Planned for future).
 - Complex analytics dashboards.
-- Direct integration with Garmin/Polar (reliant on Oura/Strava pass-through).
+- Direct integration with Garmin/Polar (reliant on Oura and intervals.icu pass-through).
 
 ## Acceptance Criteria
 - App compiles and runs without crashes.
@@ -62,4 +64,4 @@ Individuals following a progressive training programme who want an adaptive, con
 
 ## Future Features
 - Remote AI-based training plan adjustments based on continuous biometric feedback.
-- Strava integration extension point.
+- Further activity sources beyond Oura and intervals.icu.

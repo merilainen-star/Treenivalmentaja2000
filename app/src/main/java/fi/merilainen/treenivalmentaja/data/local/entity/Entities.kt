@@ -119,22 +119,23 @@ data class OuraDailySummaryEntity(
 )
 
 /**
- * One Strava activity, as the summary endpoint reported it.
+ * One activity read from intervals.icu — where the Suunto watch's own recordings arrive.
  *
- * Everything optional is nullable for the reason the Oura rows' fields are: Strava's summary
- * carries no calories at all, a treadmill run may carry no distance, and heart rate exists only
- * when a sensor was worn. Missing is never zero.
+ * Everything optional is nullable for the reason the Oura rows' fields are: a treadmill run may
+ * carry no distance, heart rate exists only when a sensor was worn, and a walk has no training
+ * load. Missing is never zero.
  *
- * `id` is Strava's own activity id, so a re-fetched activity overwrites itself.
+ * `id` is intervals.icu's own activity id and **a string** (e.g. `i84461234`), which is what makes
+ * the sync idempotent: a re-fetched activity overwrites itself rather than arriving twice.
  */
 @Entity(
-  tableName = "strava_activities",
+  tableName = "intervals_activities",
   indices = [Index("matchedSessionId"), Index("startTimeUtc")],
 )
-data class StravaActivityEntity(
-  @PrimaryKey val id: Long,
+data class IntervalsActivityEntity(
+  @PrimaryKey val id: String,
   val name: String? = null,
-  /** Strava's `SportType`, e.g. `Run`, `TrailRun`, `Walk`. Stored as it arrives. */
+  /** intervals.icu's activity type, e.g. `Run`, `Walk`, `WeightTraining`. Stored as it arrives. */
   val sportType: String,
   val startTimeUtc: Long,
   /** Seconds actually moving — what pace is computed from. */
@@ -145,7 +146,17 @@ data class StravaActivityEntity(
   val avgHeartRate: Int? = null,
   val maxHeartRate: Int? = null,
   val elevationGainMeters: Double? = null,
-  /** The planned session this activity answers, decided by the matcher — never by Strava. */
+  val calories: Int? = null,
+  /** intervals.icu's own training load — a number neither Oura nor Strava's summary provided. */
+  val trainingLoad: Int? = null,
+  /**
+   * Which service the activity came from: `SUUNTO`, `UPLOAD`, `MANUAL`, `STRAVA`, … A documented
+   * enum, stored because it answers "did this really come off the watch". Never filtered on — a
+   * run uploaded by hand is still that run.
+   */
+  val source: String? = null,
+  val deviceName: String? = null,
+  /** The planned session this activity answers, decided by the matcher — never by intervals.icu. */
   val matchedSessionId: String? = null,
   val fetchedAtUtc: Long,
 )

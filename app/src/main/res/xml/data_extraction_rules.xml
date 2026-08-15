@@ -9,10 +9,10 @@
          ciphertext would be unreadable there too. See data/oura/OuraTokenStore.kt. -->
     <cloud-backup>
         <exclude domain="sharedpref" path="oura_tokens.xml"/>
-        <exclude domain="sharedpref" path="strava_tokens.xml"/>
+        <exclude domain="sharedpref" path="intervals_credentials.xml"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="oura_tokens.xml"/>
-        <exclude domain="sharedpref" path="strava_tokens.xml"/>
+        <exclude domain="sharedpref" path="intervals_credentials.xml"/>
     </device-transfer>
 </data-extraction-rules>

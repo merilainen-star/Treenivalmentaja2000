@@ -166,75 +166,90 @@ The client therefore sends `end_date` as **one day past** the range it was asked
 only request that means "up to and including this day" for all of them at once. See
 `OuraClient.url`.
 
-**This is what motivated the Strava integration below**: a run recorded on a watch reaches Oura's
-own app and not its API, so the only way to see it here is to ask Strava directly.
+**This is what motivated the second integration below**: a run recorded on a watch reaches Oura's
+own app and not its API, so the only way to see it here is to ask elsewhere. That was Strava for
+about a day, and is intervals.icu now.
 
-## Strava API v3
+## Intervals.icu API v1
 
-*(Built — `app/src/main/java/fi/merilainen/treenivalmentaja/data/strava/`, on OkHttp for the same
-reason the Oura client is. The setup a user performs on Strava's side is in
-[STRAVA_SETUP.md](STRAVA_SETUP.md). Written against Strava's published developer documentation; no
-specification is vendored, because Strava does not publish one this app could pin to. **No real
-account has been connected yet** — the tests run against a local HTTP server, so what has been
-verified is the client's behaviour, not that Strava's answers match the shapes below.)*
+*(Built — `app/src/main/java/fi/merilainen/treenivalmentaja/data/intervals/`, on OkHttp for the same
+reason the Oura client is. The setup a user performs is in [INTERVALS_SETUP.md](INTERVALS_SETUP.md).
+Written against the vendored [`docs/api/intervals-icu-openapi.json`](api/intervals-icu-openapi.json)
+— OpenAPI 3.0.1, 117 paths, 110 schemas — fetched from the service's own `/api/v1/docs`, so field
+names and types were read rather than remembered. **No real account has been connected yet**: the
+tests run against a local HTTP server, so what is verified is the client's behaviour, not that
+intervals.icu's answers match these shapes.)*
+
+### Why this and not Strava
+
+Strava paywalled its API in June 2026 — standard developer access now requires an active Strava
+subscription. The Suunto watch's recordings already reach intervals.icu, whose API is free for
+personal use, so the same data arrives by a different road. Suunto's **own** API was ruled out
+first: its developer FAQ states plainly that access is for "companies/organizations" and that "we
+do not provide this for personal use".
 
 ### Base information
 
 | | |
 | --- | --- |
-| Base URL | `https://www.strava.com` |
-| Activities | `GET /api/v3/athlete/activities` |
-| Authorization URL | `https://www.strava.com/oauth/mobile/authorize` |
-| Token URL | `https://www.strava.com/oauth/token` |
-| Scope this app requests | `activity:read_all`, and nothing else |
-| Redirect | `treenivalmentaja://localhost/strava` |
+| Base URL | `https://intervals.icu` |
+| Activities | `GET /api/v1/athlete/{id}/activities` |
+| Authentication | HTTP Basic — username the literal string `API_KEY`, password the personal key |
+| Athlete id | `0` means "the athlete this key belongs to" |
 
-### Differences from Oura worth knowing
+Both an API key and an OAuth bearer token are accepted on every endpoint. This app uses the key:
+see [INTERVALS_SETUP.md](INTERVALS_SETUP.md#why-an-api-key-rather-than-oauth) for why OAuth would be
+four moving parts serving one person's own credentials.
 
-Both are OAuth2 authorization-code flows over OkHttp, and the two clients look alike on purpose.
-Four things genuinely differ:
-
-1. **No PKCE.** Strava's token endpoint does not accept a `code_verifier`; the client secret
-   authenticates the exchange. So `state` carries the whole burden of tying a redirect to the
-   request this device made, and `StravaOAuth.readRedirect` is correspondingly strict.
-2. **Paging is by page number**, not by an opaque token. There is no `next_token`: request
-   `page=1,2,…` with `per_page=100` and stop when a page comes back short.
-3. **The host validates the redirect.** Strava checks the redirect URI's *host* against the API
-   application's "Authorization Callback Domain" field. `localhost` is what that field accepts for
-   an app with no web domain, hence the odd-looking `treenivalmentaja://localhost/strava`.
-4. **Expiry is absolute.** The token response carries `expires_at` in epoch seconds rather than
-   Oura's relative `expires_in`.
-
-### The activity shape
+### The activities endpoint
 
 ```
-GET /api/v3/athlete/activities?after=&before=&page=&per_page=
-→ [ { … }, … ]          // a bare array, not an envelope
+GET /api/v1/athlete/0/activities?oldest=&newest=&limit=&fields=
+→ [ { … }, … ]          // a bare array, in descending date order
 ```
 
-`after`/`before` are epoch **seconds**, and the app derives them from local dates in the device's
-zone — a run at 23:30 belongs to that local day, not to the UTC one.
+| Parameter | Notes |
+| --- | --- |
+| `oldest` | **Required.** Local ISO-8601 date or date-time. |
+| `newest` | Optional; defaults to now. |
+| `limit` | Optional. Used only by the connection test, which asks for one. |
+| `fields` | Optional, comma-separated. Also drops nulls from the response. |
+
+**There is no pagination.** No `next_token`, no page numbers — the range comes back in one array,
+which is one fewer thing to get wrong than either of the other two APIs this app has spoken to.
+
+### The fields this app reads
+
+Fifteen, of the **183** the `Activity` schema declares. They are named in `fields` so the rest are
+never sent.
 
 | Field | Notes |
 | --- | --- |
-| `id` | The activity id; also this app's primary key, so a re-fetch overwrites itself. |
-| `sport_type` | A closed enum — `Run`, `TrailRun`, `VirtualRun`, `Walk`, `Ride`, `WeightTraining`, … Unlike Oura's free-form `activity`, this is documented. |
-| `start_date` | UTC, `Z`-suffixed. |
-| `moving_time` | Seconds. **Pace is computed from this**, not from `elapsed_time`: a pause at a crossing is not part of how fast the running was. |
-| `elapsed_time` | Seconds, pauses included. |
+| `id` | **A string**, e.g. `i84461234` — not a number. The app's primary key, and what makes the sync idempotent. |
+| `type` | `Run`, `Ride`, `Walk`, `WeightTraining`, … The spec declares no enum, so the app does not treat it as one. |
+| `start_date` | UTC, `Z`-suffixed. Preferred, because it is unambiguous. |
+| `start_date_local` | A wall clock with no offset. The fallback, read against the device's zone. |
+| `moving_time`, `elapsed_time` | Seconds. **Pace is computed from `moving_time`** — a pause at a crossing is not part of how fast the running was. |
 | `distance` | Metres. |
-| `average_heartrate`, `max_heartrate` | Doubles, and absent entirely without a sensor. |
+| `average_heartrate`, `max_heartrate` | Integers here, unlike Strava's doubles. |
 | `total_elevation_gain` | Metres. |
+| `calories` | Present, where Strava's summary endpoint had none. |
+| `icu_training_load` | intervals.icu's own load figure — the one genuinely new measurement this integration brings. |
+| `source` | A documented enum: `STRAVA`, `UPLOAD`, `MANUAL`, `GARMIN_CONNECT`, `OAUTH_CLIENT`, `DROPBOX`, `POLAR`, **`SUUNTO`**, `COROS`, `WAHOO`, `ZWIFT`, `ZEPP`, `CONCEPT2`, `HUAWEI`. Stored, never filtered on. |
+| `device_name` | Kept for diagnostics; shown nowhere. |
 
-**`calories` is deliberately not read.** The summary does not carry it — only `DetailedActivity`
-does, one request per activity — and a run's load is its pace, distance, time and heart rate, all
-of which the summary has. Spending the rate budget to add a number nothing decides on would be a
-bad trade.
+**`pace` is deliberately not read**, though the field exists: its unit is undocumented, and a number
+whose unit is a guess is worse than one derived from two that are known.
+
+### Measured, not assumed
+
+An unauthenticated request and one with a wrong key were both fired at the real service on
+2026-08-15. **Both answer `401`** — the service does not distinguish "no credentials" from "bad
+credentials", so the app's message for that case has to cover both, and it does.
 
 ### Missing data
 
 The same rule as Oura, for the same reason: a treadmill run may have no distance, a run without a
-strap has no heart rate, and a flat run reports `0.0` elevation. None of those is rendered, and
-none becomes a zero. `StravaMappers` drops rows lacking an id, a sport, a parseable start or a
-moving time — those cannot be placed on the clock or reduced to a pace, which is all these rows
-exist for.
+strap has no heart rate, and a flat run reports `0.0` elevation. None of those is rendered, and none
+becomes a zero. `IntervalsMappers` drops rows lacking an id, a type, a parseable start or a moving
+time — those cannot be placed on the clock or reduced to a pace, which is all these rows exist for.

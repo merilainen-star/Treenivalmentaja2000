@@ -1,0 +1,226 @@
+package fi.merilainen.treenivalmentaja.data.intervals
+
+import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
+import java.time.ZoneId
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * intervals.icu's summaries as rows, and the pace derived from them.
+ *
+ * The rule under test throughout is the one the Oura mappers obey: **missing is not zero**. A run
+ * recorded without a heart-rate strap is a row with no heart rate, never a row claiming 0 bpm.
+ */
+class IntervalsMappersTest {
+
+  private val helsinki = ZoneId.of("Europe/Helsinki")
+
+  @Test
+  fun `a complete activity becomes a row`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "i84461234",
+            name = "Aamulenkki",
+            type = "Run",
+            startDate = "2026-08-15T06:12:03Z",
+            startDateLocal = "2026-08-15T09:12:03",
+            movingTime = 2280,
+            elapsedTime = 2400,
+            distance = 6200.0,
+            averageHeartrate = 148,
+            maxHeartrate = 171,
+            totalElevationGain = 42.0,
+            calories = 540,
+            icuTrainingLoad = 78,
+            source = "SUUNTO",
+            deviceName = "Suunto Race",
+          )
+        ),
+        fetchedAtUtc = 1_755_000_000_000,
+        zone = helsinki,
+      )
+
+    val row = rows.single()
+    // A string id, unlike Strava's numeric one — and the reason the sync is idempotent.
+    assertEquals("i84461234", row.id)
+    assertEquals("Run", row.sportType)
+    assertEquals(2280L, row.movingTimeSec)
+    assertEquals(6200.0, row.distanceMeters!!, 0.001)
+    assertEquals(148, row.avgHeartRate)
+    assertEquals(540, row.calories)
+    assertEquals(78, row.trainingLoad)
+    assertEquals("SUUNTO", row.source)
+    // Never decided by the parser — matching is a training question.
+    assertNull(row.matchedSessionId)
+  }
+
+  /** `start_date` is UTC and unambiguous, so it is preferred over the local wall clock. */
+  @Test
+  fun `the UTC start wins over the local one`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "a",
+            type = "Run",
+            startDate = "2026-08-15T06:12:03Z",
+            // Deliberately inconsistent: if this were used, the instant would differ by hours.
+            startDateLocal = "2026-08-15T20:00:00",
+            movingTime = 60,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    assertEquals(1_786_774_323_000L, rows.single().startTimeUtc)
+  }
+
+  /**
+   * With no UTC field the local one is read against the device's zone — not as if it were UTC.
+   * Getting that backwards moves an evening session by hours and makes the matcher pair a run with
+   * the wrong session.
+   */
+  @Test
+  fun `a local-only start is read in the device zone`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "a",
+            type = "Run",
+            startDate = null,
+            startDateLocal = "2026-08-15T09:12:03",
+            movingTime = 60,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    // 09:12:03 in Helsinki in August is UTC+3, so 06:12:03Z — the same instant as the test above.
+    assertEquals(1_786_774_323_000L, rows.single().startTimeUtc)
+  }
+
+  @Test
+  fun `an activity with no sensors keeps nulls rather than zeros`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "a",
+            type = "Run",
+            startDate = "2026-08-15T06:00:00Z",
+            movingTime = 1800,
+            distance = 5000.0,
+            averageHeartrate = null,
+            maxHeartrate = null,
+            // A flat run reports zero climb; "nousu 0 m" on screen is noise, not a measurement.
+            totalElevationGain = 0.0,
+            calories = null,
+            icuTrainingLoad = null,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    val row = rows.single()
+    assertNull(row.avgHeartRate)
+    assertNull(row.maxHeartRate)
+    assertNull(row.elevationGainMeters)
+    assertNull(row.calories)
+    assertNull(row.trainingLoad)
+  }
+
+  /**
+   * These rows exist to be placed on the clock and reduced to a pace. One that can do neither is
+   * dropped here rather than stored as something no screen can render.
+   */
+  @Test
+  fun `activities too incomplete to place are dropped`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(id = null, type = "Run", startDate = "2026-08-15T06:00:00Z", movingTime = 60),
+          IntervalsActivityDto(id = "b", type = null, startDate = "2026-08-15T06:00:00Z", movingTime = 60),
+          IntervalsActivityDto(id = "c", type = "Run", startDate = null, startDateLocal = null, movingTime = 60),
+          IntervalsActivityDto(id = "d", type = "Run", startDate = "not a date", startDateLocal = "also not", movingTime = 60),
+          IntervalsActivityDto(id = "e", type = "Run", startDate = "2026-08-15T06:00:00Z", movingTime = 0),
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    assertTrue(rows.toString(), rows.isEmpty())
+  }
+
+  /**
+   * A run uploaded by hand is still that run. `source` is stored because it answers "did this come
+   * off the watch", but nothing filters on it — dropping a `MANUAL` activity would be the same
+   * mistake as dropping an Oura workout whose activity word the app did not recognise.
+   */
+  @Test
+  fun `a manual upload is kept, with its source recorded`() {
+    val rows =
+      IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "m1",
+            type = "Run",
+            startDate = "2026-08-15T06:00:00Z",
+            movingTime = 1800,
+            source = "MANUAL",
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+
+    assertEquals("MANUAL", rows.single().source)
+  }
+
+  // ------------------------------------------------------------------ pace
+
+  /** 38 minutes over 6.2 km is 6:07 per kilometre. */
+  @Test
+  fun `pace comes from moving time and distance`() {
+    val metrics = metrics(movingTimeSec = 2280, distanceKm = 6.2)
+
+    assertEquals(367, metrics.paceSecPerKm)
+    assertEquals("6:07 /km", metrics.paceText)
+  }
+
+  /** A strength session has no distance, and therefore no pace to print. */
+  @Test
+  fun `no distance means no pace, not a division by zero`() {
+    val metrics = metrics(movingTimeSec = 2700, distanceKm = null)
+
+    assertNull(metrics.paceSecPerKm)
+    assertNull(metrics.paceText)
+  }
+
+  /** A GPS blip of a few metres would otherwise produce a pace of hours per kilometre. */
+  @Test
+  fun `a distance too small to be a run yields no pace`() {
+    assertNull(metrics(movingTimeSec = 600, distanceKm = 0.01).paceSecPerKm)
+  }
+
+  @Test
+  fun `seconds under ten are zero-padded so the pace reads as a clock`() {
+    assertEquals("5:01 /km", metrics(movingTimeSec = 1806, distanceKm = 6.0).paceText)
+  }
+
+  private fun metrics(movingTimeSec: Long, distanceKm: Double?) =
+    CompletedRunMetrics(
+      activityId = "i1",
+      sportType = "Run",
+      startTimeUtc = 0,
+      movingTimeSec = movingTimeSec,
+      distanceKm = distanceKm,
+    )
+}

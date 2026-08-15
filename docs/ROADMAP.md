@@ -79,23 +79,26 @@ the numbers behind them.
 ## Next Milestone
 
 The path towards an AI coach, in the order the pieces earn their keep. Decided 2026-08-15; the
-reasoning for Strava-first is that running is the most taxing session type and the one with real
-telemetry behind it (pace, distance, time, calories), while a strength session's lone
-heart-rate line says little — an advisor analysing only what Oura holds would have almost nothing
-to say about the sessions that matter most.
+reasoning for watch-telemetry-first is that running is the most taxing session type and the one
+with real numbers behind it (pace, distance, time, calories, training load), while a strength
+session's lone heart-rate line says little — an advisor analysing only what Oura holds would have
+almost nothing to say about the sessions that matter most.
 
-1. ~~**Strava integration**~~ — built. `data/strava` reads `/api/v3/athlete/activities` between two
-   dates, pages by page number, maps the documented failures to typed already-Finnish exceptions,
-   and stores `strava_activities` (schema v6, auto migration). OAuth2 with user-entered credentials
-   in Settings, same pattern as Oura
-   ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)),
-   but **no PKCE** — Strava's token endpoint does not accept a verifier, so `state` carries the
-   whole burden. Runs match to planned sessions through the same use case Oura's workouts go
-   through, and the session shows a pace line Oura cannot supply. Calories are not read: they are
-   absent from the summary endpoint and worth no extra request.
+1. ~~**Watch telemetry, via intervals.icu**~~ — built. `data/intervals` reads
+   `/api/v1/athlete/0/activities` between two dates and stores `intervals_activities` (schema v7).
+   Runs match to planned sessions through the same use case Oura's workouts go through, and a
+   matched session shows a pace line Oura cannot supply, plus intervals.icu's own training load.
+
+   **This was Strava for about a day.** Strava paywalled its API in June 2026 — developer access
+   now needs an active subscription — so that integration was removed entirely and replaced. Suunto's
+   own API was ruled out first: its FAQ states access is for "companies/organizations" and that "we
+   do not provide this for personal use". intervals.icu already receives the watch's activities, its
+   API is free for personal use, and it authenticates with a personal API key over HTTP Basic — no
+   OAuth, no callback activity, no refresh token, and one fewer exported component than before.
+
    **Not yet connected to a real account** — the tests run against a local HTTP server, so what is
-   verified is the client, not that Strava's answers match the shapes it expects. The setup steps
-   are in [STRAVA_SETUP.md](STRAVA_SETUP.md).
+   verified is the client, not that intervals.icu's answers match the shapes it expects. The setup
+   steps are in [INTERVALS_SETUP.md](INTERVALS_SETUP.md).
 2. ~~**Readiness rule, deterministic (Phase A)**~~ — built, and no AI anywhere in it.
    `ReadinessAdviceUseCase` is a pure function of the stored Oura days and the plan: a session left
    open on a day whose readiness was below 70 raises a card the next morning offering to shift the
@@ -107,7 +110,7 @@ to say about the sessions that matter most.
    first point where the readiness number reaches the plan at all.
 3. **AI coach comments, read-only (Phase B)** — a "pyydä valmentajan kommentit" button. BYOK: the
    user's own LLM API key, typed into Settings and stored like the Oura credentials. The advisor
-   reads completed sessions, Oura-recorded other activity and Strava runs, and writes an
+   reads completed sessions, Oura-recorded other activity and the watch's own runs, and writes an
    assessment — it changes nothing. The exact request payload is shown to the user before/with
    the response (see [INSPIRATION.md](INSPIRATION.md)); [PRIVACY.md](PRIVACY.md) must be updated
    before this ships, because health data leaves the device for a third party.

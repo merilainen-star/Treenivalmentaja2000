@@ -176,4 +176,77 @@ class MigrationTest {
     assertTrue(activities.isNull(activities.getColumnIndex("matchedSessionId")))
     activities.close()
   }
+
+  /**
+   * Version 7 is the first migration that **removes** something: Strava paywalled its API, so
+   * `strava_activities` goes and `intervals_activities` arrives in its place.
+   *
+   * Two things worth proving, and the first is the one that matters. Everything else stored — the
+   * training plan, its sessions, the Oura rows — has to survive untouched, because a migration
+   * that drops a table is exactly where a mistake would take neighbouring data with it. The second
+   * is that the new table is really there and writable, with a **string** primary key where the old
+   * one was numeric.
+   *
+   * The Strava row inserted below never existed on a real device — Strava was never connected to an
+   * account — but it is inserted anyway, so this test proves the drop works on a populated table
+   * rather than on an empty one that would hide a failure.
+   */
+  @Test
+  fun migrate6To7() {
+    var db = helper.createDatabase(TEST_DB, 6)
+
+    db.execSQL(
+      """
+      INSERT INTO `training_plans` (`id`, `name`, `schemaVersion`, `timeZone`, `startDate`, `description`, `createdAt`, `contentHash`, `isActive`)
+      VALUES ('plan1', 'Plan 1', 1, 'Europe/Helsinki', '2026-08-01', 'Desc', 1000, 'hash', 1)
+      """
+    )
+    db.execSQL(
+      """
+      INSERT INTO `oura_daily_summaries` (`date`, `readinessScore`, `sleepScore`, `activityScore`, `fetchedAtUtc`)
+      VALUES ('2026-08-15', 94, 88, 71, 1754755200000)
+      """
+    )
+    db.execSQL(
+      """
+      INSERT INTO `strava_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `elapsedTimeSec`, `distanceMeters`, `avgHeartRate`, `maxHeartRate`, `elevationGainMeters`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES (12345, 'Aamulenkki', 'Run', 1754755200000, 2280, 2400, 6200.0, 148, 171, 42.0, NULL, 1754755200000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 7, true)
+
+    // The neighbours: untouched by a migration that dropped the table beside them.
+    val plans = db.query("SELECT * FROM training_plans")
+    assertTrue(plans.moveToFirst())
+    assertEquals("Plan 1", plans.getString(plans.getColumnIndex("name")))
+    plans.close()
+
+    val summaries = db.query("SELECT * FROM oura_daily_summaries")
+    assertTrue(summaries.moveToFirst())
+    assertEquals(94, summaries.getInt(summaries.getColumnIndex("readinessScore")))
+    summaries.close()
+
+    // The new table exists and takes a string id, which is what makes the sync idempotent against
+    // intervals.icu's own activity identifiers.
+    db.execSQL(
+      """
+      INSERT INTO `intervals_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `elapsedTimeSec`, `distanceMeters`, `avgHeartRate`, `maxHeartRate`, `elevationGainMeters`, `calories`, `trainingLoad`, `source`, `deviceName`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES ('i84461234', 'Aamulenkki', 'Run', 1754755200000, 2280, 2400, 6200.0, 148, 171, 42.0, 540, 78, 'SUUNTO', 'Suunto Race', NULL, 1754755200000)
+      """
+    )
+    val activities = db.query("SELECT * FROM intervals_activities")
+    assertTrue(activities.moveToFirst())
+    assertEquals("i84461234", activities.getString(activities.getColumnIndex("id")))
+    assertEquals("SUUNTO", activities.getString(activities.getColumnIndex("source")))
+    assertEquals(78, activities.getInt(activities.getColumnIndex("trainingLoad")))
+    activities.close()
+
+    // And the old one is really gone rather than merely unused.
+    val tables =
+      db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='strava_activities'")
+    assertEquals(0, tables.count)
+    tables.close()
+  }
 }

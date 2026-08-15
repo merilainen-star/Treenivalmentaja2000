@@ -9,15 +9,17 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.room.DeleteTable
+import androidx.room.migration.AutoMigrationSpec
+import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.local.dao.OuraDao
 import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
-import fi.merilainen.treenivalmentaja.data.local.dao.StravaDao
 import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
-import fi.merilainen.treenivalmentaja.data.local.entity.StravaActivityEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 
@@ -29,15 +31,25 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       SessionEventEntity::class,
       OuraDailySummaryEntity::class,
       OuraWorkoutEntity::class,
-      StravaActivityEntity::class,
+      IntervalsActivityEntity::class,
     ],
-  version = 6,
+  version = 7,
   exportSchema = true,
-  // Purely additive both times — 4→5 added three nullable columns on `oura_workouts`, 5→6 adds
-  // the whole `strava_activities` table — which is exactly the case the note on `build` says to
-  // use an auto migration for. Room writes the SQL by diffing the exported schemas;
-  // `MigrationTest` runs each against a populated database of the older version.
-  autoMigrations = [AutoMigration(from = 4, to = 5), AutoMigration(from = 5, to = 6)],
+  // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
+  // additive. 6→7 is the one that removes something: `strava_activities` goes and
+  // `intervals_activities` arrives, because Strava paywalled its API and the Suunto data now comes
+  // through intervals.icu instead. A drop is still an auto migration when it is declared —
+  // [DropStravaActivities] is what tells Room the table is meant to go rather than to be renamed.
+  //
+  // **Nothing is lost by that drop.** Strava was never connected to a real account, so the table
+  // it created has always been empty on every device this build reaches. Were that not true, this
+  // would be a hand-written migration copying rows across instead.
+  autoMigrations =
+    [
+      AutoMigration(from = 4, to = 5),
+      AutoMigration(from = 5, to = 6),
+      AutoMigration(from = 6, to = 7, spec = AppDatabase.DropStravaActivities::class),
+    ],
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -45,7 +57,17 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun workoutSessionDao(): WorkoutSessionDao
   abstract fun sessionEventDao(): SessionEventDao
   abstract fun ouraDao(): OuraDao
-  abstract fun stravaDao(): StravaDao
+  abstract fun intervalsDao(): IntervalsDao
+
+  /**
+   * Declares that `strava_activities` is meant to disappear at version 7.
+   *
+   * Without this Room refuses to generate the migration at all, because a table present in one
+   * schema and absent from the next is ambiguous: dropped, or renamed and its rows meant to
+   * survive? Saying so here is the difference between a deliberate removal and a silent data loss.
+   */
+  @DeleteTable(tableName = "strava_activities")
+  class DropStravaActivities : AutoMigrationSpec
 
   companion object {
     private const val DB_NAME = "treenivalmentaja.db"
