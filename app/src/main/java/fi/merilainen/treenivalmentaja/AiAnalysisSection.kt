@@ -36,14 +36,29 @@ import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
  * `WorkoutDetails` because that function is deliberately read-only — content, never actions — and
  * the buttons on both cards sit beside it rather than inside it.
  *
- * Draws nothing at all when [kind] is `null`, which is what keeps the button off the hundreds of
- * rows the week list scrolls back through.
+ * Draws nothing at all in two cases, and both are deliberate:
+ *
+ *  - **[kind] is `null`** — the session is outside both windows. This is what keeps the button off
+ *    the hundreds of rows the week list scrolls back through.
+ *  - **[configured] is `false`** — no API key, so the feature is off. It draws *nothing*, not an
+ *    explanation.
+ *
+ * That second one was a mistake first time round, and the screenshot suite is what caught it. The
+ * original drew a line reading "AI-analyysi vaatii Anthropic API -avaimen" whenever a key was
+ * missing, reasoning by analogy with the Oura card, which explains itself rather than offering a
+ * button it knows cannot work. The analogy does not hold: the Oura card is **one** card on the
+ * Settings screen, whereas this renders on *every* workout in a ten-day window. An owner who has no
+ * interest in the AI feature — or has not set it up yet — would have found the same advertisement
+ * repeated across their whole training week, on the two screens they actually use daily. Thirteen
+ * screenshot baselines changed, which is exactly the right alarm for "you have altered every card
+ * in the app".
+ *
+ * An opt-in feature that has not been opted into should be invisible. Settings is where you find out
+ * it exists.
  *
  * @param kind which analysis this session can be asked for, from `AiAnalysisAvailability`.
  * @param state `null` before anything has been asked.
- * @param configured whether an API key exists. Without one the button is still shown but says what
- *   is missing when tapped is pointless — so it explains up front instead, the same way the Oura
- *   card refuses to draw a connect button it knows cannot work.
+ * @param configured whether an API key exists. `false` draws nothing — see above.
  */
 @Composable
 fun AiAnalysisSection(
@@ -54,19 +69,10 @@ fun AiAnalysisSection(
   onDismiss: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
-  if (kind == null) return
+  if (kind == null || !configured) return
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     when {
-      // A disabled button invites tapping to find out why. This says why without being tapped —
-      // the same reasoning the Oura card's missing-credentials state follows.
-      !configured ->
-        Text(
-          text = "AI-analyysi vaatii Anthropic API -avaimen. Aseta se Asetuksista.",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
       state is AiAnalysisState.Loading ->
         Row(
           verticalAlignment = Alignment.CenterVertically,

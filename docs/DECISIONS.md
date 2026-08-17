@@ -385,7 +385,7 @@
   - **Failure handling**, mirroring `IntervalsClient`'s existing exception shapes:
     | Case | Behaviour |
     | --- | --- |
-    | No key saved | Checked client-side before any request, same as `IntervalsNotConfiguredException` — "Anthropic API -avainta ei ole asetettu. Aseta se Asetuksista.", no network call. |
+    | No key saved | **The section draws nothing at all** — no button, no explanation. An opt-in feature that has not been opted into is invisible, and Settings is where its existence is advertised. The first implementation drew a "set a key in Settings" line instead, by analogy with the Oura card; the analogy was wrong, because that card appears once in Settings whereas this renders on every workout in a ten-day window. Thirteen screenshot baselines changed, which is what caught it. The client still refuses without a key (`AnthropicNotConfiguredException`, no network call), because the state can change between composition and tap. |
     | Offline / connection failure | `AnthropicUnavailableException`, Finnish message, "Yritä uudelleen". |
     | `401` | `AnthropicAuthException` — "Avain ei kelpaa. Tarkista se Asetuksista." |
     | `404` | The selected model no longer exists — a retired id in a list that has gone stale. Says so, and points at the model selector: "Valittua mallia ei enää ole. Valitse toinen malli Asetuksista." Anything else sends the owner hunting for a broken key. |
