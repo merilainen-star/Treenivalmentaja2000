@@ -17,6 +17,20 @@ internal enum class OuraCollection(val path: String) {
   DAILY_SLEEP("daily_sleep"),
   DAILY_ACTIVITY("daily_activity"),
   WORKOUT("workout"),
+
+  /**
+   * The **sleep periods**, not the sleep score — `sleep`, where [DAILY_SLEEP] is `daily_sleep`.
+   *
+   * Named `SLEEP_PERIODS` rather than `SLEEP` on purpose. It sits directly beside `DAILY_SLEEP` in
+   * this enum, their paths differ only by a prefix, and they return entirely different documents:
+   * one is a 0–100 score for the night, the other is the night itself with its HRV and heart rate.
+   * Two constants that differ only by a prefix, next to each other, returning different things is a
+   * mistake waiting to be made by whoever reads this next, so the name says which is which.
+   *
+   * Unlike the other four this collection returns **more than one document per day** — naps are
+   * sleep periods too. Picking the right one is [OuraMappers]' job.
+   */
+  SLEEP_PERIODS("sleep"),
 }
 
 /**

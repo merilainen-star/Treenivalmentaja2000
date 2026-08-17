@@ -33,6 +33,7 @@ internal object OuraMappers {
     sleep: List<OuraDailyScoreDto>,
     activity: List<OuraDailyScoreDto>,
     fetchedAtUtc: Long,
+    sleepPeriods: List<OuraSleepPeriodDto> = emptyList(),
   ): List<OuraDailySummaryEntity> {
     val byDay = { list: List<OuraDailyScoreDto> ->
       list
@@ -43,16 +44,56 @@ internal object OuraMappers {
     val readinessByDay = byDay(readiness)
     val sleepByDay = byDay(sleep)
     val activityByDay = byDay(activity)
-    return (readinessByDay.keys + sleepByDay.keys + activityByDay.keys).sorted().map { day ->
+    val nightByDay = nightsByDay(sleepPeriods)
+    val days = readinessByDay.keys + sleepByDay.keys + activityByDay.keys + nightByDay.keys
+    return days.sorted().map { day ->
+      val night = nightByDay[day]
       OuraDailySummaryEntity(
         date = day,
         readinessScore = readinessByDay[day],
         sleepScore = sleepByDay[day],
         activityScore = activityByDay[day],
+        averageHrvMs = night?.averageHrv?.takeIf { it > 0 },
+        restingHrBpm = night?.lowestHeartRate?.takeIf { it > 0 },
+        sleepHrBpm = night?.averageHeartRate?.takeIf { it > 0.0 }?.roundToInt(),
         fetchedAtUtc = fetchedAtUtc,
       )
     }
   }
+
+  /**
+   * The one sleep period per day whose numbers describe *the night*.
+   *
+   * The sleep collection is the only one that returns several documents for the same day, because
+   * naps are sleep periods too — and **averaging them together would be wrong**. A twenty-minute
+   * nap's HRV is not a comparable measurement to a night's; blending them would quietly corrupt
+   * exactly the trend this data was fetched to show. So one period is chosen and the rest ignored:
+   *
+   *  - `rest` and `deleted` are discarded outright. `rest` is a period Oura detected and the user
+   *    rejected as not-sleep, and `deleted` is one they removed; treating either as a night would be
+   *    reinstating data the person already said was wrong.
+   *  - `long_sleep` wins — the spec's own definition is sleep long enough (>3 h) to contribute to
+   *    the daily scores automatically, which is the night.
+   *  - With no `long_sleep`, the longest remaining period wins. A night that came in under three
+   *    hours is still that night's only measurement, and reporting nothing would be worse than
+   *    reporting a short one. A day holding only a genuine nap yields that nap's numbers, which is
+   *    the honest floor: it is what the ring measured while asleep that day.
+   *
+   * Periods with no `day` are dropped — the day is the row's primary key, and a reading that cannot
+   * be addressed is worse than one that is not there.
+   */
+  private fun nightsByDay(periods: List<OuraSleepPeriodDto>): Map<String, OuraSleepPeriodDto> =
+    periods
+      .filter { !it.day.isNullOrBlank() && it.type !in IGNORED_SLEEP_TYPES }
+      .groupBy { it.day!! }
+      .mapValues { (_, forDay) ->
+        forDay
+          .sortedWith(
+            compareByDescending<OuraSleepPeriodDto> { it.type == LONG_SLEEP }
+              .thenByDescending { it.totalSleepDuration ?: 0 }
+          )
+          .first()
+      }
 
   /**
    * Workouts as rows, dropping the ones that cannot be placed in time.
@@ -143,6 +184,15 @@ internal object OuraMappers {
   }
 
   private const val UNKNOWN_ACTIVITY = "unknown"
+
+  /** The `PublicSleepType` value for a period long enough to count as the night on its own. */
+  private const val LONG_SLEEP = "long_sleep"
+
+  /**
+   * Periods that are not sleep the user accepts: one Oura detected and they rejected in the confirm
+   * prompt, and one they deleted outright.
+   */
+  private val IGNORED_SLEEP_TYPES = setOf("rest", "deleted")
 
   /**
    * Below this, the samples in a workout's window are background readings rather than a record of

@@ -42,7 +42,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
@@ -78,6 +81,8 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val intervalsState by viewModel.intervalsState.collectAsState()
     val runMetrics by viewModel.runMetrics.collectAsState()
     val advice by viewModel.readinessAdvice.collectAsState()
+    val analyses by viewModel.aiAnalyses.collectAsState()
+    val anthropicState by viewModel.anthropicState.collectAsState()
 
     // On every **resume**, not merely on first composition.
     //
@@ -116,6 +121,10 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onShiftProgramme = viewModel::shiftProgrammeForward,
         onStartLighter = viewModel::startTodayLighter,
         onDismissAdvice = viewModel::dismissReadinessAdvice,
+        analyses = analyses,
+        analysisConfigured = anthropicState == AnthropicConnectionState.Configured,
+        onRequestAnalysis = viewModel::requestAiAnalysis,
+        onDismissAnalysis = viewModel::dismissAiAnalysis,
     )
 }
 
@@ -144,6 +153,10 @@ fun TodayScreenContent(
     onShiftProgramme: () -> Unit = {},
     onStartLighter: () -> Unit = {},
     onDismissAdvice: () -> Unit = {},
+    analyses: Map<String, AiAnalysisState> = emptyMap(),
+    analysisConfigured: Boolean = false,
+    onRequestAnalysis: (String) -> Unit = {},
+    onDismissAnalysis: (String) -> Unit = {},
 ) {
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
@@ -189,6 +202,10 @@ fun TodayScreenContent(
                     onExerciseClick = onExerciseClick,
                     completed = completedMetrics[workout.id],
                     run = runMetrics[workout.id],
+                    analysis = analyses[workout.id],
+                    analysisConfigured = analysisConfigured,
+                    onRequestAnalysis = { onRequestAnalysis(workout.id) },
+                    onDismissAnalysis = { onDismissAnalysis(workout.id) },
                 )
             }
         } else {
@@ -509,6 +526,10 @@ fun WorkoutCardToday(
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
+    analysis: AiAnalysisState? = null,
+    analysisConfigured: Boolean = false,
+    onRequestAnalysis: () -> Unit = {},
+    onDismissAnalysis: () -> Unit = {},
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -649,6 +670,18 @@ fun WorkoutCardToday(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Above the action buttons rather than below them: on a completed session it is the
+            // only thing left to do with the card, and on an upcoming one it is what the buttons
+            // underneath are the answer to.
+            AiAnalysisSection(
+                kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
+                state = analysis,
+                configured = analysisConfigured,
+                onRequest = onRequestAnalysis,
+                onDismiss = onDismissAnalysis,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
 
             // Action buttons. Only offered while the session is still open — a completed,
             // skipped or cancelled session has no legal transition left.

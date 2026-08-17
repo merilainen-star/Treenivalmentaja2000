@@ -121,15 +121,29 @@ The order of priority is:
 
 ### 4. Oura Daily Summary (`OuraDailySummary`)
 - **Table:** `oura_daily_summaries`
-- **Purpose:** Caches daily readiness, sleep, and activity scores.
+- **Purpose:** Caches daily readiness, sleep and activity scores, **and the night's own
+  measurements**.
 - **Primary Key:** `date` (String — `YYYY-MM-DD`)
 - **Fields:**
   - `readinessScore` (Int?)
   - `sleepScore` (Int?)
   - `activityScore` (Int?)
+  - `averageHrvMs` (Int?) — average heart-rate variability during sleep, milliseconds
+  - `restingHrBpm` (Int?) — Oura's `lowest_heart_rate`, the resting figure its own app shows
+  - `sleepHrBpm` (Int?) — average heart rate across the night
   - `fetchedAtUtc` (Long)
-- **Nullability:** All scores are nullable as Oura may not provide them (ring not worn). Missing
-  data is **not** treated as zero — the UI shows "ei dataa".
+- **Two collections, one row.** The three scores come from `daily_readiness`, `daily_sleep` and
+  `daily_activity`; the three measurements come from the **sleep periods** collection (`sleep`),
+  added at schema v11. They share a row because Oura keys a sleep period by the day it *belongs
+  to* — the morning you wake up — which is already this table's primary key. No join, no offset.
+- **One period per day, not an average.** The sleep collection returns several documents for a day
+  when naps are recorded. The night is the `long_sleep` period, falling back to the longest
+  remaining one; `rest` and `deleted` periods are discarded. Averaging them would blend a
+  twenty-minute nap's HRV into the night's and quietly corrupt the trend. See `OuraMappers`.
+- **Nullability:** All six are nullable as Oura may not provide them (ring not worn, night not
+  scored, or the sleep-periods fetch failing on its own without failing the sync). Missing data is
+  **not** treated as zero — the UI shows "ei dataa", and an HRV of 0 would read as autonomic
+  collapse rather than as no reading.
 - **Lifecycle:** Synced via WorkManager. Overwritten on update. Cleared when the user disconnects Oura.
 
 ### 5. Oura Workout (`OuraWorkout`)

@@ -349,4 +349,44 @@ class MigrationTest {
     assertTrue(activities.isNull(activities.getColumnIndex("ctl")))
     activities.close()
   }
+
+  /**
+   * Version 11 adds the night's own measurements to the daily summaries.
+   *
+   * The first migration in a while to touch an Oura table rather than an intervals.icu one, and the
+   * assertion is the same as every additive one before it — a day synced before v11 keeps its
+   * scores and gets nulls, not zeros.
+   *
+   * That distinction matters more here than usual. A stored HRV of 0 ms is not merely wrong, it is
+   * the single most alarming reading the analysis could be handed: it would be read as an athlete
+   * in complete autonomic collapse and advised accordingly. "Not known" and "catastrophic" must
+   * never be the same value, which is the rule the whole Oura layer is built on.
+   */
+  @Test
+  fun migrate10To11() {
+    var db = helper.createDatabase(TEST_DB, 10)
+
+    db.execSQL(
+      """
+      INSERT INTO `oura_daily_summaries` (`date`, `readinessScore`, `sleepScore`, `activityScore`, `fetchedAtUtc`)
+      VALUES ('2026-08-17', 72, 80, 65, 1786889278000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 11, true)
+
+    val summaries = db.query("SELECT * FROM oura_daily_summaries")
+    assertTrue(summaries.moveToFirst())
+    assertEquals("2026-08-17", summaries.getString(summaries.getColumnIndex("date")))
+    // The scores that were there survive.
+    assertEquals(72, summaries.getInt(summaries.getColumnIndex("readinessScore")))
+    assertEquals(80, summaries.getInt(summaries.getColumnIndex("sleepScore")))
+    assertEquals(65, summaries.getInt(summaries.getColumnIndex("activityScore")))
+    // The night's measurements are absent, not zero.
+    assertTrue(summaries.isNull(summaries.getColumnIndex("averageHrvMs")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("restingHrBpm")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("sleepHrBpm")))
+    summaries.close()
+  }
 }

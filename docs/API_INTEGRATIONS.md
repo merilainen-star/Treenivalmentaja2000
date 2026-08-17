@@ -69,9 +69,36 @@ covers all of them.
 | `/v2/usercollection/daily_readiness` | the readiness reading on the Today screen | `PublicDailyReadiness` |
 | `/v2/usercollection/workout` | matching completed workouts to planned sessions | `PublicWorkout` |
 | `/v2/usercollection/daily_sleep` | sleep score, if readiness alone proves too blunt | `PublicDailySleep` |
+| `/v2/usercollection/sleep` | **the night's own HRV and resting heart rate** | `PublicModifiedSleepModel` |
 | `/v2/usercollection/personal_info` | only if the profile is ever shown | `PersonalInfoResponse` |
 
 `daily_activity` is available and returns 25 fields; nothing in the app needs them yet.
+
+### `sleep` is not `daily_sleep`, and it is the odd one out
+
+The two paths differ by a prefix and return entirely different documents: `daily_sleep` is a 0–100
+score for the night, `sleep` is the night itself. Only the second carries `average_hrv`,
+`lowest_heart_rate` and `average_heart_rate`, which is why it is fetched at all — a score is Oura's
+opinion of a night relative to the athlete's own baseline, where those three are numbers that mean
+the same thing next season. The enum constant is `SLEEP_PERIODS`, not `SLEEP`, for exactly this
+reason.
+
+It breaks three assumptions the other four collections share:
+
+- **More than one document per day.** Naps are sleep periods. The `type` field
+  (`long_sleep` / `sleep` / `late_nap` / `rest` / `deleted`) separates them; the app takes the
+  `long_sleep` period, falls back to the longest remaining one, and discards `rest` and `deleted`
+  outright. It does **not** average them — a nap's HRV is not a comparable measurement to a night's.
+- **`day` means the morning you wake up**, which the specification states outright ("day that the
+  sleep belongs to"). That is already how `oura_daily_summaries` is keyed, so the night merges onto
+  the existing row with no offset arithmetic. The opposite convention would have been just as
+  plausible and would have shifted every reading by a day.
+- **Its failure is caught separately.** Which scope covers this path is an assumption, not a
+  reading — the vendored specification declares empty scope arrays on *every* operation, including
+  `daily_activity`, which is known to need `daily`. Oura's own documentation puts sleep periods under
+  `daily`, so the scope string is unchanged; if that is wrong the endpoint answers `401`, and
+  fetching it inline would take the four working collections down with it. See
+  `OuraRepository.sleepPeriodsOrNone`.
 
 ### Fields that actually exist
 

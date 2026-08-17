@@ -66,6 +66,23 @@ internal class OuraClient(
     fetch(OuraCollection.WORKOUT, from, to, workoutAdapter)
 
   /**
+   * The sleep periods themselves — where HRV and resting heart rate live.
+   *
+   * Returns **several documents per day** where the other collections return one: a night, and any
+   * naps. They are all handed back as they arrive; deciding which one is the night belongs to
+   * [OuraMappers], not to a fetch.
+   *
+   * **Which scope covers this is an assumption, not a reading.** The vendored specification declares
+   * empty scope arrays on every operation — including `daily_activity`, which is known to need
+   * `daily` — so nothing in it says what this path requires. Oura's own documentation puts sleep
+   * periods under `daily`, which the app already requests, so [OuraOAuth.SCOPES] is unchanged and no
+   * reconnect should be needed. If that is wrong this answers `401`, which the diagnostics screen
+   * reports by name rather than leaving as a silent absence.
+   */
+  suspend fun sleepPeriods(from: LocalDate, to: LocalDate): List<OuraSleepPeriodDto> =
+    fetch(OuraCollection.SLEEP_PERIODS, from, to, sleepPeriodAdapter)
+
+  /**
    * Heart-rate samples between two instants.
    *
    * The one collection that does not take dates: `start_datetime` and `end_datetime`, because a
@@ -240,6 +257,11 @@ internal class OuraClient(
 
     private val workoutAdapter: JsonAdapter<OuraPageDto<OuraWorkoutDto>> =
       moshi.adapter(Types.newParameterizedType(OuraPageDto::class.java, OuraWorkoutDto::class.java))
+
+    private val sleepPeriodAdapter: JsonAdapter<OuraPageDto<OuraSleepPeriodDto>> =
+      moshi.adapter(
+        Types.newParameterizedType(OuraPageDto::class.java, OuraSleepPeriodDto::class.java)
+      )
 
     private val heartRateAdapter: JsonAdapter<OuraPageDto<OuraHeartRateDto>> =
       moshi.adapter(

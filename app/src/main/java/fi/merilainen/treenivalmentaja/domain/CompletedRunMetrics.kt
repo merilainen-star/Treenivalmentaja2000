@@ -52,6 +52,17 @@ data class CompletedRunMetrics(
   val hrLoad: Int? = null,
   /** Training impulse — the classic heart-rate integral. */
   val trimp: Double? = null,
+  /**
+   * Acute training load — fatigue, the short rolling average — as it stood after this activity.
+   *
+   * Stored on the row since schema v10 and read by nothing until now. This is the accessor that
+   * entity's comment promised would "arrive with the rule": the upcoming-workout analysis
+   * (ADR-010) hands the pair to the model as the fatigue-versus-fitness signal, which is the
+   * question they were fetched to answer.
+   */
+  val atl: Double? = null,
+  /** Chronic training load — fitness, the long rolling average. See [atl]. */
+  val ctl: Double? = null,
   /** The recording device, when the source named one. */
   val deviceName: String? = null,
 ) {

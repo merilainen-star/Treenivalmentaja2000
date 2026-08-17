@@ -14,6 +14,12 @@ The app handles personal health data and training schedules. Threats include una
   ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)),
   which removes the accepted risk below for the published test build entirely. The paragraph is
   kept because it still applies to a local build that supplies credentials through `.env`.
+- **The Anthropic API key** follows the same mechanism: typed into Settings, stored with AES-256-GCM
+  under its own Android Keystore alias in its own preferences file
+  (`data/anthropic/AnthropicApiKeyStore.kt`,
+  [ADR-010](DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key)).
+  It is never redisplayed once saved and never logged. This is the **third** instance of the
+  entered-at-run-time mechanism, not a fourth mechanism.
 - **Accepted risk (see [ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)):** in a build
   that does compile them in, the Oura client secret is present in the built APK. This is accepted
   **only** for the private single-user build, which is never published. The mitigations are: the APK is
@@ -69,7 +75,21 @@ client secret lives in the APK — see "Secret Management" above.
 
 ## User Data Deletion & Privacy
 - Biometric data is strictly minimized. The app only requests scopes needed for scheduling (readiness, sleep, workouts).
-- AI prompts (future) will minimize data, sending only abstracted metrics rather than raw identifiable health data.
+- **AI prompts send raw health measurements, not abstracted ones — this line used to promise the
+  opposite, and the promise was not kept.** It said prompts "will minimize data, sending only
+  abstracted metrics rather than raw identifiable health data". The analysis built in
+  [ADR-010](DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key)
+  sends a week of nightly HRV in milliseconds and resting heart rate in beats per minute, which is
+  exactly the raw health data that sentence excluded. Abstracting them would have defeated the
+  feature: the reason HRV is fetched at all is that a *measurement* means the same thing next season
+  where a score does not.
+
+  The honest position, which replaces it: the data is raw, and the protections are that **nothing is
+  sent unless the user taps the button**, that the request is **shown to them verbatim** afterwards,
+  that **only one workout and about a week of readings** go with it rather than the whole history,
+  and that **not entering a key disables the feature entirely**. Recorded as a change of position
+  rather than edited away, because a security document that quietly drops a promise it broke is
+  worse than one that never made it.
 - User can trigger a complete local data wipe from the Settings screen.
 
 ## Known Security Gaps

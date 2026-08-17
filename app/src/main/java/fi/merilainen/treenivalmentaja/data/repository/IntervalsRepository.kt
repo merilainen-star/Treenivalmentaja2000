@@ -249,5 +249,7 @@ private fun IntervalsActivityEntity.toMetrics(): CompletedRunMetrics =
     intensity = intensity,
     hrLoad = hrLoad,
     trimp = trimp,
+    atl = atl,
+    ctl = ctl,
     deviceName = deviceName,
   )

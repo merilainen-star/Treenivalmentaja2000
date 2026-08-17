@@ -42,6 +42,54 @@ internal data class OuraDailyScoreDto(
 )
 
 /**
+ * One sleep period, `PublicModifiedSleepModel` — the night itself, not its score.
+ *
+ * **This is where the nightly measurements live.** The `daily_sleep` collection carries a 0–100
+ * score and nothing else; `average_hrv` and `lowest_heart_rate` exist only here. Three fields are
+ * read of the roughly thirty the schema declares, and taking all three costs nothing extra — they
+ * arrive in the same document.
+ *
+ * The specification declares only `id`, `bedtime_start`, `bedtime_end`, `day`, `low_battery_alert`,
+ * `period` and `time_in_bed` as required; everything this app reads is explicitly nullable there,
+ * which is the honest shape for a night the ring was charging or a period the algorithm could not
+ * score. Nullable here for the usual reason on top of that: Moshi throws on a missing non-null
+ * field, so a service changing shape must become a row without data rather than a crash.
+ */
+internal data class OuraSleepPeriodDto(
+  val id: String? = null,
+  /**
+   * `YYYY-MM-DD` — **the day the sleep belongs to**, which is the morning you wake up.
+   *
+   * That is already how `oura_daily_summaries` is keyed, so the night merges onto the existing row
+   * with no offset arithmetic. Worth stating because the opposite convention would be just as
+   * plausible and would silently shift every reading by a day.
+   */
+  val day: String? = null,
+  /**
+   * Which kind of period this is: `long_sleep`, `sleep`, `late_nap`, `rest`, `deleted`.
+   *
+   * The field that makes this collection usable. A day can hold a night *and* a nap, and their
+   * numbers are not comparable — see [OuraMappers] for which one wins and why averaging would be
+   * wrong.
+   */
+  val type: String? = null,
+  /** Average heart-rate variability during sleep, in milliseconds. */
+  @Json(name = "average_hrv") val averageHrv: Int? = null,
+  /**
+   * Lowest heart rate during sleep — the resting figure Oura's own app shows.
+   *
+   * The spec notes this is computed from 30-second samples and so differs slightly from the app's
+   * own display, which aggregates to 5 minutes. Close enough to be the same measurement; recorded
+   * here so a future discrepancy is not mistaken for a bug.
+   */
+  @Json(name = "lowest_heart_rate") val lowestHeartRate: Int? = null,
+  /** Average heart rate during sleep, beats per minute. Same 30-second-sample caveat. */
+  @Json(name = "average_heart_rate") val averageHeartRate: Double? = null,
+  /** Seconds actually asleep. Used only to rank periods when no `long_sleep` is present. */
+  @Json(name = "total_sleep_duration") val totalSleepDuration: Int? = null,
+)
+
+/**
  * One heart-rate sample, `PublicHeartRateRow`.
  *
  * A separate collection from everything else, and a different request shape: it is a time series

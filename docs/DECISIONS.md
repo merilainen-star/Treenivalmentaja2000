@@ -198,3 +198,270 @@
     this app is actually installed.
 - **Related Files:** `data/oura/OuraConnection.kt`, `data/oura/OuraTokenStore.kt`, `OuraCard.kt`,
   `TreenivalmentajaApplication.kt`, `AUTHENTICATION.md`, `SETUP.md`, `SECURITY.md`
+
+## ADR-010: On-demand AI workout analysis, called directly from the app with a user-supplied key
+- **Status:** Accepted (2026-08-17), and built. Implements the "AI coach comments, read-only
+  (Phase B)" item in `ROADMAP.md`, which this ADR makes concrete. Governed by
+  [ADR-005](#adr-005-ai-advisor-as-proposal-only) — this feature returns prose, never a plan edit —
+  and follows the credential pattern of
+  [ADR-009](#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it) and
+  [ADR-008](#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences).
+- **Context:** An "AI-analyysi" button under a workout card, tapped by hand, that calls Claude and
+  shows the result inline. Two variants: what a **completed** session cost against that morning's
+  recovery, and how to execute an **upcoming** one against the current recovery trend. Three things
+  found during investigation shape the design below:
+  - **No raw HRV or resting heart rate is stored anywhere in the app.** `DailyRecovery` holds only
+    Oura's three composite scores (readiness/sleep/activity, 0–100). An analysis of "how did this
+    session sit against that morning's recovery" written from a single 0–100 composite is a thinner
+    claim than the data allows: Oura holds the underlying nightly HRV and resting heart rate, and a
+    trend in those is what a coach actually reads. **This ADR fetches them** — see the sleep-periods
+    decision below.
+  - **Acute/chronic training load (`atl`/`ctl`) is stored but read by nothing.** The most recent
+    commit added these columns to `IntervalsActivityEntity` for "the fatigue rule in ROADMAP.md";
+    `IntervalsRepository.toMetrics()` never copies them into `CompletedRunMetrics`. This ADR is that
+    rule's first reader, and includes wiring the two fields through as part of the same change.
+  - **The vendored specification declares no per-operation scopes.** Every path's `security` block is
+    `{"BearerAuth": []}, {"OAuth2": []}` — empty arrays, including on `daily_activity`, which is
+    known to need `daily`. So the spec cannot answer which scope covers the sleep-periods endpoint,
+    and the answer has to be measured rather than read. This is the same class of gap
+    `AUTHENTICATION.md` already records about the stale `BearerAuth` declaration.
+- **Decision:**
+  - **Key storage.** A new `AnthropicApiKeyStore`, byte-for-byte the same construction as
+    `IntervalsApiKeyStore` — AES-256-GCM under its own Android Keystore alias, its own
+    `SharedPreferences` file, excluded from backup, never redisplayed once saved. Entered on a new
+    card in Settings, below the Intervals.icu card. **Unlike** the Intervals key, saving does **not**
+    trigger an immediate test call — intervals.icu's `testKey()` is free, an Anthropic call is not,
+    and spending the user's money to validate a paste they didn't ask to spend money on is the wrong
+    default. The first real "AI-analyysi" tap is the test; a `401` there says so.
+  - **Nightly HRV and resting heart rate are fetched from Oura**, as a fifth collection:
+    `GET /v2/usercollection/sleep` (`PublicModifiedSleepModel`), which is the *sleep periods*
+    endpoint and a different thing from the `daily_sleep` **score** the app already reads. The
+    `OuraCollection` constant is therefore `SLEEP_PERIODS("sleep")`, not `SLEEP` — it sits directly
+    beside `DAILY_SLEEP("daily_sleep")` in the same enum, and two constants whose names differ only
+    by a prefix, whose paths differ only by a prefix, and which return entirely different documents
+    is a mistake waiting to be made by whoever reads this next. Three fields are taken from it, and
+    taking all three is free once the request is made — they arrive in the same document:
+
+    | Field | Type | What it is |
+    | --- | --- | --- |
+    | `average_hrv` | int, nullable | Average heart-rate variability during sleep, in ms |
+    | `lowest_heart_rate` | int, nullable | Lowest heart rate during sleep — the resting-HR figure Oura's own app shows |
+    | `average_heart_rate` | number, nullable | Average heart rate during sleep |
+
+    Four things about this endpoint differ from the four collections already read, and each is a
+    decision rather than a detail:
+    - **It returns more than one document per day.** Naps are sleep periods too. The `type` field
+      (`long_sleep` / `sleep` / `late_nap` / `rest` / `deleted`) is what separates them: the night's
+      figures come from the `long_sleep` document, falling back to the longest `total_sleep_duration`
+      among the remainder when there is none. `rest` (a falsely detected period the user rejected)
+      and `deleted` are discarded outright. **Averaging the periods together would be wrong** — a
+      twenty-minute nap's HRV is not a comparable measurement to a night's, and blending them would
+      quietly corrupt exactly the trend this feature exists to read.
+    - **`day` already means what this app needs.** The spec defines it as the day the sleep *belongs
+      to* — the morning you wake up — which is the same keying `oura_daily_summaries` uses. No offset
+      arithmetic, and the row merges into the existing day rather than creating a parallel table.
+    - **The scope is an assumption, not a reading.** The spec declares empty scope arrays everywhere
+      (see Context), so nothing in it says whether `daily` covers this path. Oura's own documentation
+      puts sleep periods under `daily`, so `OuraOAuth.SCOPES` is **left unchanged** and no reconnect
+      is expected. If that assumption is wrong the endpoint answers `401` and the diagnostics screen
+      says so in one tap — which is why it gains a row for this collection.
+    - **Its failure must not fail the sync.** The existing `sync()` fetches all four collections
+      before writing anything, so any one failing discards the lot. That is right for four
+      collections known to work; it is wrong for a new one whose scope coverage is unverified — a
+      `401` here would otherwise take down readiness, sleep, activity and workouts with it. This call
+      is therefore caught on its own and its absence leaves the three new columns `null`, following
+      the precedent `withHeartRatePerWorkout` already sets for the `heartrate` scope.
+  - **Default model `claude-sonnet-5`, changeable in Settings.** The default is Sonnet because of the
+    task shape: interpreting a page of numbers already labelled with what they mean and writing a
+    short assessment against explicit bands is summarisation and judgment over structured input, not
+    the open-ended multi-step reasoning Opus-tier is bought for. But the right tier for *this* prompt
+    on *this* athlete's data is a judgment best made by reading a few real answers, not by reasoning
+    about it in advance — so Settings carries a selector rather than the ADR carrying a verdict:
+
+    | Option | Model id | $/Mtok in ⋅ out | Shown as |
+    | --- | --- | --- | --- |
+    | Cheapest | `claude-haiku-4-5` | 1 ⋅ 5 | "Nopein ja edullisin" |
+    | **Default** | `claude-sonnet-5` | 3 ⋅ 15 | "Tasapainoinen (oletus)" |
+    | Most capable | `claude-opus-5` | 5 ⋅ 25 | "Paras arvio, kallein" |
+
+    **What a tap actually costs**, on a prompt of roughly 1 500 input tokens and a few hundred words
+    of Finnish out: on the order of **half a cent on Haiku, 2–3 cents on Sonnet, 4–6 cents on Opus**.
+    The spread is wider than output length alone suggests because Sonnet 5 and Opus 5 think
+    adaptively by default and **thinking is billed as output tokens** — the thinking, not the visible
+    answer, is most of the bill. Even the dearest option is cents per tap for something read a few
+    times a week, which is the whole reason this is a selector and not an optimisation problem.
+
+    *(Sonnet 5 is at an introductory 2 ⋅ 10 until 2026-08-31 — a fortnight from this ADR. The table
+    lists the standard rate deliberately: the figures above should not become wrong on 1 September.)*
+
+    A **fixed list, not a free-text field.** A mistyped model id is a `404` discovered at tap time,
+    on a phone, with no way to tell it from a broken key; three known-good ids in a dropdown cannot
+    produce that. The cost is that the list goes stale as models are released — accepted, because it
+    is one constant in one file, and a stale list still works where a typo does not. A model that is
+    *retired* rather than merely superseded also answers `404`, which is why the failure table below
+    gives that status its own message rather than folding it into the generic one.
+
+    The selector is stored with `NotificationSettingsStore`'s DataStore preferences, **not** in the
+    Keystore: a model id is a preference, not a secret, and putting it behind encryption would imply
+    otherwise. The request body is identical for all three ids, so the selector really is a string
+    swap — see the next bullet.
+  - **Call shape.** Direct OkHttp POST to `https://api.anthropic.com/v1/messages`, no SDK, no
+    backend, matching ADR-007's reasoning for the Oura client — one endpoint, already have OkHttp
+    and Moshi, a dependency buys nothing here. Non-streaming: the response is a paragraph or two,
+    nowhere near the size that needs streaming to avoid a timeout.
+    ```
+    POST https://api.anthropic.com/v1/messages
+    x-api-key: <stored key>
+    anthropic-version: 2023-06-01
+    content-type: application/json
+
+    { "model": "<selected id>", "max_tokens": 8192,
+      "messages": [{ "role": "user", "content": "<constructed prompt>" }] }
+    ```
+    **No `thinking` parameter is sent**, and that is what makes one request body serve all three
+    models: Sonnet 5 and Opus 5 think adaptively when the field is absent, Haiku 4.5 does not think
+    at all, and all three accept the request as written.
+
+    **`max_tokens` is 8192 rather than the ~500 the visible answer needs**, because on Sonnet 5 and
+    Opus 5 it bounds thinking *and* response text together — a value sized for the prose alone would
+    spend the budget on reasoning and truncate the answer mid-sentence. A ceiling costs nothing
+    unless it is reached; only generated tokens are billed.
+
+    **The answer is not `content[0]`.** `content` is a list of typed blocks, and on the two models
+    that think, the **thinking blocks come first** — so `content[0]` is a `thinking` block whose text
+    is empty (`display` defaults to `omitted`, which is what this app wants: the reasoning is neither
+    shown nor paid attention to, only billed). On Haiku 4.5, which does not think, `content[0]` *is*
+    the text. Reading index zero would therefore work on one of the three models and silently render
+    an empty analysis on the other two. The client **scans for the first block whose `type` is
+    `"text"`** instead, after checking `stop_reason`. That block's text is displayed as-is — no
+    structured output, no further parsing. A malformed-JSON failure mode is not worth buying for a
+    feature that changes nothing in the plan either way.
+
+    **No `fallbacks` parameter**, though Anthropic's own guidance recommends one by default for
+    `claude-opus-5` code: it re-runs a refused request on another model inside the same call. It is a
+    beta header plus a second model id in every request, to rescue a refusal category ("cyber", "bio")
+    that a Finnish training-analysis prompt has no route to. The refusal row below is the cheaper
+    honest handling. Worth revisiting only if a refusal is ever actually observed.
+  - **Prompt construction is a pure function**, `AnalysisPromptBuilder` in `domain/`, built entirely
+    from state the ViewModel already holds (`completedMetrics`, `runMetrics`, `recoveryByDay`,
+    `workouts`) — no new fetches. Two builders, one per analysis type:
+    - **Completed workout:** the session's type/planned duration/description; whatever of
+      `CompletedSessionMetrics` (Oura) and `CompletedRunMetrics` (intervals.icu — pace, HR,
+      `trainingLoad`, `intensityPercent`, `hrLoad`, `trimp`) exist for it, nulls omitted rather than
+      sent as zero; that morning's `DailyRecovery` — readiness/sleep/activity scores **and the
+      nightly HRV, resting heart rate and sleep heart rate** added by this change; the same figures
+      for the preceding six days as trend.
+    - **Upcoming workout:** the session's type/planned duration/description/`Intensity` enum
+      (`EASY`/`MODERATE`/`HARD`/`MAX` — Plan Schema v1's only notion of intended load, there is no
+      numeric target); the last seven days of readiness, HRV and resting heart rate as trend; the
+      latest known `atl`/`ctl` (added to `CompletedRunMetrics` as part of this change) as the
+      fatigue/fitness signal, when a matched activity carries one.
+    **Absent values are omitted rather than sent as zero or as a dash**, the same rule the rest of
+    the app obeys — a night the ring was not worn must not reach the model as an HRV of 0, which
+    reads as a catastrophic reading rather than as no reading.
+    Both end with an explicit instruction: assess or advise only, in Finnish, and never propose or
+    imply a specific plan edit — the app has no mechanism to act on one and must not read as if it
+    does (ADR-005).
+  - **Time windows for the button.** A session gets the button in exactly one of these two states,
+    never both, decided by `status` rather than a separate flag:
+    - **Completed:** `status == COMPLETED` and `dayOffset` in `-7..0` — the last seven days,
+      inclusive of today.
+    - **Upcoming:** `status == PLANNED || status == NOTIFIED` and `dayOffset` in `0..3` — today
+      through three days out. `STARTED` is deliberately excluded: "how should I execute this" is
+      moot once the session is already under way.
+    `SKIPPED` sessions get no button — there is nothing completed to assess and nothing upcoming to
+    advise on.
+  - **Where it renders.** `WorkoutDetails.kt` stays read-only, as documented; the button is a new
+    shared composable (`AiAnalysisSection`), called from both `WorkoutCardToday` (today's session,
+    beside its existing action-button column) and `WorkoutCardWeek` (inside the expanded content,
+    beside `WorkoutDetails`) — the two places sessions in the -7..+3 window are actually shown.
+  - **State** lives in `WorkoutViewModel` as `Map<sessionId, AiAnalysisState>`
+    (`Idle` / `Loading` / `Loaded(text)` / `Failed(message)`), so scrolling the week list doesn't
+    lose an open analysis and more than one card can be open at once.
+  - **Transparency.** The result card carries a collapsed "Näytä pyyntö" row that expands to the
+    exact prompt text sent — no separate request/response log, just the string already built,
+    shown. This is the ROADMAP item's own requirement, and it costs one more `Text` in a
+    `Column`.
+  - **Failure handling**, mirroring `IntervalsClient`'s existing exception shapes:
+    | Case | Behaviour |
+    | --- | --- |
+    | No key saved | Checked client-side before any request, same as `IntervalsNotConfiguredException` — "Anthropic API -avainta ei ole asetettu. Aseta se Asetuksista.", no network call. |
+    | Offline / connection failure | `AnthropicUnavailableException`, Finnish message, "Yritä uudelleen". |
+    | `401` | `AnthropicAuthException` — "Avain ei kelpaa. Tarkista se Asetuksista." |
+    | `404` | The selected model no longer exists — a retired id in a list that has gone stale. Says so, and points at the model selector: "Valittua mallia ei enää ole. Valitse toinen malli Asetuksista." Anything else sends the owner hunting for a broken key. |
+    | `429` | `AnthropicRateLimitException`, reading `Retry-After` if present, same pattern as `IntervalsRateLimitException`. |
+    | `529` | Overloaded — retryable, and distinct from `429` in that waiting is the only remedy and no quota was spent. Same "yritä hetken päästä" wording as `OuraRateLimitException`. |
+    | Other non-200 | Generic Finnish message naming the HTTP status. |
+    | `stop_reason: "refusal"` | A `200` with no usable text — the model's safety classifiers declined. Nothing in a training prompt should reach them, but `stop_reason` is checked before the content list is walked regardless: a refusal can carry an empty `content`, and "shouldn't happen" is not a reason to skip a one-line guard. |
+    | While waiting | Button replaced by a disabled state, a small `CircularProgressIndicator`, and "Analysoidaan…" — the `IntervalsCard.Testing()` shape. |
+- **Consequences:**
+  - **Database schema v11.** `oura_daily_summaries` gains three nullable columns (`averageHrvMs`,
+    `restingHeartRate`, `sleepHeartRate`) — purely additive, so `AutoMigration(10, 11)` writes the
+    SQL, and `MigrationTest` gains the 10→11 case that `AppDatabase`'s own four-step rule requires.
+    A day stored before this keeps its scores and gets nulls, which is indistinguishable from a night
+    the ring was not worn — correct in both cases, because in both cases the app does not know.
+  - **The HRV values are useful beyond this feature.** They are a stored column on the day, not a
+    field on a prompt: the Today card, the readiness rule, and the easy-run drift rule in
+    `ROADMAP.md` can all read them without another fetch. This ADR is the reason they arrive, not
+    the limit of what may use them.
+  - **One more request per sync**, on the same window as the other four. The sleep-periods response
+    is larger than a score document (it carries the 30-second phase and movement strings, which this
+    app ignores), but it is one call over a fortnight, not one per day.
+  - `PRIVACY.md` changes in **two** places, not one: the network-destinations table grows a sixth row
+    (`api.anthropic.com`) describing exactly what is sent, **and** the "What the app requests from
+    Oura" section — which currently says the app reads only scores — has to say it now also reads
+    nightly HRV and heart rate. Shipping without that second edit would leave the policy stating
+    something untrue about health data, which is worse than leaving the feature unbuilt.
+  - `SECURITY.md`'s "Secret Management" section, which already names "API keys for AI" as a future
+    entry, gets an implementation line pointing at `AnthropicApiKeyStore`; `AGENTS.md`'s two-mechanism
+    secrets list gains this as a third instance of mechanism 1, not a new mechanism. `SECURITY.md`'s
+    "AI prompts (future) will minimize data, sending only abstracted metrics rather than raw
+    identifiable health data" needs revisiting rather than quietly contradicting: nightly HRV **is**
+    a raw health metric, and the honest position is that the user chooses per tap to send it, sees
+    exactly what is sent, and it leaves the device only on that tap.
+  - `DATA_MODEL.md` § 4 and `API_INTEGRATIONS.md` both describe the Oura tables and collections and
+    both need the fifth collection and the three columns.
+  - `CompletedRunMetrics` gains two nullable fields (`atl`, `ctl`) purely by copying already-stored
+    columns through `toMetrics()` — no migration, no new fetch.
+  - Every tap spends the user's own money against their own key. Nothing about that is hidden: the
+    request shown under "Näytä pyyntö" is the actual bill.
+  - The two analysis types share a builder shape but not a prompt — a future third type (e.g. a
+    weekly rollup) adds a builder, not a rework of these two.
+- **Alternatives Considered:**
+  - *Readiness score alone, no new Oura collection* — the design this ADR started from, and rejected
+    once the cost was counted honestly: one endpoint, one DTO, three additive columns and an auto
+    migration, against an analysis that can read a real HRV trend instead of a composite that hides
+    it. The migration is the cheap kind Room writes itself.
+  - *`daily_readiness.contributors.hrv_balance` and `.resting_heart_rate`* — available on a
+    collection the app **already fetches**, so it would need no new endpoint at all. Rejected because
+    they are 0–100 *contributor scores*, not measurements: `hrv_balance: 82` says Oura's opinion of
+    the night relative to the athlete's own baseline, where `average_hrv: 61` is a number in
+    milliseconds that means the same thing tomorrow and next season. The request was for HRV, and a
+    score of HRV is not HRV.
+  - *The `hrv` sample series on the same document* — the per-night time series rather than its
+    average. Rejected: hundreds of samples to store and summarise per night, to produce a figure the
+    same document already carries as `average_hrv`.
+  - *Free-text model id in Settings* — rejected: a typo is a `404` at tap time on a phone,
+    indistinguishable from a bad key, and the failure lands in the middle of the one flow this
+    feature has. The staleness of a fixed list is the cheaper problem.
+  - *No selector, `claude-sonnet-5` fixed* — rejected: whether Sonnet's Finnish and its judgment on a
+    real week of this athlete's data are good enough is an empirical question, and a selector answers
+    it by letting the user compare rather than by requiring a rebuild to find out.
+  - *Test the Anthropic key on save, like intervals.icu* — rejected: that test is free on
+    intervals.icu and is not free here. Spending money to validate a paste is a choice the user
+    should make by tapping "AI-analyysi", not one the Settings screen makes for them.
+  - *Route through a backend* — rejected on the same grounds as ADR-006: no second user, no need to
+    hide a key from the person who already owns it, and a backend for one HTTP call is pure overhead.
+  - *Structured JSON output instead of prose* — rejected: nothing downstream acts on the response
+    (ADR-005), so there is nothing to validate a schema against; parsing JSON only adds a failure
+    mode a read-only feature does not need.
+- **Related Files:** `data/anthropic/AnthropicApiKeyStore.kt`, `data/anthropic/AnthropicClient.kt`,
+  `domain/AnalysisPromptBuilder.kt`, `WorkoutDetails.kt`, `WorkoutCardToday` (`TodayScreen.kt`),
+  `WorkoutCardWeek` (`WeekScreen.kt`), `SettingsScreen.kt`, `WorkoutViewModel.kt`,
+  `data/settings/NotificationSettingsStore.kt`, `data/repository/IntervalsRepository.kt`,
+  `domain/CompletedRunMetrics.kt` — and, for the Oura side: `data/oura/OuraApi.kt` (fifth
+  collection), `data/oura/OuraDto.kt` (`OuraSleepPeriodDto`), `data/oura/OuraClient.kt`,
+  `data/oura/OuraMappers.kt`, `data/repository/OuraRepository.kt`,
+  `data/local/entity/Entities.kt`, `data/local/AppDatabase.kt` (v11),
+  `domain/DailyRecovery.kt`, `MigrationTest`. Docs: `ROADMAP.md`, `PRIVACY.md`, `SECURITY.md`,
+  `DATA_MODEL.md`, `API_INTEGRATIONS.md`, `AGENTS.md`

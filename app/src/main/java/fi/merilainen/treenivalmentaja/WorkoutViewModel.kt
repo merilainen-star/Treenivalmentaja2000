@@ -26,6 +26,19 @@ import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsSyncResult
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicClient
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnection
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicException
+import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
+import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
+import fi.merilainen.treenivalmentaja.domain.AnthropicModel
+import fi.merilainen.treenivalmentaja.domain.CompletedAnalysisInput
+import fi.merilainen.treenivalmentaja.domain.Intensity
+import fi.merilainen.treenivalmentaja.domain.UpcomingAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
 import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
@@ -77,6 +90,14 @@ data class Workout(
   val exercises: List<Exercise> = emptyList(),
   /** Circuit rounds the whole exercise list is repeated for, when the plan says so. */
   val rounds: Int = 1,
+  /**
+   * The effort the plan asked for, when it said.
+   *
+   * Plan Schema v1's only notion of intended load — there is no numeric target — which is why the
+   * AI analysis of an *upcoming* session leans on it: without it the model would be told a duration
+   * and a description and left to guess how hard the session is meant to be.
+   */
+  val intensity: Intensity? = null,
 ) {
   val dayString: String
     get() =
@@ -128,6 +149,16 @@ class WorkoutViewModel(
   private val intervalsConnection: IntervalsConnection? = null,
   private val intervalsRepository: IntervalsRepository? = null,
   private val readinessAdviceUseCase: ReadinessAdviceUseCase = ReadinessAdviceUseCase(),
+  /**
+   * The AI analysis collaborators, all nullable for the reason [intervalsConnection] is: the
+   * existing unit tests have no Keystore to build a real key store against, and a ViewModel that
+   * could not be constructed without one would make every test an instrumented test. A missing
+   * connection reads as "no key", which is also true.
+   */
+  private val anthropicConnection: AnthropicConnection? = null,
+  private val anthropicClient: AnthropicClient? = null,
+  private val analysisSettingsStore: AnalysisSettingsStore? = null,
+  private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
 ) : ViewModel() {
 
   val workouts: StateFlow<List<Workout>> =
@@ -664,6 +695,117 @@ class WorkoutViewModel(
     }
   }
 
+  // ------------------------------------------------------------------ AI analysis
+
+  /** Whether an Anthropic key is stored. Two states, because saving one does not test it. */
+  val anthropicState: StateFlow<AnthropicConnectionState> =
+    anthropicConnection?.state
+      ?: MutableStateFlow<AnthropicConnectionState>(AnthropicConnectionState.NotConfigured)
+        .asStateFlow()
+
+  /** Which model the next analysis will ask. Read fresh per request, not captured at launch. */
+  val analysisModel: StateFlow<AnthropicModel> =
+    (analysisSettingsStore?.modelFlow ?: MutableStateFlow(AnthropicModel.DEFAULT))
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnthropicModel.DEFAULT)
+
+  /**
+   * Every open analysis, keyed by session id.
+   *
+   * A map rather than one value, so scrolling the week list does not lose an open card and two
+   * sessions can be read side by side. Nothing here is written to Room: an analysis lives as long as
+   * this ViewModel and no longer, which is what keeps a feature that changes nothing from quietly
+   * accumulating a history of machine verdicts beside the training log.
+   */
+  private val _aiAnalyses = MutableStateFlow<Map<String, AiAnalysisState>>(emptyMap())
+  val aiAnalyses: StateFlow<Map<String, AiAnalysisState>> = _aiAnalyses.asStateFlow()
+
+  fun saveAnthropicApiKey(key: String) {
+    val connection = anthropicConnection ?: return
+    viewModelScope.launch { connection.saveApiKey(key) }
+  }
+
+  /** Forgets the key. No cached rows to drop — no analysis was ever stored. */
+  fun clearAnthropicApiKey() {
+    val connection = anthropicConnection ?: return
+    viewModelScope.launch { connection.clearApiKey() }
+  }
+
+  fun setAnalysisModel(model: AnthropicModel) {
+    val store = analysisSettingsStore ?: return
+    viewModelScope.launch { store.setModel(model) }
+  }
+
+  /** Closes one card. The next tap asks again — nothing is cached to re-show. */
+  fun dismissAiAnalysis(sessionId: String) {
+    _aiAnalyses.update { it - sessionId }
+  }
+
+  /**
+   * Asks Claude about one session, and puts the answer on that session's card.
+   *
+   * The prompt is built here from state already in memory — no fetch happens for an analysis, so a
+   * tap costs exactly one HTTP request. Which of the two prompts is built is decided by
+   * [AiAnalysisAvailability] from the same status and offset the button's visibility was decided
+   * from, so the two can never disagree about what a session is.
+   */
+  fun requestAiAnalysis(sessionId: String) {
+    val client = anthropicClient ?: return
+    if (_aiAnalyses.value[sessionId] is AiAnalysisState.Loading) return
+    val workout = workouts.value.firstOrNull { it.id == sessionId } ?: return
+    val kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset) ?: return
+
+    val today = LocalDate.now()
+    val date = today.plusDays(workout.dayOffset.toLong())
+    val prompt =
+      when (kind) {
+        AiAnalysisKind.COMPLETED ->
+          analysisPromptBuilder.completed(
+            CompletedAnalysisInput(
+              type = workout.type,
+              date = date,
+              plannedDurationMin = workout.durationMin.takeIf { it > 0 },
+              plannedIntensity = workout.intensity,
+              description = workout.description,
+              oura = completedMetrics.value[sessionId],
+              run = runMetrics.value[sessionId],
+              recoveryByDay = recoveryByDay.value,
+            )
+          )
+        AiAnalysisKind.UPCOMING -> {
+          // The most recent activity that carried a load pair. Read from what is already observed
+          // rather than queried: acute and chronic load are properties of the athlete on a date, so
+          // the newest one is the current one whichever session it happens to hang off.
+          val latest =
+            runMetrics.value.values
+              .filter { it.atl != null && it.ctl != null }
+              .maxByOrNull { it.startTimeUtc }
+          analysisPromptBuilder.upcoming(
+            UpcomingAnalysisInput(
+              type = workout.type,
+              date = date,
+              plannedDurationMin = workout.durationMin.takeIf { it > 0 },
+              plannedIntensity = workout.intensity,
+              description = workout.description,
+              recoveryByDay = recoveryByDay.value,
+              acuteLoad = latest?.atl,
+              chronicLoad = latest?.ctl,
+            )
+          )
+        }
+      }
+
+    _aiAnalyses.update { it + (sessionId to AiAnalysisState.Loading) }
+    viewModelScope.launch {
+      val state =
+        try {
+          AiAnalysisState.Loaded(client.analyse(prompt, analysisModel.value), prompt)
+        } catch (e: AnthropicException) {
+          AiAnalysisState.Failed(e.message ?: "AI-analyysi epäonnistui.", e.canRetry)
+        }
+      _aiAnalyses.update { it + (sessionId to state) }
+    }
+  }
+
   /** Cheap enough to run whenever Settings opens: one GET of a few hundred bytes. */
   fun checkForUpdate() {
     if (_updateStatus.value is UpdateStatus.Checking) return
@@ -905,6 +1047,10 @@ class WorkoutViewModel(
           application.ouraRepository,
           application.intervalsConnection,
           application.intervalsRepository,
+          anthropicConnection = application.anthropicConnection,
+          anthropicClient = application.anthropicClient,
+          analysisSettingsStore = application.analysisSettingsStore,
+          analysisPromptBuilder = application.analysisPromptBuilder,
         )
       }
     }
@@ -925,6 +1071,7 @@ class WorkoutViewModel(
             movedHere = session.originalSessionId != null,
             exercises = session.exercises.orEmpty(),
             rounds = (session.rounds ?: session.roundsMin ?: 1).coerceAtLeast(1),
+            intensity = session.intensity,
           )
         }
   }

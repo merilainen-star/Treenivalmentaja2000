@@ -115,6 +115,25 @@ data class OuraDailySummaryEntity(
   val readinessScore: Int? = null,
   val sleepScore: Int? = null,
   val activityScore: Int? = null,
+  /**
+   * The night's measurements, from the sleep-periods collection rather than the daily scores.
+   *
+   * Three columns from one request, and they sit on this row rather than in a table of their own
+   * because Oura keys a sleep period by the day it *belongs to* — the morning you wake up — which is
+   * exactly this row's primary key. No offset arithmetic, no join.
+   *
+   * `averageHrvMs` and `restingHrBpm` are the measurements behind `readinessScore`: the score is
+   * Oura's opinion of the morning relative to this athlete's own baseline, these are the numbers it
+   * formed that opinion from. Added at schema v11 for the AI analysis
+   * ([ADR-010](../../../../../../../../docs/DECISIONS.md)), but useful to anything that wants a
+   * trend rather than a verdict — rows written before v11 keep nulls, which is indistinguishable
+   * from a night the ring was not worn, and correct in both cases.
+   */
+  val averageHrvMs: Int? = null,
+  /** Oura's `lowest_heart_rate` — the resting figure its own app shows. */
+  val restingHrBpm: Int? = null,
+  /** Oura's `average_heart_rate` across the night. */
+  val sleepHrBpm: Int? = null,
   val fetchedAtUtc: Long,
 )
 

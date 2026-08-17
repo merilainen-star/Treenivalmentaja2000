@@ -149,12 +149,24 @@ almost nothing to say about the sessions that matter most.
    *Deliberately out of scope:* `icu_atl` and `icu_ctl` — acute and chronic load — are in the API
    response and are **not** stored. They answer a different question ("has total load outrun the
    plan?") and deserve their own rule rather than being folded into this one.
-4. **AI coach comments, read-only (Phase B)** — a "pyydä valmentajan kommentit" button. BYOK: the
-   user's own LLM API key, typed into Settings and stored like the Oura credentials. The advisor
-   reads completed sessions, Oura-recorded other activity and the watch's own runs, and writes an
-   assessment — it changes nothing. The exact request payload is shown to the user before/with
-   the response (see [INSPIRATION.md](INSPIRATION.md)); [PRIVACY.md](PRIVACY.md) must be updated
-   before this ships, because health data leaves the device for a third party.
+4. ~~**AI coach comments, read-only (Phase B)**~~ — built. An "AI-analyysi" button under individual
+   workouts, in two flavours: what a **completed** session cost against that morning's recovery, and
+   how to execute an **upcoming** one against the current trend. BYOK — the user's own Anthropic key,
+   typed into Settings and stored under its own Keystore alias like the other two
+   ([ADR-010](DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key)).
+   It changes nothing: no button on the result touches the plan, and no analysis is stored.
+
+   **Three things came with it that outlast it.** The night's own **HRV and resting heart rate** are
+   now read from Oura's sleep-periods collection and stored on the daily summary (schema v11) — a
+   measurement where the readiness score is an opinion of one, and available to any future rule that
+   wants a trend rather than a verdict. `icu_atl`/`icu_ctl`, stored since v10 and read by nothing,
+   finally have a reader. And the **model is chosen in Settings** from three options rather than
+   fixed, because which tier suits this athlete's data is an empirical question.
+
+   The request payload is shown verbatim behind "Näytä pyyntö" (the idea came from
+   [INSPIRATION.md](INSPIRATION.md)). [PRIVACY.md](PRIVACY.md) was revised in two places before this
+   shipped, and [SECURITY.md](SECURITY.md) records that its old promise to send "only abstracted
+   metrics" is not what was built.
 5. **AI plan adjustments with approval (Phase C)** — the advisor may propose changes as
    structured operations (move session X to day Y, lighten session Z) that map onto the same
    engine operations Phase A uses. Nothing is written without the user accepting, and accepted

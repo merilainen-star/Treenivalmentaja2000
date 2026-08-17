@@ -51,6 +51,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
@@ -74,6 +77,8 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val recoveryByDay by viewModel.recoveryByDay.collectAsState()
     val intervalsState by viewModel.intervalsState.collectAsState()
     val runMetrics by viewModel.runMetrics.collectAsState()
+    val analyses by viewModel.aiAnalyses.collectAsState()
+    val anthropicState by viewModel.anthropicState.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.
@@ -94,6 +99,10 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         onGuideRetry = viewModel::retryExerciseGuide,
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
         onGuideDismiss = viewModel::closeExerciseGuide,
+        analyses = analyses,
+        analysisConfigured = anthropicState == AnthropicConnectionState.Configured,
+        onRequestAnalysis = viewModel::requestAiAnalysis,
+        onDismissAnalysis = viewModel::dismissAiAnalysis,
     )
 }
 
@@ -111,6 +120,10 @@ fun WeekScreenContent(
     unmatchedByDay: Map<LocalDate, List<CompletedSessionMetrics>> = emptyMap(),
     recoveryByDay: Map<LocalDate, DailyRecovery> = emptyMap(),
     runMetrics: Map<String, CompletedRunMetrics> = emptyMap(),
+    analyses: Map<String, AiAnalysisState> = emptyMap(),
+    analysisConfigured: Boolean = false,
+    onRequestAnalysis: (String) -> Unit = {},
+    onDismissAnalysis: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -197,6 +210,10 @@ fun WeekScreenContent(
                                 onExerciseClick = onExerciseClick,
                                 completed = completedMetrics[workout.id],
                                 run = runMetrics[workout.id],
+                                analysis = analyses[workout.id],
+                                analysisConfigured = analysisConfigured,
+                                onRequestAnalysis = { onRequestAnalysis(workout.id) },
+                                onDismissAnalysis = { onDismissAnalysis(workout.id) },
                             )
                         }
                     }
@@ -287,6 +304,10 @@ fun WorkoutCardWeek(
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
+    analysis: AiAnalysisState? = null,
+    analysisConfigured: Boolean = false,
+    onRequestAnalysis: () -> Unit = {},
+    onDismissAnalysis: () -> Unit = {},
 ) {
     var expanded by rememberSaveable(workout.id) { mutableStateOf(false) }
     WorkoutCardWeek(
@@ -296,6 +317,10 @@ fun WorkoutCardWeek(
         onExerciseClick = onExerciseClick,
         completed = completed,
         run = run,
+        analysis = analysis,
+        analysisConfigured = analysisConfigured,
+        onRequestAnalysis = onRequestAnalysis,
+        onDismissAnalysis = onDismissAnalysis,
     )
 }
 
@@ -307,6 +332,10 @@ fun WorkoutCardWeek(
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
+    analysis: AiAnalysisState? = null,
+    analysisConfigured: Boolean = false,
+    onRequestAnalysis: () -> Unit = {},
+    onDismissAnalysis: () -> Unit = {},
 ) {
     val indicatorColor = when (workout.type) {
         WorkoutType.RUNNING -> ColorBlue
@@ -433,6 +462,17 @@ fun WorkoutCardWeek(
             Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
                 HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
                 WorkoutDetails(workout, onExerciseClick = onExerciseClick)
+                // Inside the expanded content, not the collapsed header: an analysis is something
+                // you go looking for, and a button on every collapsed row would compete with the
+                // scanning the header exists for.
+                AiAnalysisSection(
+                    kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
+                    state = analysis,
+                    configured = analysisConfigured,
+                    onRequest = onRequestAnalysis,
+                    onDismiss = onDismissAnalysis,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
             }
         }
       }

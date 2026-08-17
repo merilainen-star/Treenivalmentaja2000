@@ -33,7 +33,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       OuraWorkoutEntity::class,
       IntervalsActivityEntity::class,
     ],
-  version = 10,
+  version = 11,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -47,6 +47,13 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
   // 7→8, 8→9 and 9→10 are additive again: nullable columns on `intervals_activities` — cadence and
   // intensity, then the speeds, the recording time and the load figures, then acute and chronic
   // load. A row stored before any of them keeps its values and gets nulls.
+  //
+  // 10→11 is additive on a different table: three nullable columns on `oura_daily_summaries` for
+  // the night's own measurements — HRV, resting heart rate and sleep heart rate — which arrive from
+  // the sleep-periods collection rather than the daily scores
+  // (ADR-010). Days synced before v11 keep their scores and get nulls, which is indistinguishable
+  // from a night the ring was not worn and correct in both cases: a backfill is not needed, because
+  // the ordinary sync window re-fetches the recent past anyway.
   autoMigrations =
     [
       AutoMigration(from = 4, to = 5),
@@ -55,6 +62,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 7, to = 8),
       AutoMigration(from = 8, to = 9),
       AutoMigration(from = 9, to = 10),
+      AutoMigration(from = 10, to = 11),
     ],
 )
 @TypeConverters(Converters::class)

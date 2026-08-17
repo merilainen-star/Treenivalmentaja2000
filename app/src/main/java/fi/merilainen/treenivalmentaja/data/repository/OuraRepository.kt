@@ -65,9 +65,11 @@ class OuraRepository internal constructor(
       val sleep = client.sleep(from, to)
       val activity = client.activity(from, to)
       val workouts = client.workouts(from, to)
+      val sleepPeriods = sleepPeriodsOrNone(from, to)
 
       val fetchedAt = clock()
-      val summaries = OuraMappers.toDailySummaries(readiness, sleep, activity, fetchedAt)
+      val summaries =
+        OuraMappers.toDailySummaries(readiness, sleep, activity, fetchedAt, sleepPeriods)
       val workoutRows = withHeartRatePerWorkout(OuraMappers.toWorkouts(workouts))
 
       if (summaries.isNotEmpty()) dao.upsertDailySummaries(summaries)
@@ -125,6 +127,31 @@ class OuraRepository internal constructor(
       failures = failures,
     )
   }
+
+  /**
+   * The night's sleep periods, or none — **a failure here is not a failure of the sync**.
+   *
+   * Every other collection is fetched inside the try block above, so any one of them failing
+   * abandons the whole sync and leaves the database as it was. That is right for four collections
+   * that are known to work: a half-written day would be worse than a stale one.
+   *
+   * It is wrong for this one. Which OAuth scope covers the sleep-periods path is an assumption
+   * rather than something the specification states (see [OuraClient.sleepPeriods]), and if that
+   * assumption is wrong the endpoint answers `401` — which, fetched inline, would take readiness,
+   * sleep, activity and workouts down with it. An unproven addition must not be able to break the
+   * four things that already work, so its failure leaves the three nightly columns null and the rest
+   * of the sync completes. This is the same precedent [withHeartRatePerWorkout] set for the
+   * `heartrate` scope, and for the same reason.
+   */
+  private suspend fun sleepPeriodsOrNone(
+    from: LocalDate,
+    to: LocalDate,
+  ): List<fi.merilainen.treenivalmentaja.data.oura.OuraSleepPeriodDto> =
+    try {
+      client.sleepPeriods(from, to)
+    } catch (e: OuraException) {
+      emptyList()
+    }
 
   /**
    * The heart-rate samples covering the workouts just fetched, or none.
@@ -307,5 +334,8 @@ private fun OuraDailySummaryEntity.toDomain(): DailyRecovery =
     readiness = readinessScore,
     sleep = sleepScore,
     activity = activityScore,
+    averageHrvMs = averageHrvMs,
+    restingHeartRate = restingHrBpm,
+    sleepHeartRate = sleepHrBpm,
     fetchedAtUtc = fetchedAtUtc,
   )

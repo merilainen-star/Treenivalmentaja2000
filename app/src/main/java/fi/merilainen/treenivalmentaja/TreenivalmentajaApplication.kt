@@ -38,6 +38,11 @@ import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnection
 import fi.merilainen.treenivalmentaja.data.intervals.clearCachedIntervalsData
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicApiKeyStore
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicClient
+import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnection
+import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
+import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -202,6 +207,30 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     IntervalsRepository(client = intervalsClient, dao = db.intervalsDao())
   }
 
+  private val anthropicApiKeyStore: AnthropicApiKeyStore by lazy { AnthropicApiKeyStore(this) }
+
+  /** One for the whole process, for the reason [ouraConnection] is. */
+  val anthropicConnection: AnthropicConnection by lazy {
+    AnthropicConnection(store = anthropicApiKeyStore)
+  }
+
+  /**
+   * The Claude client.
+   *
+   * Its own timeouts rather than the ten seconds every other caller here uses: a thinking model
+   * working on a hard analysis can take the better part of a minute, where an Oura fetch that has
+   * not answered in ten seconds is broken. The default factory inside the client sets them; it is
+   * constructed with nothing but a key source because there is nothing else to configure.
+   */
+  internal val anthropicClient: AnthropicClient by lazy {
+    AnthropicClient(apiKeys = anthropicConnection.keySource())
+  }
+
+  val analysisSettingsStore: AnalysisSettingsStore by lazy { AnalysisSettingsStore(this) }
+
+  /** Pure, stateless, and shared for that reason — it holds nothing between calls. */
+  val analysisPromptBuilder: AnalysisPromptBuilder by lazy { AnalysisPromptBuilder() }
+
   override fun onCreate() {
     super.onCreate()
     NotificationChannels.createChannels(this)
@@ -210,6 +239,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
       // answer is on disk behind a Keystore decryption rather than in memory.
       ouraConnection.refreshState()
       intervalsConnection.refreshState()
+      anthropicConnection.refreshState()
     }
     // Scheduled only while there is something to fetch with — a worker that woke daily to discover
     // it has no token would be a battery cost with no possible result. Collected rather than
