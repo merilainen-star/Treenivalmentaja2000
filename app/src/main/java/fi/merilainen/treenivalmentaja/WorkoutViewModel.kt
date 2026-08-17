@@ -26,16 +26,16 @@ import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsSyncResult
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicClient
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnection
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicException
+import fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient
+import fi.merilainen.treenivalmentaja.data.analysis.AnalysisConnection
+import fi.merilainen.treenivalmentaja.data.analysis.AnalysisException
 import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
+import fi.merilainen.treenivalmentaja.domain.AnalysisModel
 import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
-import fi.merilainen.treenivalmentaja.domain.AnthropicModel
+import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.domain.CompletedAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.UpcomingAnalysisInput
@@ -155,8 +155,8 @@ class WorkoutViewModel(
    * could not be constructed without one would make every test an instrumented test. A missing
    * connection reads as "no key", which is also true.
    */
-  private val anthropicConnection: AnthropicConnection? = null,
-  private val anthropicClient: AnthropicClient? = null,
+  private val analysisConnection: AnalysisConnection? = null,
+  private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
 ) : ViewModel() {
@@ -697,16 +697,15 @@ class WorkoutViewModel(
 
   // ------------------------------------------------------------------ AI analysis
 
-  /** Whether an Anthropic key is stored. Two states, because saving one does not test it. */
-  val anthropicState: StateFlow<AnthropicConnectionState> =
-    anthropicConnection?.state
-      ?: MutableStateFlow<AnthropicConnectionState>(AnthropicConnectionState.NotConfigured)
-        .asStateFlow()
+  /** Which providers have a key. No "verified" state — saving a key does not test it. */
+  val analysisConfigured: StateFlow<Set<AnalysisProvider>> =
+    analysisConnection?.configured
+      ?: MutableStateFlow<Set<AnalysisProvider>>(emptySet()).asStateFlow()
 
   /** Which model the next analysis will ask. Read fresh per request, not captured at launch. */
-  val analysisModel: StateFlow<AnthropicModel> =
-    (analysisSettingsStore?.modelFlow ?: MutableStateFlow(AnthropicModel.DEFAULT))
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnthropicModel.DEFAULT)
+  val analysisModel: StateFlow<AnalysisModel> =
+    (analysisSettingsStore?.modelFlow ?: MutableStateFlow(AnalysisModel.DEFAULT))
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AnalysisModel.DEFAULT)
 
   /**
    * Every open analysis, keyed by session id.
@@ -719,18 +718,18 @@ class WorkoutViewModel(
   private val _aiAnalyses = MutableStateFlow<Map<String, AiAnalysisState>>(emptyMap())
   val aiAnalyses: StateFlow<Map<String, AiAnalysisState>> = _aiAnalyses.asStateFlow()
 
-  fun saveAnthropicApiKey(key: String) {
-    val connection = anthropicConnection ?: return
-    viewModelScope.launch { connection.saveApiKey(key) }
+  fun saveAnalysisApiKey(provider: AnalysisProvider, key: String) {
+    val connection = analysisConnection ?: return
+    viewModelScope.launch { connection.saveApiKey(provider, key) }
   }
 
-  /** Forgets the key. No cached rows to drop — no analysis was ever stored. */
-  fun clearAnthropicApiKey() {
-    val connection = anthropicConnection ?: return
-    viewModelScope.launch { connection.clearApiKey() }
+  /** Forgets one provider's key. No cached rows to drop — no analysis was ever stored. */
+  fun clearAnalysisApiKey(provider: AnalysisProvider) {
+    val connection = analysisConnection ?: return
+    viewModelScope.launch { connection.clearApiKey(provider) }
   }
 
-  fun setAnalysisModel(model: AnthropicModel) {
+  fun setAnalysisModel(model: AnalysisModel) {
     val store = analysisSettingsStore ?: return
     viewModelScope.launch { store.setModel(model) }
   }
@@ -749,7 +748,10 @@ class WorkoutViewModel(
    * from, so the two can never disagree about what a session is.
    */
   fun requestAiAnalysis(sessionId: String) {
-    val client = anthropicClient ?: return
+    // The selected model decides which client answers. Read at request time rather than captured,
+    // so changing the model in Settings takes effect on the next tap and not the next launch.
+    val model = analysisModel.value
+    val client = analysisClients[model.provider] ?: return
     if (_aiAnalyses.value[sessionId] is AiAnalysisState.Loading) return
     val workout = workouts.value.firstOrNull { it.id == sessionId } ?: return
     val kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset) ?: return
@@ -798,8 +800,8 @@ class WorkoutViewModel(
     viewModelScope.launch {
       val state =
         try {
-          AiAnalysisState.Loaded(client.analyse(prompt, analysisModel.value), prompt)
-        } catch (e: AnthropicException) {
+          AiAnalysisState.Loaded(client.analyse(prompt, model), prompt)
+        } catch (e: AnalysisException) {
           AiAnalysisState.Failed(e.message ?: "AI-analyysi epäonnistui.", e.canRetry)
         }
       _aiAnalyses.update { it + (sessionId to state) }
@@ -1047,8 +1049,8 @@ class WorkoutViewModel(
           application.ouraRepository,
           application.intervalsConnection,
           application.intervalsRepository,
-          anthropicConnection = application.anthropicConnection,
-          anthropicClient = application.anthropicClient,
+          analysisConnection = application.analysisConnection,
+          analysisClients = application.analysisClients,
           analysisSettingsStore = application.analysisSettingsStore,
           analysisPromptBuilder = application.analysisPromptBuilder,
         )

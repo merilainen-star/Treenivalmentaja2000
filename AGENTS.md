@@ -44,7 +44,8 @@ Begin every completion report with the line: `AGENTS.md luettu (v4)`
 - **No Secrets in Client Code:** Client secrets and API keys must **never** be hardcoded in source,
   resources, or committed files. Two mechanisms are sanctioned, and nothing else is:
   1. **Entered by the user at run time** and stored encrypted under an Android Keystore key — how
-     the Oura client id and secret, the intervals.icu API key and the Anthropic API key all arrive
+     the Oura client id and secret, the intervals.icu API key and the three AI provider keys all
+     arrive
      ([ADR-009](docs/DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it),
      [ADR-008](docs/DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences),
      [ADR-010](docs/DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key)).

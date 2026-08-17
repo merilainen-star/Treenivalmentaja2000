@@ -38,11 +38,15 @@ import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnection
 import fi.merilainen.treenivalmentaja.data.intervals.clearCachedIntervalsData
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsRepository
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicApiKeyStore
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicClient
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnection
+import fi.merilainen.treenivalmentaja.data.analysis.AnalysisApiKeyStore
+import fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient
+import fi.merilainen.treenivalmentaja.data.analysis.AnalysisConnection
+import fi.merilainen.treenivalmentaja.data.analysis.AnthropicClient
+import fi.merilainen.treenivalmentaja.data.analysis.GeminiClient
+import fi.merilainen.treenivalmentaja.data.analysis.OpenAiClient
 import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
 import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
+import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -207,23 +211,37 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     IntervalsRepository(client = intervalsClient, dao = db.intervalsDao())
   }
 
-  private val anthropicApiKeyStore: AnthropicApiKeyStore by lazy { AnthropicApiKeyStore(this) }
+  /**
+   * One key store per provider, each with its own Keystore alias and its own preferences file.
+   *
+   * Separate files so that clearing one provider's key cannot touch another's — a property of the
+   * layout rather than of careful key naming.
+   */
+  private val analysisKeyStores by lazy {
+    AnalysisProvider.entries.associateWith { AnalysisApiKeyStore(this, it) }
+  }
 
   /** One for the whole process, for the reason [ouraConnection] is. */
-  val anthropicConnection: AnthropicConnection by lazy {
-    AnthropicConnection(store = anthropicApiKeyStore)
+  val analysisConnection: AnalysisConnection by lazy {
+    AnalysisConnection(stores = analysisKeyStores)
   }
 
   /**
-   * The Claude client.
+   * One client per provider, chosen at request time by the selected model's provider.
    *
-   * Its own timeouts rather than the ten seconds every other caller here uses: a thinking model
-   * working on a hard analysis can take the better part of a minute, where an Oura fetch that has
-   * not answered in ten seconds is broken. The default factory inside the client sets them; it is
-   * constructed with nothing but a key source because there is nothing else to configure.
+   * Built eagerly into a map rather than lazily per call: they are stateless, hold nothing but a key
+   * source, and constructing one costs a hash lookup. Each takes its key from its *own* store, so a
+   * key pasted into the wrong field cannot authenticate somewhere it was not meant to.
    */
-  internal val anthropicClient: AnthropicClient by lazy {
-    AnthropicClient(apiKeys = anthropicConnection.keySource())
+  internal val analysisClients: Map<AnalysisProvider, AnalysisClient> by lazy {
+    mapOf(
+      AnalysisProvider.ANTHROPIC to
+        AnthropicClient(apiKeys = analysisConnection.keySource(AnalysisProvider.ANTHROPIC)),
+      AnalysisProvider.OPENAI to
+        OpenAiClient(apiKeys = analysisConnection.keySource(AnalysisProvider.OPENAI)),
+      AnalysisProvider.GEMINI to
+        GeminiClient(apiKeys = analysisConnection.keySource(AnalysisProvider.GEMINI)),
+    )
   }
 
   val analysisSettingsStore: AnalysisSettingsStore by lazy { AnalysisSettingsStore(this) }
@@ -239,7 +257,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
       // answer is on disk behind a Keystore decryption rather than in memory.
       ouraConnection.refreshState()
       intervalsConnection.refreshState()
-      anthropicConnection.refreshState()
+      analysisConnection.refreshState()
     }
     // Scheduled only while there is something to fetch with — a worker that woke daily to discover
     // it has no token would be a battery cost with no possible result. Collected rather than

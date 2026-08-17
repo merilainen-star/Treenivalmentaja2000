@@ -26,8 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
-import fi.merilainen.treenivalmentaja.domain.AnthropicModel
+import fi.merilainen.treenivalmentaja.domain.AnalysisModel
+import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
@@ -62,7 +62,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val rawActivities by viewModel.rawActivityRefs.collectAsState()
     val backfillProgress by viewModel.backfillProgress.collectAsState()
     val backfillResult by viewModel.backfillResult.collectAsState()
-    val anthropicState by viewModel.anthropicState.collectAsState()
+    val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
 
     /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
@@ -179,10 +179,10 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         intervalsBackfillResult = backfillResult,
         onIntervalsBackfill = viewModel::backfillIntervals,
         onDismissIntervalsBackfillResult = viewModel::dismissBackfillResult,
-        anthropicState = anthropicState,
+        analysisConfigured = analysisConfigured,
         analysisModel = analysisModel,
-        onSaveAnthropicApiKey = viewModel::saveAnthropicApiKey,
-        onClearAnthropicApiKey = viewModel::clearAnthropicApiKey,
+        onSaveAnalysisApiKey = viewModel::saveAnalysisApiKey,
+        onClearAnalysisApiKey = viewModel::clearAnalysisApiKey,
         onAnalysisModelChange = viewModel::setAnalysisModel,
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
@@ -251,11 +251,11 @@ fun SettingsScreenContent(
     intervalsBackfillResult: IntervalsBackfillResult? = null,
     onIntervalsBackfill: () -> Unit = {},
     onDismissIntervalsBackfillResult: () -> Unit = {},
-    anthropicState: AnthropicConnectionState = AnthropicConnectionState.NotConfigured,
-    analysisModel: AnthropicModel = AnthropicModel.DEFAULT,
-    onSaveAnthropicApiKey: (String) -> Unit = {},
-    onClearAnthropicApiKey: () -> Unit = {},
-    onAnalysisModelChange: (AnthropicModel) -> Unit = {},
+    analysisConfigured: Set<AnalysisProvider> = emptySet(),
+    analysisModel: AnalysisModel = AnalysisModel.DEFAULT,
+    onSaveAnalysisApiKey: (AnalysisProvider, String) -> Unit = { _, _ -> },
+    onClearAnalysisApiKey: (AnalysisProvider) -> Unit = {},
+    onAnalysisModelChange: (AnalysisModel) -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -371,12 +371,12 @@ fun SettingsScreenContent(
             onDismissBackfillResult = onDismissIntervalsBackfillResult,
         )
 
-        AnthropicCard(
-            state = anthropicState,
+        AnalysisCard(
+            configured = analysisConfigured,
             model = analysisModel,
-            onSaveApiKey = onSaveAnthropicApiKey,
-            onClearApiKey = onClearAnthropicApiKey,
             onModelChange = onAnalysisModelChange,
+            onSaveApiKey = onSaveAnalysisApiKey,
+            onClearApiKey = onClearAnalysisApiKey,
         )
 
         Card(

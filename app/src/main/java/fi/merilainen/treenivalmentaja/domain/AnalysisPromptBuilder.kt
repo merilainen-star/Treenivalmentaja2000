@@ -200,7 +200,7 @@ class AnalysisPromptBuilder {
     val COMPLETED_TASK =
       """
       ## Tehtävä
-      Kirjoita lyhyt arvio (2–4 kappaletta):
+      Vastaa kolmeen kysymykseen yhtenäisenä tekstinä:
       1. Miten harjoitus meni suhteessa siihen, mitä oli suunniteltu?
       2. Miltä kuormitus näyttää sen aamun palautumislukemien ja viime päivien kehityksen valossa?
       3. Suositus seuraavaksi: painaako kovempaa, jatkaako suunnitelman mukaan, vai levätäkö.
@@ -211,7 +211,7 @@ class AnalysisPromptBuilder {
     val UPCOMING_TASK =
       """
       ## Tehtävä
-      Kirjoita lyhyt ohje (2–3 kappaletta):
+      Vastaa kolmeen kysymykseen yhtenäisenä tekstinä:
       1. Miltä palautuminen näyttää juuri nyt?
       2. Kannattaako harjoitus tehdä suunnitellusti, keventää tehoa, lyhentää kestoa, vai jättää
          kokonaan väliin?
@@ -220,17 +220,27 @@ class AnalysisPromptBuilder {
         .trimIndent()
 
     /**
-     * The two things the answer must not do.
+     * The three things the answer must not do.
      *
      * The first is ADR-005 in one sentence: this app has no mechanism to act on a proposed plan
      * edit, so an answer that reads like one would be offering something the app cannot deliver.
-     * The second keeps the model inside the data — it is the same discipline the deterministic
-     * readiness rule follows, applied to something that could otherwise invent freely.
+     * The second keeps the model inside the data — the same discipline the deterministic readiness
+     * rule follows, applied to something that could otherwise invent freely.
+     *
+     * The third is **a hard word count, and it is there because of what happened without one.**
+     * Asked for "2–4 kappaletta", all three providers wrote something that read well on a laptop
+     * and was far too long on a phone — which is the only screen this app has. The instruction is
+     * therefore a number rather than an adjective: "lyhyt" is a word every model interprets against
+     * its own defaults, where 110 words is the same length for all of them. Naming the *screen* as
+     * the reason is deliberate too — it gives the model something to reason about when trimming,
+     * rather than a limit to obey blindly.
      */
     val GUARDRAILS =
       """
 
       ## Rajoitteet
+      - Vastaus luetaan puhelimen ruudulta. Enintään 110 sanaa, 2–3 lyhyttä kappaletta.
+        Mieluummin liian lyhyt kuin liian pitkä.
       - Älä ehdota muutoksia harjoitusohjelmaan kalenterissa; sovellus ei voi toteuttaa niitä.
         Anna arvio ja suositus, ei suunnitelmaa.
       - Älä keksi lukuja, joita ei ole yllä. Jos jokin tieto puuttuu, sano se.

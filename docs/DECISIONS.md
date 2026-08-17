@@ -465,3 +465,86 @@
   `data/local/entity/Entities.kt`, `data/local/AppDatabase.kt` (v11),
   `domain/DailyRecovery.kt`, `MigrationTest`. Docs: `ROADMAP.md`, `PRIVACY.md`, `SECURITY.md`,
   `DATA_MODEL.md`, `API_INTEGRATIONS.md`, `AGENTS.md`
+
+## ADR-011: Three analysis providers behind one interface
+- **Status:** Accepted (2026-08-17), and built. Extends
+  [ADR-010](#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key),
+  which assumed a single provider. Everything ADR-010 decided about *what the feature is* — read-only
+  prose, the two time windows, the prompt contents, no stored analyses, keys typed into Settings —
+  stands unchanged. This ADR is only about there being three of them.
+- **Context:** ADR-010 shipped with Claude alone and a model selector, on the reasoning that which
+  tier suits this athlete's data is an empirical question. The owner then answered a bigger version
+  of that question by hand: the same real prompt was pasted into Claude, ChatGPT and Gemini, and
+  **all three returned the same substantive judgement in different prose.** That is the finding this
+  ADR rests on, and it points two ways at once.
+  - *The prompt is doing the work, not the model.* If three independently-trained models read the
+    same numbers and reach the same conclusion, the conclusion is in the data and the prompt. That
+    makes the provider a matter of taste and price rather than of correctness, and it makes the
+    shared prompt the thing worth protecting.
+  - *The real defect was length, not quality.* All three wrote something that read well on a laptop
+    and was far too long on a phone — the only screen this app has. That was a prompt bug, present
+    in all three, and no amount of provider choice would have fixed it.
+- **Decision:**
+  - **One `AnalysisClient` interface, one method**, with three implementations in `data/analysis/`.
+    The differences between providers are entirely inside it; the ViewModel picks a client by the
+    selected model's provider and never learns which one answered.
+  - **One shared exception hierarchy** (`AnalysisException`), because the card needs exactly two
+    things from a failure — Finnish text and whether waiting would help — and three parallel
+    hierarchies would mean the UI knowing which provider failed in order to read a message.
+  - **One key store class, three instances**, each with its own Keystore alias and its own
+    preferences file derived from the provider. Clearing one provider's key must not be able to
+    touch another's, and a key pasted into the wrong field must not silently authenticate elsewhere.
+  - **One model enum across all providers.** The stored preference is the enum *constant name*, not
+    the model id: a provider can rename or retire an id, and a stored choice should survive that
+    rather than silently resetting.
+  - **A hard word count in the shared prompt** — "enintään 110 sanaa" — replacing "2–4 kappaletta".
+    A number rather than an adjective, because "lyhyt" is a word each model interprets against its
+    own defaults where 110 words is the same length for all three. The reason (a phone screen) is
+    named in the prompt so the model has something to reason about when trimming.
+  - **Each provider's response extraction is its own code and its own test**, because that is where
+    a bug is silent — every status code says success and the card renders empty:
+
+    | Provider | Where the answer is | The trap |
+    | --- | --- | --- |
+    | Claude | first block whose `type` is `text` | thinking blocks precede it and their text is empty |
+    | ChatGPT | `choices[0].message.content` | `finish_reason: content_filter` is a `200` with no text |
+    | Gemini | `candidates[0].content.parts[*].text`, joined | a blocked prompt omits `candidates` **entirely** |
+
+    ADR-010 already shipped the Claude one as a real bug. Each provider now has a fixture for its own
+    version of it.
+  - **Gemini's key goes in the `x-goog-api-key` header, never the `?key=` query parameter** that
+    Google's own examples show. Both work; only one keeps the secret out of proxy logs, crash
+    reports and `Referer` headers.
+  - **Gemini's `400` is read as an auth failure**, not a malformed request. It answers `400` for a
+    rejected key where the other two answer `401`, and the generic wording would tell the owner their
+    app is broken when their key is merely wrong.
+  - **Paid Gemini only, stated in the UI.** Google's free tier uses submitted content to improve
+    their products; the paid tier does not. This app sends nightly HRV and resting heart rate, and
+    `PRIVACY.md` promises that no data is used to train machine-learning models. The Settings hint
+    for the Gemini key therefore says "käytä maksullista tasoa" rather than leaving the tier to
+    chance — the owner confirmed they are on the paid tier.
+- **Consequences:**
+  - `PRIVACY.md`'s destinations table gains two rows and its AI section now names the *selected*
+    provider rather than one company. The ML-training promise stays true **only because of the
+    paid-tier decision above**, which is why that decision is recorded here rather than left to the
+    reader.
+  - Three secrets on the device where ADR-010 had one, each behind its own Keystore alias.
+  - Three model lists going stale independently. A retired id answers `404`, which has its own
+    Finnish message pointing at the model selector rather than at the key.
+  - The provider-neutral half — `AnalysisPromptBuilder`, `AiAnalysisAvailability`, `AiAnalysisState`,
+    `AiAnalysisSection` and their tests — was not touched. That it did not need to be is the
+    strongest evidence the original layering was right.
+- **Alternatives Considered:**
+  - *Stay on one provider* — genuinely defensible, and the honest cost comparison nearly won it:
+    paid Gemini Flash saves roughly 30 cents a month against Sonnet and nothing at all against Haiku,
+    which was already in the list. It was rejected on the owner's own comparison — they preferred
+    ChatGPT's phrasing — which is a taste argument, and taste is exactly what a selector is for.
+  - *An OpenAI-compatible shim for all three* — many providers expose an OpenAI-shaped endpoint, and
+    one client would have served all of them. Rejected: neither Anthropic's nor Gemini's first-party
+    API is OpenAI-shaped, so this would mean routing the owner's health data through a translation
+    layer or a third-party gateway to save perhaps sixty lines.
+  - *Free-tier Gemini* — the cheapest option and the reason Gemini was raised at all. Rejected on
+    the data-use condition; see above.
+- **Related Files:** `data/analysis/` (whole package), `domain/AnalysisModel.kt`,
+  `domain/AnalysisPromptBuilder.kt`, `AnalysisCard.kt`, `data/settings/AnalysisSettingsStore.kt`,
+  `WorkoutViewModel.kt`, `TreenivalmentajaApplication.kt`, `PRIVACY.md`, `SECURITY.md`, `AGENTS.md`

@@ -1,10 +1,11 @@
-package fi.merilainen.treenivalmentaja.data.anthropic
+package fi.merilainen.treenivalmentaja.data.analysis
 
 import android.content.Context
 import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.core.content.edit
+import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.util.Base64
@@ -16,13 +17,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Where the Anthropic API key lives.
+ * Where one provider's API key lives.
  *
  * An interface for the reason the Oura and intervals.icu key stores are: the implementation below
  * needs an Android Keystore, which has no JVM equivalent, so anything that merely *uses* a key store
  * would otherwise need an emulator to test.
  */
-internal interface AnthropicApiKeyStorage {
+internal interface AnalysisApiKeyStorage {
 
   suspend fun apiKey(): String?
 
@@ -34,7 +35,7 @@ internal interface AnthropicApiKeyStorage {
 }
 
 /**
- * The API key on disk, encrypted with a key that cannot leave the device.
+ * One provider's API key on disk, encrypted with a key that cannot leave the device.
  *
  * The same construction as `IntervalsApiKeyStore` and `OuraTokenStore`, deliberately unchanged — a
  * 256-bit AES key generated inside the Android Keystore where it is not extractable, AES-GCM so a
@@ -43,18 +44,23 @@ internal interface AnthropicApiKeyStorage {
  * See `OuraTokenStore` for the full rationale and
  * [ADR-008](../../../../../../../../docs/DECISIONS.md) for why not `EncryptedSharedPreferences`.
  *
- * **Its own preferences file and its own Keystore alias.** Clearing one service's secret must not be
- * able to touch another's, and separate files make that a property of the layout rather than of
- * careful key naming. This matters more here than elsewhere: this key is the one that costs money
- * when it is used.
- *
- * Excluded from backups — see `res/xml/backup_rules.xml`. Restoring the ciphertext onto a device
- * whose Keystore has none of the key would leave the app holding bytes it can never read.
+ * **One instance per provider, each with its own preferences file and its own Keystore alias**, both
+ * derived from [provider]. Three providers means three secrets, and clearing one must not be able to
+ * touch another — that has to be a property of the layout rather than of careful key naming. It also
+ * means a key pasted into the wrong field cannot silently authenticate somewhere else: it is stored
+ * under the provider whose field it was typed into, and only that provider's client reads it.
  */
-internal class AnthropicApiKeyStore(context: Context) : AnthropicApiKeyStorage {
+internal class AnalysisApiKeyStore(
+  context: Context,
+  private val provider: AnalysisProvider,
+) : AnalysisApiKeyStorage {
 
   private val prefs: SharedPreferences =
-    context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+    context.applicationContext.getSharedPreferences(fileName(), Context.MODE_PRIVATE)
+
+  private fun fileName(): String = "analysis_${provider.name.lowercase()}_credentials"
+
+  private fun alias(): String = "treenivalmentaja.analysis.${provider.name.lowercase()}.apikey"
 
   override suspend fun apiKey(): String? =
     withContext(Dispatchers.IO) { decrypt(prefs.getString(KEY_API_KEY, null)) }
@@ -113,22 +119,21 @@ internal class AnthropicApiKeyStore(context: Context) : AnthropicApiKeyStorage {
   }
 
   private fun secretKey(): SecretKey {
-    val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
-    (keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let {
+    val keyStore = KeyStore.getInstance(PROVIDER_ANDROID).apply { load(null) }
+    (keyStore.getEntry(alias(), null) as? KeyStore.SecretKeyEntry)?.let {
       return it.secretKey
     }
-    val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
+    val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER_ANDROID)
     generator.init(
       KeyGenParameterSpec.Builder(
-          ALIAS,
+          alias(),
           KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
         )
         .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
         .setKeySize(256)
-        // Deliberately not requiring user authentication. Unlike the other two stores this one is
-        // only ever read from a foreground tap, so a prompt would be defensible — but it would be a
-        // second unlock on a phone that was just unlocked to reach the button.
+        // Deliberately not requiring user authentication: this is only ever read from a foreground
+        // tap, so a prompt would be a second unlock on a phone that was just unlocked.
         .setUserAuthenticationRequired(false)
         .build()
     )
@@ -136,11 +141,7 @@ internal class AnthropicApiKeyStore(context: Context) : AnthropicApiKeyStorage {
   }
 
   private companion object {
-    const val FILE = "anthropic_credentials"
-
-    const val PROVIDER = "AndroidKeyStore"
-
-    const val ALIAS = "treenivalmentaja.anthropic.apikey"
+    const val PROVIDER_ANDROID = "AndroidKeyStore"
 
     const val TRANSFORMATION = "AES/GCM/NoPadding"
 

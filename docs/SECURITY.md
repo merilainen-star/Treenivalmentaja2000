@@ -14,12 +14,18 @@ The app handles personal health data and training schedules. Threats include una
   ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)),
   which removes the accepted risk below for the published test build entirely. The paragraph is
   kept because it still applies to a local build that supplies credentials through `.env`.
-- **The Anthropic API key** follows the same mechanism: typed into Settings, stored with AES-256-GCM
-  under its own Android Keystore alias in its own preferences file
-  (`data/anthropic/AnthropicApiKeyStore.kt`,
-  [ADR-010](DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key)).
-  It is never redisplayed once saved and never logged. This is the **third** instance of the
-  entered-at-run-time mechanism, not a fourth mechanism.
+- **The AI provider API keys** — Anthropic, OpenAI and Google — follow the same mechanism: typed
+  into Settings, stored with AES-256-GCM under **their own** Keystore aliases in **their own**
+  preferences files (`data/analysis/AnalysisApiKeyStore.kt`,
+  [ADR-010](DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key),
+  [ADR-011](DECISIONS.md#adr-011-three-analysis-providers-behind-one-interface)). Separate files per
+  provider so clearing one key cannot touch another, and so a key pasted into the wrong field cannot
+  authenticate somewhere it was not meant to. None is redisplayed once saved, and none is logged.
+  These are further instances of the entered-at-run-time mechanism, not new mechanisms.
+- **Gemini's key travels in the `x-goog-api-key` header, never the `?key=` query parameter** that
+  Google's own examples show. Both authenticate; only one keeps the secret out of proxy logs, crash
+  reports and `Referer` headers. `AnalysisClientTest` asserts the header form rather than trusting
+  it.
 - **Accepted risk (see [ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)):** in a build
   that does compile them in, the Oura client secret is present in the built APK. This is accepted
   **only** for the private single-user build, which is never published. The mitigations are: the APK is

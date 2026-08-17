@@ -167,6 +167,16 @@ almost nothing to say about the sessions that matter most.
    [INSPIRATION.md](INSPIRATION.md)). [PRIVACY.md](PRIVACY.md) was revised in two places before this
    shipped, and [SECURITY.md](SECURITY.md) records that its old promise to send "only abstracted
    metrics" is not what was built.
+
+   **Then it grew two more providers** — ChatGPT and Gemini beside Claude
+   ([ADR-011](DECISIONS.md#adr-011-three-analysis-providers-behind-one-interface)), after the same
+   real prompt was pasted into all three by hand. They returned the same substantive judgement in
+   different prose, which is the finding that shaped the design: the prompt is doing the work, so it
+   stays shared and the provider is taste and price. The comparison also exposed the actual defect —
+   every one of them wrote something too long for a phone — so the prompt now carries a hard
+   "enintään 110 sanaa" rather than "2–4 kappaletta". Gemini is used on its **paid** tier, because
+   the free tier permits Google to use submitted content to improve their products and this app
+   submits HRV.
 5. **AI plan adjustments with approval (Phase C)** — the advisor may propose changes as
    structured operations (move session X to day Y, lighten session Z) that map onto the same
    engine operations Phase A uses. Nothing is written without the user accepting, and accepted

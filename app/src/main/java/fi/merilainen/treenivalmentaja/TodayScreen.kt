@@ -42,7 +42,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.key
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
@@ -82,7 +81,8 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val runMetrics by viewModel.runMetrics.collectAsState()
     val advice by viewModel.readinessAdvice.collectAsState()
     val analyses by viewModel.aiAnalyses.collectAsState()
-    val anthropicState by viewModel.anthropicState.collectAsState()
+    val analysisConfigured by viewModel.analysisConfigured.collectAsState()
+    val analysisModel by viewModel.analysisModel.collectAsState()
 
     // On every **resume**, not merely on first composition.
     //
@@ -122,7 +122,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onStartLighter = viewModel::startTodayLighter,
         onDismissAdvice = viewModel::dismissReadinessAdvice,
         analyses = analyses,
-        analysisConfigured = anthropicState == AnthropicConnectionState.Configured,
+        analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
         onDismissAnalysis = viewModel::dismissAiAnalysis,
     )

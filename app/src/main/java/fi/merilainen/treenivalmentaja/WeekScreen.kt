@@ -51,7 +51,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
-import fi.merilainen.treenivalmentaja.data.anthropic.AnthropicConnectionState
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
@@ -78,7 +77,8 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val intervalsState by viewModel.intervalsState.collectAsState()
     val runMetrics by viewModel.runMetrics.collectAsState()
     val analyses by viewModel.aiAnalyses.collectAsState()
-    val anthropicState by viewModel.anthropicState.collectAsState()
+    val analysisConfigured by viewModel.analysisConfigured.collectAsState()
+    val analysisModel by viewModel.analysisModel.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.
@@ -100,7 +100,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
         onGuideDismiss = viewModel::closeExerciseGuide,
         analyses = analyses,
-        analysisConfigured = anthropicState == AnthropicConnectionState.Configured,
+        analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
         onDismissAnalysis = viewModel::dismissAiAnalysis,
     )

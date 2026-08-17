@@ -1,11 +1,12 @@
 # Privacy Policy — Treenivalmentaja
 
 **Last updated: 17 August 2026** *(revised: an optional **AI analysis** feature. When you tap
-"AI-analyysi" on a workout, that workout's data and your recent recovery readings are sent to
-**Anthropic**. This is the first time any health data leaves your device for anything other than the
-service it came from, so read "What leaves your device" below. The same revision starts reading your
-**nightly HRV and resting heart rate** from Oura. Previously revised on 15 August 2026 to read
-activities from intervals.icu, and on 10 August 2026 to add the Oura `heartrate` scope.)*
+"AI-analyysi" on a workout, that workout's data and your recent recovery readings are sent to the
+**AI provider you selected** — Anthropic, OpenAI or Google. This is the first time any health data
+leaves your device for anything other than the service it came from, so read "What leaves your
+device" below. The same revision starts reading your **nightly HRV and resting heart rate** from
+Oura. Previously revised on 15 August 2026 to read activities from intervals.icu, and on
+10 August 2026 to add the Oura `heartrate` scope.)*
 
 Treenivalmentaja is a private, single-user Android training-companion app. It is built and installed
 by its author for their own use and is not distributed through any app store. This policy describes
@@ -20,8 +21,10 @@ the author or to any analytics service. Data lives on your phone until you delet
 
 **One exception, and it only happens when you ask for it.** If you set up the optional AI analysis
 and tap "AI-analyysi" on a workout, that workout's numbers and your recent recovery readings are
-sent to Anthropic to be commented on. Nothing is sent unless you tap the button; the app shows you
-the exact text it sent; and if you never enter an Anthropic API key the feature does nothing at all.
+sent to **one** AI provider — whichever you picked in Settings — to be commented on. Nothing is sent
+unless you tap the button; the app shows you the exact text it sent; and if you enter no API key the
+feature does nothing at all. Only the selected provider is ever contacted: the app does not ask two
+of them, and a key stored for a provider you are not using is never sent anywhere.
 
 ## What the app stores on your device
 
@@ -34,10 +37,11 @@ the exact text it sent; and if you never enter an Anthropic API key the feature 
   moving and elapsed time, distance, heart rate, elevation gain, calories and training load.
   Stored so the app works offline.
 - **Your Oura tokens and Oura application's Client ID and Secret, your intervals.icu API key, and
-  your Anthropic API key** — encrypted with AES-256-GCM under keys held in the Android Keystore,
-  which cannot be extracted from the device. Each service has its own file and its own key. All of
-  these are excluded from Android cloud backup and device transfer. The intervals.icu and Anthropic
-  keys are never redisplayed in the app once saved, and are never written to a log.
+  any AI provider API keys you have entered (Anthropic, OpenAI, Google)** — encrypted with
+  AES-256-GCM under keys held in the Android Keystore, which cannot be extracted from the device.
+  Each service has its own file and its own key, so removing one cannot affect another. All are
+  excluded from Android cloud backup and device transfer. The intervals.icu and AI provider keys are
+  never redisplayed in the app once saved, and are never written to a log.
 - **AI analyses are not stored at all.** An analysis lives on screen until you close it or leave the
   screen, and is never written to the database. There is no history of them.
 - **App settings**, such as reminder times.
@@ -46,13 +50,16 @@ All of it is stored inside the app's private storage, protected by the Android a
 
 ## What leaves your device, and where it goes
 
-The app makes network requests to exactly six places, and to nobody else:
+The app makes network requests to exactly eight places, and to nobody else — and the three AI
+providers are contacted **only** when you tap the button, and only the one you selected:
 
 | Destination | What is sent | Why |
 | --- | --- | --- |
 | `api.ouraring.com`, `cloud.ouraring.com` | Your Oura credentials and tokens; requests for date ranges | To sign in to Oura and read your own Oura data |
 | `intervals.icu` | Your intervals.icu API key; requests for date ranges | To read your own activities, which arrive there from your Suunto watch |
-| `api.anthropic.com` | **Only when you tap "AI-analyysi":** your Anthropic API key, and one workout's details plus about a week of recovery readings | To get a coach's comment on that workout |
+| `api.anthropic.com` | **Only when you tap "AI-analyysi" with Claude selected:** your Anthropic key, one workout's details, and about a week of recovery readings | To get a coach's comment on that workout |
+| `api.openai.com` | The same, when ChatGPT is selected | The same |
+| `generativelanguage.googleapis.com` | The same, when Gemini is selected | The same |
 | `oss.exercisedb.dev` (ExerciseDB) | The name or catalogue id of an exercise in your plan | To show an animation and instructions when you tap a movement |
 | `wger.de` | The same | The same, for movements ExerciseDB does not have |
 | `api.github.com` / `github.com` | Nothing about you — only a request for the latest release metadata | To tell you whether your installed build is the current one |
@@ -80,10 +87,16 @@ simply left out — nothing is filled in with a placeholder.
 **You can see the request.** Every analysis has a "Näytä pyyntö" control that shows the exact text
 that was sent, character for character. Nothing is sent that you cannot read afterwards.
 
-**Anthropic's handling of what it receives** is governed by their own terms and privacy policy and
-your account settings with them, not by this policy. If you would rather not send health data to a
-third party at all, do not enter an Anthropic API key — the button then explains what is missing and
-sends nothing.
+**The provider's handling of what it receives** is governed by their own terms and privacy policy
+and your account settings with them, not by this policy. If you would rather not send health data to
+a third party at all, enter no AI key — the feature is then invisible and sends nothing.
+
+**One provider difference is worth stating outright.** Google's Gemini has a free tier and a paid
+tier, and they treat your data differently: on the free tier submitted content may be used to
+improve Google's products, while the paid tier states it is not. Because these requests carry health
+measurements, **this app is used with the paid Gemini tier**, and the Settings hint says so at the
+point the key is pasted. That is what keeps the "no use of your data for training machine-learning
+models" statement below true.
 
 ## What the app requests from Oura, and what it does not
 
@@ -135,9 +148,9 @@ account; see [INTERVALS_SETUP.md](INTERVALS_SETUP.md#why-an-api-key-rather-than-
   row from the device. Your training plan is untouched.
 - **Settings → Intervals.icu → "Poista avain"** deletes the stored API key and every cached
   activity from the device. Your training plan is untouched.
-- **Settings → AI-analyysi → "Poista avain"** deletes the stored Anthropic key. There is nothing
-  else to delete: no analysis was ever stored. Removing the key also stops the feature from being
-  able to send anything.
+- **Settings → AI-analyysi → "Poista"** deletes one provider's stored key; each provider has its
+  own. There is nothing else to delete: no analysis was ever stored. Removing the key of the
+  selected provider stops the feature from being able to send anything.
 - **"Vaihda tunnukset"** under Oura additionally deletes its stored Client ID and Secret.
 - **Uninstalling the app** removes everything it has stored.
 
@@ -148,14 +161,15 @@ An intervals.icu API key is not revoked from here either: deleting it removes th
 the key itself is regenerated from intervals.icu's own Developer Settings if you want the old one
 to stop working everywhere.
 
-## Data held by Oura, intervals.icu and Anthropic
+## Data held by Oura, intervals.icu and the AI providers
 
-This policy covers only what Treenivalmentaja does. The data Oura, intervals.icu and Anthropic
-themselves hold about you is governed by their own privacy policies and your account settings there.
+This policy covers only what Treenivalmentaja does. The data Oura, intervals.icu, Anthropic, OpenAI
+and Google themselves hold about you is governed by their own privacy policies and your account
+settings there.
 The route your watch data takes into intervals.icu is a matter between those services and you; this
-app only reads what has already arrived. What Anthropic does with an analysis request — how long it
-is retained, whether it is used for anything else — is likewise governed by your agreement with
-them, and is the reason the feature is off until you deliberately turn it on.
+app only reads what has already arrived. What an AI provider does with an analysis request — how
+long it is retained, whether it is used for anything else — is likewise governed by your agreement
+with them, and is the reason the feature is off until you deliberately turn it on.
 
 ## Children
 
