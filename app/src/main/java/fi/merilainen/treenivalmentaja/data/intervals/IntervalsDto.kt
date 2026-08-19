@@ -127,3 +127,30 @@ internal data class IntervalsActivityDto(
 // There is no DTO for `/athlete/{id}/profile` here on purpose. Testing the key against a *different*
 // endpoint would prove the key works for that endpoint; the connection test therefore asks the
 // activities endpoint for one activity, which is the exact call the sync makes.
+
+/**
+ * One day's wellness record — `GET /api/v1/athlete/{id}/wellness`, the `Wellness` schema.
+ *
+ * **This is where fitness and fatigue actually live.** `IntervalsActivityDto` also carries `icu_atl`
+ * and `icu_ctl`, but those are frozen at the moment of an activity: they say what the load was
+ * *after that session*, and they do not decay afterwards. Both figures fall every day that follows
+ * — ATL on roughly a 7-day time constant, CTL on 42 — so an activity three days old reports a
+ * fatigue the athlete no longer carries. Measured on this athlete: the 16 August run stored
+ * `icu_atl` 17.7 / `icu_ctl` 11.7, while the wellness record for 19 August said 11.5 / 10.9. Read
+ * from the activity, the analysis was told of a TSB of -5.9 when the true figure was -0.6.
+ *
+ * Only three fields are read of the 46 the schema declares. The record also carries `hrv`,
+ * `restingHR`, `sleepScore` and `readiness`, and those are deliberately **not** taken: Oura is
+ * already this app's source for them, and a second source for the same measurement is a question
+ * about which one wins that nobody wants to answer at three in the morning.
+ */
+internal data class IntervalsWellnessDto(
+  /** The date, `YYYY-MM-DD`. The schema calls it `id`, and it is the record's primary key. */
+  val id: String? = null,
+  /** Chronic training load — fitness, the long rolling average, as it stands on [id]. */
+  val ctl: Double? = null,
+  /** Acute training load — fatigue, the short rolling average, as it stands on [id]. */
+  val atl: Double? = null,
+  /** How fast fitness is changing, in CTL per week. Stored because it costs one column. */
+  val rampRate: Double? = null,
+)

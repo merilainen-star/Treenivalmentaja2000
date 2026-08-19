@@ -83,6 +83,33 @@ internal class IntervalsClient(
     return decode(get(url)).size
   }
 
+  /**
+   * One day's training load per day, decayed — `GET /api/v1/athlete/{id}/wellness`.
+   *
+   * **Not the same numbers as the activities' own `icu_atl`/`icu_ctl`.** Those are frozen at the
+   * moment of a session and never decay; these are the daily series, which is what "how loaded is
+   * the athlete today" means. See [IntervalsWellnessDto].
+   *
+   * Only `ctl`, `atl` and `rampRate` are read, of the 46 the `Wellness` schema declares. The record
+   * also carries `hrv`, `restingHR` and `sleepScore`, and those are deliberately left alone: Oura is
+   * already this app's source for them.
+   *
+   * The specification templates this path as `/wellness{ext}`, with the extension a required path
+   * parameter. The plain form is what is used here; if the real service ever answers `404`, `.json`
+   * is the other candidate. The caller treats a failure as "no load figures" rather than as a failed
+   * sync, so a wrong guess costs the analysis its load section and nothing else.
+   */
+  suspend fun wellness(from: LocalDate, to: LocalDate): List<IntervalsWellnessDto> {
+    val url =
+      "$baseUrl/api/v1/athlete/$SELF/wellness"
+        .toHttpUrl()
+        .newBuilder()
+        .addQueryParameter("oldest", from.toString())
+        .addQueryParameter("newest", to.toString())
+        .build()
+    return decodeList(get(url), wellnessAdapter)
+  }
+
   private fun activitiesUrl(): HttpUrl = "$baseUrl/api/v1/athlete/$SELF/activities".toHttpUrl()
 
   // ------------------------------------------------------------------ diagnostics
@@ -169,6 +196,18 @@ internal class IntervalsClient(
       }
     }
   }
+
+  /** The same reading of an unreadable body, for any list-shaped response. */
+  private fun <T : Any> decodeList(body: String, listAdapter: JsonAdapter<List<T?>>): List<T> =
+    try {
+      listAdapter.fromJson(body)?.filterNotNull()
+    } catch (e: JsonEncodingException) {
+      throw IntervalsUnavailableException(UNREADABLE)
+    } catch (e: JsonDataException) {
+      throw IntervalsUnavailableException(UNREADABLE)
+    } catch (e: IOException) {
+      throw IntervalsUnavailableException(UNREADABLE)
+    } ?: throw IntervalsUnavailableException(UNREADABLE)
 
   private fun decode(body: String): List<IntervalsActivityDto> =
     try {
@@ -281,6 +320,9 @@ internal class IntervalsClient(
 
     private val adapter: JsonAdapter<List<IntervalsActivityDto?>> =
       moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsActivityDto::class.java))
+
+    private val wellnessAdapter: JsonAdapter<List<IntervalsWellnessDto?>> =
+      moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsWellnessDto::class.java))
 
     /** Matched to the other clients in this app: a few kilobytes over a phone connection. */
     private fun defaultCallFactory(): Call.Factory =

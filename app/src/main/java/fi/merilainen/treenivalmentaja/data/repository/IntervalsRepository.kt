@@ -7,6 +7,7 @@ import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
+import fi.merilainen.treenivalmentaja.domain.DailyTrainingLoad
 import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
 import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
@@ -70,6 +71,7 @@ class IntervalsRepository internal constructor(
       val activities = client.activities(from, to)
       val rows = IntervalsMappers.toActivities(activities, clock(), zone)
       if (rows.isNotEmpty()) dao.upsertActivities(rows)
+      syncWellness(from, to)
       IntervalsSyncResult.Success(activities = rows.size)
     } catch (e: IntervalsException) {
       IntervalsSyncResult.Failure(
@@ -79,6 +81,42 @@ class IntervalsRepository internal constructor(
           (e as? fi.merilainen.treenivalmentaja.data.intervals.IntervalsRateLimitException)
             ?.retryAfterSeconds,
       )
+    }
+
+  /**
+   * The daily load series, or nothing — **a failure here is not a failure of the sync**.
+   *
+   * The activities fetch above is the one this integration exists for, and a wellness endpoint whose
+   * exact path is read from a templated specification (`/wellness{ext}`) must not be able to take it
+   * down. Caught on its own for the same reason `OuraRepository.sleepPeriodsOrNone` is: an addition
+   * whose shape is not fully proven should cost its own feature and nothing else.
+   *
+   * What it costs when it fails: the upcoming-workout analysis loses its load section, which the
+   * prompt builder omits rather than guesses at.
+   */
+  private suspend fun syncWellness(from: LocalDate, to: LocalDate) {
+    val days =
+      try {
+        client.wellness(from, to)
+      } catch (e: IntervalsException) {
+        return
+      }
+    val rows = IntervalsMappers.toWellness(days, clock())
+    if (rows.isNotEmpty()) dao.upsertWellness(rows)
+  }
+
+  /**
+   * The athlete's training load as it stands on a date — fitness, fatigue, and the gap between them.
+   *
+   * **On or before**, because a day can be missing and the current state is still the answer. And
+   * from the daily series rather than from an activity's own `atl`/`ctl`: those are frozen at the
+   * moment of a session and never decay, so a three-day-old run reports fatigue the athlete has
+   * since shed. Measured on this athlete's data, the difference was a TSB of -5.9 against a true
+   * -0.6 — enough to turn "ease off" into "go as planned".
+   */
+  suspend fun loadOn(date: LocalDate): DailyTrainingLoad? =
+    dao.latestWellnessOnOrBefore(date.toString())?.let {
+      DailyTrainingLoad(date = it.date, acute = it.atl, chronic = it.ctl, rampRate = it.rampRate)
     }
 
   /**

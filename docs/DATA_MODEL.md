@@ -319,3 +319,30 @@ Before installing a build that bumps the version, take a copy of the device data
 - **API to DB:** Network models are mapped to Room entities in the repository layer.
 - **DB to Domain:** Room entities are mapped to domain models before being exposed to the UI via
   `Flow`. UI code never sees an entity class.
+
+### 7. Intervals.icu daily training load (`IntervalsWellness`)
+- **Table:** `intervals_wellness`
+- **Purpose:** The athlete's fitness and fatigue **per day**, from intervals.icu's wellness record.
+- **Primary Key:** `date` (String — `YYYY-MM-DD`)
+- **Fields:**
+  - `ctl` (Double?) — chronic training load: fitness, the long rolling average
+  - `atl` (Double?) — acute training load: fatigue, the short rolling average
+  - `rampRate` (Double?) — CTL change per week
+  - `fetchedAtUtc` (Long)
+- **Why this exists when `intervals_activities` already has `atl`/`ctl`.** Those columns are frozen
+  at the moment of a session: they record the load *immediately after that activity* and never
+  decay. Both figures fall every day that follows — ATL on roughly a 7-day time constant, CTL on 42.
+  Reading them for "how loaded is the athlete now" is therefore wrong by however many days have
+  passed. Measured on real data: a run on 16 August stored `atl` 17.7 / `ctl` 11.7, while the
+  wellness record for 19 August said 11.5 / 10.9 — a TSB of −5.9 against a true −0.6, which is the
+  difference between "ease off" and "go as planned".
+- **The activity columns stay.** The load right after a session is a true and different fact; nothing
+  reads it for the AI analysis any more. Removing it would lose data to fix a misuse.
+- **What is deliberately not stored.** The wellness record also carries `hrv`, `restingHR`,
+  `sleepScore` and `readiness`. Oura is already this app's source for those, and a second source for
+  the same measurement is a question about which one wins that nobody wants to answer.
+- **Nullability:** `ctl` and `atl` are nullable, and a record with neither is dropped at the mapper
+  rather than stored — a row of nulls would later read as "the athlete has no fitness" instead of
+  "not known".
+- **Lifecycle:** Written by the ordinary intervals.icu sync, whose failure it cannot cause (it is
+  caught separately). Cleared when the user removes the API key. Added at schema v12.

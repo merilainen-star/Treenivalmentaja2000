@@ -141,10 +141,16 @@ class AnalysisPromptBuilderTest {
         UpcomingAnalysisInput(
           type = WorkoutType.RUNNING,
           date = day,
-          acuteLoad = 42.0,
-          chronicLoad = null,
+          load = DailyTrainingLoad(date = day.toString(), acute = 42.0, chronic = null),
         )
       )
+
+    assertFalse(prompt.contains("Kuormitus"))
+  }
+
+  @Test
+  fun `an upcoming prompt omits the load section entirely when there is none`() {
+    val prompt = builder.upcoming(UpcomingAnalysisInput(type = WorkoutType.RUNNING, date = day))
 
     assertFalse(prompt.contains("Kuormitus"))
   }
@@ -156,8 +162,7 @@ class AnalysisPromptBuilderTest {
         UpcomingAnalysisInput(
           type = WorkoutType.RUNNING,
           date = day,
-          acuteLoad = 60.0,
-          chronicLoad = 50.0,
+          load = DailyTrainingLoad(date = day.toString(), acute = 60.0, chronic = 50.0),
         )
       )
 
@@ -165,6 +170,30 @@ class AnalysisPromptBuilderTest {
     assertTrue(prompt.contains("Krooninen kuormitus"))
     // Fitness minus fatigue: negative here, which is the interesting direction.
     assertTrue(prompt.contains("-10"))
+  }
+
+  /**
+   * The load figures carry the day they describe.
+   *
+   * This is the guard against the bug that produced it: load decays daily, so an undated figure
+   * cannot be checked for staleness. The first version read acute and chronic load from the newest
+   * *activity*, where they are frozen at the moment of that session — a three-day-old run reported a
+   * TSB of -5.9 when the athlete's true figure that morning was -0.6. Naming the date makes a stale
+   * number visible in the prompt instead of silent.
+   */
+  @Test
+  fun `the load section names the day it describes`() {
+    val prompt =
+      builder.upcoming(
+        UpcomingAnalysisInput(
+          type = WorkoutType.RUNNING,
+          // The session is on the 19th, but the freshest load row is from the 17th.
+          date = LocalDate.of(2026, 8, 19),
+          load = DailyTrainingLoad(date = "2026-08-17", acute = 11.5, chronic = 10.9),
+        )
+      )
+
+    assertTrue("the reader cannot tell how current the figures are", prompt.contains("Kuormitus (2026-08-17)"))
   }
 
   // ------------------------------------------------------------------ guardrails

@@ -17,6 +17,7 @@ import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
 import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
@@ -32,8 +33,9 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       OuraDailySummaryEntity::class,
       OuraWorkoutEntity::class,
       IntervalsActivityEntity::class,
+      IntervalsWellnessEntity::class,
     ],
-  version = 11,
+  version = 12,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -49,11 +51,18 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
   // load. A row stored before any of them keeps its values and gets nulls.
   //
   // 10→11 is additive on a different table: three nullable columns on `oura_daily_summaries` for
-  // the night's own measurements — HRV, resting heart rate and sleep heart rate — which arrive from
-  // the sleep-periods collection rather than the daily scores
-  // (ADR-010). Days synced before v11 keep their scores and get nulls, which is indistinguishable
-  // from a night the ring was not worn and correct in both cases: a backfill is not needed, because
-  // the ordinary sync window re-fetches the recent past anyway.
+  // the night's own measurements — HRV, resting heart rate and sleep heart rate — from the
+  // sleep-periods collection rather than the daily scores (ADR-010). Days synced before v11 keep
+  // their scores and get nulls, which is indistinguishable from a night the ring was not worn and
+  // correct in both cases; no backfill is needed, because the ordinary sync window re-fetches the
+  // recent past anyway.
+  //
+  // 11→12 adds a whole table, `intervals_wellness`: intervals.icu's daily load series. Additive, so
+  // Room writes it. It exists because `intervals_activities` already stores `atl`/`ctl` and those
+  // are the wrong numbers for "how loaded is the athlete now" — they are frozen at the moment of a
+  // session and never decay, so a three-day-old run reports fatigue the athlete has since shed. The
+  // old columns stay, because the load immediately after a session is a true and different fact;
+  // nothing reads them for the analysis any more.
   autoMigrations =
     [
       AutoMigration(from = 4, to = 5),
@@ -63,6 +72,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 8, to = 9),
       AutoMigration(from = 9, to = 10),
       AutoMigration(from = 10, to = 11),
+      AutoMigration(from = 11, to = 12),
     ],
 )
 @TypeConverters(Converters::class)

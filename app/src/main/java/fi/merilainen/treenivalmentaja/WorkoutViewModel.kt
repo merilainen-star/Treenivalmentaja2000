@@ -828,12 +828,7 @@ class WorkoutViewModel(
           )
         )
 
-      AiAnalysisKind.UPCOMING -> {
-        // Acute and chronic load are properties of the athlete on a date rather than of a session,
-        // so the newest activity carrying a pair holds the current one — whichever session it
-        // happens to hang off.
-        val latest =
-          runs.values.filter { it.atl != null && it.ctl != null }.maxByOrNull { it.startTimeUtc }
+      AiAnalysisKind.UPCOMING ->
         analysisPromptBuilder.upcoming(
           UpcomingAnalysisInput(
             type = session.type,
@@ -842,11 +837,12 @@ class WorkoutViewModel(
             plannedIntensity = session.intensity,
             description = session.description,
             recoveryByDay = recovery,
-            acuteLoad = latest?.atl,
-            chronicLoad = latest?.ctl,
+            // From the daily series, not from the newest activity's own atl/ctl. Those are frozen
+            // at the moment of a session and never decay, so a three-day-old run reported a fatigue
+            // the athlete had already shed — measured here as a TSB of -5.9 against a true -0.6.
+            load = intervalsRepository?.loadOn(date),
           )
         )
-      }
     }
   }
 

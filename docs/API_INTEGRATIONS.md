@@ -375,3 +375,30 @@ The same rule as Oura, for the same reason: a treadmill run may have no distance
 strap has no heart rate, and a flat run reports `0.0` elevation. None of those is rendered, and none
 becomes a zero. `IntervalsMappers` drops rows lacking an id, a type, a parseable start or a moving
 time — those cannot be placed on the clock or reduced to a pace, which is all these rows exist for.
+
+### The wellness endpoint, and why the activities' own load figures are not enough
+
+`GET /api/v1/athlete/{id}/wellness?oldest=&newest=` returns one `Wellness` record per day. The app
+reads three of its 46 fields: `ctl`, `atl` and `rampRate`. The record's `id` **is the date**.
+
+This is fetched despite `intervals_activities` already storing `icu_atl` and `icu_ctl`, because those
+two are not the same numbers. An activity's figures are frozen at the moment of that session and
+never decay, while the real ones fall every day — ATL on roughly a 7-day time constant, CTL on 42.
+Measured against this athlete's own account:
+
+| Source | ATL | CTL | TSB |
+| --- | --- | --- | --- |
+| Activity of 16 August, read on 19 August | 17.7 | 11.7 | −5.9 |
+| Wellness record for 19 August | 11.5 | 10.9 | −0.6 |
+
+The AI analysis was reading the first row and calling it today. It now reads the second, and the
+prompt names the date the figures belong to so a stale one is visible rather than silent.
+
+**Two things are deliberately not read** from this record, though it carries them: `hrv` and
+`restingHR`. Oura is already the app's source for both, and a second source for the same measurement
+is a question about which one wins.
+
+**The path is a guess in one respect.** The specification templates it as `/wellness{ext}` with the
+extension a required path parameter; the plain form is what the app sends. A `404` there would mean
+trying `.json`. The sync catches this fetch separately, so a wrong guess costs the analysis its load
+section and nothing else.

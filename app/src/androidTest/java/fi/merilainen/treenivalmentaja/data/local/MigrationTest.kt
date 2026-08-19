@@ -389,4 +389,58 @@ class MigrationTest {
     assertTrue(summaries.isNull(summaries.getColumnIndex("sleepHrBpm")))
     summaries.close()
   }
+
+  /**
+   * Version 12 adds `intervals_wellness` — the daily training-load series.
+   *
+   * A new table rather than new columns, so the assertion is different in kind from the additive
+   * ones before it: the existing rows must be untouched, and the new table must exist and be empty.
+   * Empty is correct — the ordinary sync fills it on the next resume, and inventing rows during a
+   * migration would be inventing training history.
+   *
+   * It exists because `intervals_activities.atl`/`ctl` were the wrong numbers to read for "how
+   * loaded is the athlete now": they are frozen at the moment of a session and never decay. Those
+   * columns are deliberately still here, which this test also pins — the load immediately after a
+   * session is a true and different fact, and dropping it would lose data to fix a misuse.
+   */
+  @Test
+  fun migrate11To12() {
+    var db = helper.createDatabase(TEST_DB, 11)
+
+    db.execSQL(
+      """
+      INSERT INTO `intervals_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `recordingTimeSec`, `distanceMeters`, `avgSpeedMps`, `maxSpeedMps`, `avgHeartRate`, `maxHeartRate`, `avgCadence`, `elevationGainMeters`, `calories`, `trainingLoad`, `intensity`, `hrLoad`, `trimp`, `atl`, `ctl`, `source`, `deviceName`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES ('i176422661', 'Afternoon Run', 'Run', 1786889278000, 2117, 2117, 6029.0, 2.892, 3.62, 149, 167, 79, 68.4, 481, 35, 77.14803, 35, 60.31146, 17.650415, 11.711897, 'SUUNTO', 'SUUNTO Suunto 5', NULL, 1786889278000)
+      """
+    )
+    db.execSQL(
+      """
+      INSERT INTO `oura_daily_summaries` (`date`, `readinessScore`, `sleepScore`, `activityScore`, `averageHrvMs`, `restingHrBpm`, `sleepHrBpm`, `fetchedAtUtc`)
+      VALUES ('2026-08-19', 84, 86, 92, 34, 51, 55, 1786889278000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 12, true)
+
+    // The new table is there and empty; the next sync fills it.
+    val wellness = db.query("SELECT * FROM intervals_wellness")
+    assertEquals(0, wellness.count)
+    wellness.close()
+
+    // The per-activity load figures survive. They are a record of the load right after that
+    // session, which is a legitimate fact — just not the one the analysis should read.
+    val activities = db.query("SELECT * FROM intervals_activities")
+    assertTrue(activities.moveToFirst())
+    assertEquals(17.650415, activities.getDouble(activities.getColumnIndex("atl")), 0.0001)
+    assertEquals(11.711897, activities.getDouble(activities.getColumnIndex("ctl")), 0.0001)
+    activities.close()
+
+    // And v11's own columns are undisturbed by a table being added beside them.
+    val summaries = db.query("SELECT * FROM oura_daily_summaries")
+    assertTrue(summaries.moveToFirst())
+    assertEquals(34, summaries.getInt(summaries.getColumnIndex("averageHrvMs")))
+    assertEquals(51, summaries.getInt(summaries.getColumnIndex("restingHrBpm")))
+    summaries.close()
+  }
 }

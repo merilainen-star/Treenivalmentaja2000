@@ -34,8 +34,10 @@ of them, and a key stored for a provider you are not using is never sent anywher
   variability, lowest heart rate and average heart rate; and completed workouts, for the days the
   app has fetched. Stored so the app works offline.
 - **Activity data from intervals.icu, cached** — your activities for the days the app has fetched: sport, start time,
-  moving and elapsed time, distance, heart rate, elevation gain, calories and training load.
-  Stored so the app works offline.
+  moving and elapsed time, distance, heart rate, elevation gain, calories and training load; plus
+  your **daily fitness and fatigue figures** (CTL, ATL) for those days. Stored so the app works
+  offline. The app does **not** read the heart-rate, resting-heart-rate or sleep fields that
+  intervals.icu also holds — Oura is the source for those.
 - **Your Oura tokens and Oura application's Client ID and Secret, your intervals.icu API key, and
   any AI provider API keys you have entered (Anthropic, OpenAI, Google)** — encrypted with
   AES-256-GCM under keys held in the Android Keystore, which cannot be extracted from the device.
@@ -146,8 +148,8 @@ account; see [INTERVALS_SETUP.md](INTERVALS_SETUP.md#why-an-api-key-rather-than-
 
 - **Settings → Oura → "Katkaise Oura-yhteys"** deletes the stored Oura tokens and every cached Oura
   row from the device. Your training plan is untouched.
-- **Settings → Intervals.icu → "Poista avain"** deletes the stored API key and every cached
-  activity from the device. Your training plan is untouched.
+- **Settings → Intervals.icu → "Poista avain"** deletes the stored API key, every cached activity
+  and your cached daily fitness/fatigue figures from the device. Your training plan is untouched.
 - **Settings → AI-analyysi → "Poista"** deletes one provider's stored key; each provider has its
   own. There is nothing else to delete: no analysis was ever stored. Removing the key of the
   selected provider stops the feature from being able to send anything.

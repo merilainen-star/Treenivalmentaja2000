@@ -234,3 +234,28 @@ data class OuraWorkoutEntity(
   val avgHeartRate: Int? = null,
   val maxHeartRate: Int? = null,
 )
+
+/**
+ * One day's training load, from intervals.icu's wellness record. See `docs/DATA_MODEL.md` § 7.
+ *
+ * **Keyed by date, and that is the whole point.** `intervals_activities` also stores `atl`/`ctl`,
+ * but frozen at the moment of each activity — they never decay, so a three-day-old session reports
+ * a fatigue that has since worn off. This table is the daily series, which is what "how loaded is
+ * the athlete *today*" actually means.
+ *
+ * The activity columns are kept rather than removed: they are a true record of the load immediately
+ * after that session, which is a different and legitimate fact. Nothing reads them for the analysis
+ * any more.
+ */
+@Entity(tableName = "intervals_wellness")
+data class IntervalsWellnessEntity(
+  /** `YYYY-MM-DD`. */
+  @PrimaryKey val date: String,
+  /** Chronic training load — fitness. Nullable: a day before the athlete had any history has none. */
+  val ctl: Double? = null,
+  /** Acute training load — fatigue. */
+  val atl: Double? = null,
+  /** CTL change per week. */
+  val rampRate: Double? = null,
+  val fetchedAtUtc: Long,
+)

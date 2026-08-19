@@ -114,7 +114,15 @@ class IntervalsConnection internal constructor(
   fun keySource(): IntervalsApiKeySource = IntervalsApiKeySource { store.apiKey() }
 }
 
-/** Clearing the key drops the cached activity rows and nothing else. */
+/**
+ * Clearing the key drops everything fetched with it — the activities and the daily load series —
+ * and nothing else. The training plan is untouched.
+ *
+ * The wellness rows have to go too, and that is not obvious from the class's name: `PRIVACY.md`
+ * tells the owner that removing the key deletes "every cached activity", and a table of their
+ * fitness and fatigue left behind would make that sentence false.
+ */
 internal suspend fun IntervalsDao.clearCachedIntervalsData() {
   clearActivities()
+  clearWellness()
 }

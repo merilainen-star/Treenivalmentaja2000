@@ -156,6 +156,14 @@ almost nothing to say about the sessions that matter most.
    ([ADR-010](DECISIONS.md#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key)).
    It changes nothing: no button on the result touches the plan, and no analysis is stored.
 
+   **Two corrections landed after real use**, both of the same shape — the app was confidently
+   telling the model something it had not checked. The prompt was built from screen-scoped
+   `StateFlow`s, so tapping the button from the Today screen sent **no recovery data at all** (only
+   the Week screen collects that flow); and the fatigue figures came from the newest *activity*,
+   where they are frozen and never decay, so a three-day-old run reported a TSB of −5.9 when the
+   true figure was −0.6. The prompt is now built from the repositories, and load comes from
+   intervals.icu's daily wellness series (schema v12) with its date named in the heading.
+
    **Three things came with it that outlast it.** The night's own **HRV and resting heart rate** are
    now read from Oura's sleep-periods collection and stored on the daily summary (schema v11) — a
    measurement where the readiness score is an opinion of one, and available to any future rule that

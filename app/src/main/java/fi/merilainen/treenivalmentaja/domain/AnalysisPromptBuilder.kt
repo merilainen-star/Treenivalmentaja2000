@@ -26,10 +26,13 @@ data class UpcomingAnalysisInput(
   val plannedIntensity: Intensity? = null,
   val description: String? = null,
   val recoveryByDay: Map<LocalDate, DailyRecovery> = emptyMap(),
-  /** Acute load — fatigue — as of the most recent activity that carried one. */
-  val acuteLoad: Double? = null,
-  /** Chronic load — fitness — as of the same activity. */
-  val chronicLoad: Double? = null,
+  /**
+   * The athlete's training load, with the day it describes.
+   *
+   * Dated because load decays: a figure without its date cannot be checked for staleness, and the
+   * first version of this feature sent a three-day-old fatigue as if it were current.
+   */
+  val load: DailyTrainingLoad? = null,
 )
 
 /**
@@ -129,14 +132,24 @@ class AnalysisPromptBuilder {
       recoveryByDay = input.recoveryByDay,
     )
 
-    // Written only when intervals.icu actually computed them. Both or neither: the pair is what
-    // means something, and one alone invites the model to infer the other.
-    if (input.acuteLoad != null && input.chronicLoad != null) {
-      appendLine("## Kuormitus")
-      appendLine("- Akuutti kuormitus (väsymys): ${decimal(input.acuteLoad)}")
-      appendLine("- Krooninen kuormitus (kunto): ${decimal(input.chronicLoad)}")
-      appendLine("- Erotus (TSB): ${decimal(input.chronicLoad - input.acuteLoad)}")
-      appendLine()
+    // Written only when intervals.icu actually computed both. The pair is what means something, and
+    // one alone invites the model to infer the other.
+    //
+    // **The heading carries the date**, and that is not decoration. Load decays daily, so a figure
+    // is only as good as the day it belongs to — and when the series has no row for the session's
+    // own day, this says which day it does describe rather than letting an older number pass as
+    // today's. That is precisely how the first version went wrong, silently.
+    input.load?.let { load ->
+      val acute = load.acute
+      val chronic = load.chronic
+      val balance = load.stressBalance
+      if (acute != null && chronic != null && balance != null) {
+        appendLine("## Kuormitus (${load.date})")
+        appendLine("- Akuutti kuormitus (väsymys): ${decimal(acute)}")
+        appendLine("- Krooninen kuormitus (kunto): ${decimal(chronic)}")
+        appendLine("- Erotus (TSB): ${decimal(balance)}")
+        appendLine()
+      }
     }
 
     appendLine(UPCOMING_TASK)

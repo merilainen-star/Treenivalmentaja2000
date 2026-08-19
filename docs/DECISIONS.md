@@ -423,6 +423,18 @@
     both need the fifth collection and the three columns.
   - `CompletedRunMetrics` gains two nullable fields (`atl`, `ctl`) purely by copying already-stored
     columns through `toMetrics()` — no migration, no new fetch.
+
+    **Amended 2026-08-19: those were the wrong numbers, and the analysis no longer reads them.**
+    An activity's `icu_atl`/`icu_ctl` are frozen at the moment of that session and never decay,
+    while the real figures fall every day — ATL on roughly a 7-day time constant, CTL on 42. Reading
+    the newest activity therefore reported however stale a fatigue the last session left behind.
+    Measured on the owner's own account: the 16 August run stored 17.7 / 11.7, while intervals.icu's
+    wellness record for 19 August said 11.5 / 10.9 — a TSB of −5.9 against a true −0.6, which is the
+    difference between "ease off" and "go as planned". The upcoming-workout prompt now reads
+    intervals.icu's **daily wellness series** (`intervals_wellness`, schema v12) and carries the date
+    of the figures in the heading, so a stale one is visible rather than silent. The activity columns
+    stay: the load immediately after a session is a true and different fact, and dropping it would
+    lose data to fix a misuse.
   - Every tap spends the user's own money against their own key. Nothing about that is hidden: the
     request shown under "Näytä pyyntö" is the actual bill.
   - The two analysis types share a builder shape but not a prompt — a future third type (e.g. a

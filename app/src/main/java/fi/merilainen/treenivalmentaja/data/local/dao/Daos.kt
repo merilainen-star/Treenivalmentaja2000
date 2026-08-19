@@ -8,6 +8,7 @@ import androidx.room.Update
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
@@ -224,6 +225,27 @@ interface IntervalsDao {
   /** Every activity tied to any session, for the screens that draw a list of them. */
   @Query("SELECT * FROM intervals_activities WHERE matchedSessionId IS NOT NULL")
   fun observeMatchedActivities(): Flow<List<IntervalsActivityEntity>>
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertWellness(days: List<IntervalsWellnessEntity>)
+
+  /**
+   * The most recent load figures on or before a date.
+   *
+   * "On or before" rather than "on", because a day can be missing — intervals.icu writes a wellness
+   * record when it has something to say, and the analysis still needs the athlete's current state
+   * rather than nothing at all. Ordering by date descending and taking one gives the freshest
+   * record that is not in the session's future.
+   *
+   * Rows with no load at all are skipped: a wellness record can exist carrying only a sleep score,
+   * and returning it would answer "the athlete has no fitness" rather than "we do not know".
+   */
+  @Query(
+    "SELECT * FROM intervals_wellness WHERE date <= :onOrBefore AND (ctl IS NOT NULL OR atl IS NOT NULL) ORDER BY date DESC LIMIT 1"
+  )
+  suspend fun latestWellnessOnOrBefore(onOrBefore: String): IntervalsWellnessEntity?
+
+  @Query("DELETE FROM intervals_wellness") suspend fun clearWellness()
 
   @Query("DELETE FROM intervals_activities") suspend fun clearActivities()
 }

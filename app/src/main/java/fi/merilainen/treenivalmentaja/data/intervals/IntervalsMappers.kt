@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -96,4 +97,24 @@ internal object IntervalsMappers {
       null
     }
   }
+
+  /**
+   * Wellness records as rows, dropping the ones that cannot be placed on a day.
+   *
+   * A record with no date cannot be addressed — the day is the primary key — and one with neither
+   * load figure says nothing this table exists to hold. Both are dropped rather than stored as a row
+   * of nulls that later reads as "the athlete has no fitness".
+   */
+  fun toWellness(days: List<IntervalsWellnessDto>, fetchedAtUtc: Long): List<IntervalsWellnessEntity> =
+    days.mapNotNull { day ->
+      val date = day.id?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+      if (day.ctl == null && day.atl == null) return@mapNotNull null
+      IntervalsWellnessEntity(
+        date = date,
+        ctl = day.ctl,
+        atl = day.atl,
+        rampRate = day.rampRate,
+        fetchedAtUtc = fetchedAtUtc,
+      )
+    }
 }
