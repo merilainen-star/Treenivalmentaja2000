@@ -181,11 +181,17 @@ class AnalysisPromptBuilder {
 
   private fun decimal(value: Double): String = String.format(FINNISH, "%.1f", value)
 
-  private companion object {
+  companion object {
 
-    val FINNISH: Locale = Locale("fi", "FI")
+    private val FINNISH: Locale = Locale("fi", "FI")
 
-    /** A week of mornings around the session — enough to see a direction, short enough to read. */
+    /**
+     * A week of mornings around the session — enough to see a direction, short enough to read.
+     *
+     * Public because the caller has to fetch exactly this range from the database: a ViewModel that
+     * queried a different window than the builder renders would either waste rows or, worse, hand
+     * over a map that silently lacks the days the prompt asks for.
+     */
     const val TREND_DAYS_BACK = 6L
 
     val ROLE =

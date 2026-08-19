@@ -62,6 +62,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -740,12 +741,22 @@ class WorkoutViewModel(
   }
 
   /**
-   * Asks Claude about one session, and puts the answer on that session's card.
+   * Asks the selected provider about one session, and puts the answer on that session's card.
    *
-   * The prompt is built here from state already in memory — no fetch happens for an analysis, so a
-   * tap costs exactly one HTTP request. Which of the two prompts is built is decided by
-   * [AiAnalysisAvailability] from the same status and offset the button's visibility was decided
-   * from, so the two can never disagree about what a session is.
+   * **Everything the prompt needs is read from the repositories, not from the screens' StateFlows** —
+   * and that is a fix rather than a preference. The first version read `recoveryByDay.value`, which
+   * is `stateIn(..., WhileSubscribed(5_000))`: it holds `emptyMap()` unless something is actively
+   * collecting it, and only the Week screen ever does. Tapping the button on the Today screen
+   * therefore sent a prompt containing **no recovery data at all** — no error, no empty field, just
+   * an analysis quietly reasoning from less than the app knew. The model noticed, and said so; the
+   * app did not.
+   *
+   * It would also have looked intermittent rather than broken: open the Week screen, come back
+   * within five seconds, and the same tap works. `completedMetrics` and `runMetrics` were correct
+   * only by luck — the Today screen happens to collect both.
+   *
+   * Reading from the source removes the class of bug rather than the instance. A prompt must not
+   * depend on which screen is in front.
    */
   fun requestAiAnalysis(sessionId: String) {
     // The selected model decides which client answers. Read at request time rather than captured,
@@ -753,51 +764,22 @@ class WorkoutViewModel(
     val model = analysisModel.value
     val client = analysisClients[model.provider] ?: return
     if (_aiAnalyses.value[sessionId] is AiAnalysisState.Loading) return
-    val workout = workouts.value.firstOrNull { it.id == sessionId } ?: return
-    val kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset) ?: return
 
-    val today = LocalDate.now()
-    val date = today.plusDays(workout.dayOffset.toLong())
-    val prompt =
-      when (kind) {
-        AiAnalysisKind.COMPLETED ->
-          analysisPromptBuilder.completed(
-            CompletedAnalysisInput(
-              type = workout.type,
-              date = date,
-              plannedDurationMin = workout.durationMin.takeIf { it > 0 },
-              plannedIntensity = workout.intensity,
-              description = workout.description,
-              oura = completedMetrics.value[sessionId],
-              run = runMetrics.value[sessionId],
-              recoveryByDay = recoveryByDay.value,
-            )
-          )
-        AiAnalysisKind.UPCOMING -> {
-          // The most recent activity that carried a load pair. Read from what is already observed
-          // rather than queried: acute and chronic load are properties of the athlete on a date, so
-          // the newest one is the current one whichever session it happens to hang off.
-          val latest =
-            runMetrics.value.values
-              .filter { it.atl != null && it.ctl != null }
-              .maxByOrNull { it.startTimeUtc }
-          analysisPromptBuilder.upcoming(
-            UpcomingAnalysisInput(
-              type = workout.type,
-              date = date,
-              plannedDurationMin = workout.durationMin.takeIf { it > 0 },
-              plannedIntensity = workout.intensity,
-              description = workout.description,
-              recoveryByDay = recoveryByDay.value,
-              acuteLoad = latest?.atl,
-              chronicLoad = latest?.ctl,
-            )
-          )
-        }
-      }
-
-    _aiAnalyses.update { it + (sessionId to AiAnalysisState.Loading) }
     viewModelScope.launch {
+      // The session comes from the database too, not from `workouts` — that is a StateFlow with the
+      // same `WhileSubscribed` behaviour as the rest. It happens to be safe in the app, because the
+      // button cannot be drawn without the list that holds it, but "safe because of what the UI
+      // happens to do" is the reasoning that produced this bug in the first place.
+      val session = repository.getSession(sessionId) ?: return@launch
+      val date = runCatching { LocalDate.parse(session.scheduledDate) }.getOrNull() ?: return@launch
+      val offset = ChronoUnit.DAYS.between(LocalDate.now(), date).toInt()
+      // Decided from the same status and offset the button's visibility was, so the two cannot
+      // disagree about what a session is.
+      val kind = AiAnalysisAvailability.kindFor(session.status, offset) ?: return@launch
+
+      // Set only once the request is known to be going out, so an ineligible tap leaves no spinner.
+      _aiAnalyses.update { it + (sessionId to AiAnalysisState.Loading) }
+      val prompt = buildAnalysisPrompt(kind, session, date)
       val state =
         try {
           AiAnalysisState.Loaded(client.analyse(prompt, model), prompt)
@@ -805,6 +787,66 @@ class WorkoutViewModel(
           AiAnalysisState.Failed(e.message ?: "AI-analyysi epäonnistui.", e.canRetry)
         }
       _aiAnalyses.update { it + (sessionId to state) }
+    }
+  }
+
+  /**
+   * One session's prompt, read straight from the database.
+   *
+   * The recovery window is asked for around **the session's own date**, not around today, and it
+   * uses the builder's own [AnalysisPromptBuilder.TREND_DAYS_BACK] so the range fetched and the range
+   * rendered cannot drift apart. For an upcoming session that means the week leading up to it; days
+   * that have not happened yet simply have no rows, which is the honest answer rather than a gap to
+   * paper over.
+   */
+  private suspend fun buildAnalysisPrompt(
+    kind: AiAnalysisKind,
+    session: TrainingSession,
+    date: LocalDate,
+  ): String {
+    val recovery =
+      ouraRepository
+        .observeRecoveryRange(
+          from = date.minusDays(AnalysisPromptBuilder.TREND_DAYS_BACK),
+          to = date,
+        )
+        .first()
+    val runs = intervalsRepository?.observeMatchedRunMetrics()?.first().orEmpty()
+
+    return when (kind) {
+      AiAnalysisKind.COMPLETED ->
+        analysisPromptBuilder.completed(
+          CompletedAnalysisInput(
+            type = session.type,
+            date = date,
+            plannedDurationMin = session.durationMin?.takeIf { it > 0 },
+            plannedIntensity = session.intensity,
+            description = session.description,
+            oura = ouraRepository.observeMatchedMetrics().first()[session.id],
+            run = runs[session.id],
+            recoveryByDay = recovery,
+          )
+        )
+
+      AiAnalysisKind.UPCOMING -> {
+        // Acute and chronic load are properties of the athlete on a date rather than of a session,
+        // so the newest activity carrying a pair holds the current one — whichever session it
+        // happens to hang off.
+        val latest =
+          runs.values.filter { it.atl != null && it.ctl != null }.maxByOrNull { it.startTimeUtc }
+        analysisPromptBuilder.upcoming(
+          UpcomingAnalysisInput(
+            type = session.type,
+            date = date,
+            plannedDurationMin = session.durationMin?.takeIf { it > 0 },
+            plannedIntensity = session.intensity,
+            description = session.description,
+            recoveryByDay = recovery,
+            acuteLoad = latest?.atl,
+            chronicLoad = latest?.ctl,
+          )
+        )
+      }
     }
   }
 
