@@ -3,18 +3,39 @@ package fi.merilainen.treenivalmentaja.domain
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import java.time.Clock
 import java.time.LocalDate
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** A read-only preview. Nothing moves until the user accepts this exact proposal. */
+sealed interface MissedSessionsProposal {
+  data object None : MissedSessionsProposal
+
+  data class MoveOne(
+    val sessionId: String,
+    val fromDate: LocalDate,
+    val toDate: LocalDate,
+  ) : MissedSessionsProposal
+
+  data class ShiftPlan(
+    val missedSessionIds: List<String>,
+    val firstMissedDate: LocalDate,
+    val days: Long,
+    val affectedSessions: Int,
+  ) : MissedSessionsProposal
+}
 
 class TrainingEngine(
   private val repository: TrainingRepository,
   private val clock: Clock = Clock.systemDefaultZone(),
   private val rescheduleAlarmsUseCase: RescheduleAlarmsUseCase? = null
 ) {
+  private val missedSessionsMutex = Mutex()
 
   /**
    * User triggers "Sick". All future sessions move to PAUSED_DUE_TO_ILLNESS.
    */
   suspend fun markSick(reason: String? = null) {
-    val today = LocalDate.now(clock)
+    val today = todayInPlanZone()
     val sessions = repository.getSessions()
 
     val futureOpenSessions = sessions.filter {
@@ -40,7 +61,7 @@ class TrainingEngine(
    * - Resumes normal plan shifted to start after the recovery days.
    */
   suspend fun markRecovered() {
-    val today = LocalDate.now(clock)
+    val today = todayInPlanZone()
     val sessions = repository.getSessions()
 
     val pausedSessions = sessions.filter { it.status == SessionStatus.PAUSED_DUE_TO_ILLNESS }
@@ -106,8 +127,8 @@ class TrainingEngine(
    * - One missed session: Shifted to the next rest day.
    * - Two or three missed sessions: Shifts the entire plan forward.
    */
-  suspend fun handleMissedSessions() {
-    val today = LocalDate.now(clock)
+  suspend fun proposeMissedSessions(): MissedSessionsProposal {
+    val today = todayInPlanZone()
     val sessions = repository.getSessions()
 
     // Find sessions in the past that are still PLANNED, NOTIFIED, REPLACED_WITH_LIGHTER_VERSION, etc.
@@ -115,38 +136,64 @@ class TrainingEngine(
       it.status.isOpen && LocalDate.parse(it.scheduledDate) < today
     }.sortedBy { LocalDate.parse(it.scheduledDate) }
 
-    if (missedSessions.isEmpty()) return
+    if (missedSessions.isEmpty()) return MissedSessionsProposal.None
 
     if (missedSessions.size == 1) {
-      // Move to the next rest day
       val sessionToMove = missedSessions.first()
       val nextRestDay = findNextRestDay(sessions, today)
-      repository.reschedule(
+      return MissedSessionsProposal.MoveOne(
         sessionId = sessionToMove.id,
-        newDate = nextRestDay,
-        source = EventSource.ENGINE,
-        note = "Siirretty automaattisesti seuraavalle lepopäivälle"
+        fromDate = LocalDate.parse(sessionToMove.scheduledDate),
+        toDate = nextRestDay,
       )
     } else {
-      // Shift the entire plan forward
       val firstMissedDate = LocalDate.parse(missedSessions.first().scheduledDate)
       val daysToShift = today.toEpochDay() - firstMissedDate.toEpochDay()
+      return MissedSessionsProposal.ShiftPlan(
+        missedSessionIds = missedSessions.map { it.id },
+        firstMissedDate = firstMissedDate,
+        days = daysToShift,
+        affectedSessions = sessions.count { it.status.isOpen },
+      )
+    }
+  }
 
-      // We need to shift ALL open sessions (missed and future)
-      val allOpenSessions = sessions.filter { it.status.isOpen }
-      for (session in allOpenSessions) {
-        val originalDate = LocalDate.parse(session.scheduledDate)
-        val newDate = originalDate.plusDays(daysToShift)
-        repository.reschedule(
-          sessionId = session.id,
-          newDate = newDate,
-          source = EventSource.ENGINE,
-          note = "Koko suunnitelmaa siirretty väliin jääneiden treenien vuoksi"
-        )
+  /** Applies only a proposal that is still current; accepting twice can never move the plan twice. */
+  suspend fun applyMissedSessions(proposal: MissedSessionsProposal): Boolean =
+    missedSessionsMutex.withLock {
+      if (proposal == MissedSessionsProposal.None || proposeMissedSessions() != proposal) {
+        return@withLock false
       }
+      val sessions = repository.getSessions()
+      when (proposal) {
+        is MissedSessionsProposal.MoveOne ->
+          repository.reschedule(
+            sessionId = proposal.sessionId,
+            newDate = proposal.toDate,
+            source = EventSource.ENGINE,
+            note = "Siirretty käyttäjän hyväksymänä seuraavalle lepopäivälle",
+          )
+        is MissedSessionsProposal.ShiftPlan -> {
+          val allOpenSessions = sessions.filter { it.status.isOpen }
+          for (session in allOpenSessions) {
+            val originalDate = LocalDate.parse(session.scheduledDate)
+            repository.reschedule(
+              sessionId = session.id,
+              newDate = originalDate.plusDays(proposal.days),
+              source = EventSource.ENGINE,
+              note = "Koko suunnitelmaa siirretty käyttäjän hyväksymänä",
+            )
+          }
+        }
+        MissedSessionsProposal.None -> return@withLock false
+      }
+      rescheduleAlarmsUseCase?.execute()
+      true
     }
 
-    rescheduleAlarmsUseCase?.execute()
+  /** Kept for explicit readiness actions; unlike the old launch path this is never automatic. */
+  suspend fun handleMissedSessions() {
+    applyMissedSessions(proposeMissedSessions())
   }
 
   private fun findNextRestDay(sessions: List<TrainingSession>, fromDate: LocalDate): LocalDate {
@@ -157,4 +204,7 @@ class TrainingEngine(
     }
     return checkDate
   }
+
+  private suspend fun todayInPlanZone(): LocalDate =
+    LocalDate.now(clock.withZone(repository.activePlanTimeZone()))
 }

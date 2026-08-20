@@ -79,10 +79,12 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val analyses by viewModel.aiAnalyses.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
+    val today by viewModel.currentDate.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.
     LifecycleResumeEffect(ouraState, intervalsState) {
+        viewModel.refreshCurrentDate()
         viewModel.syncOura()
         viewModel.syncIntervals()
         onPauseOrDispose {}
@@ -90,6 +92,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
 
     WeekScreenContent(
         workouts = workouts,
+        today = today,
         guideState = guideState,
         completedMetrics = completedMetrics,
         unmatchedByDay = unmatchedByDay,

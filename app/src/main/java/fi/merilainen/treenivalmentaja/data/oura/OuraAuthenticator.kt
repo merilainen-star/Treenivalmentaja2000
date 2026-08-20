@@ -1,5 +1,6 @@
 package fi.merilainen.treenivalmentaja.data.oura
 
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
 import okhttp3.Request
@@ -61,10 +62,17 @@ internal class OuraAuthenticator(
           }
           return null
         }
-      runBlocking {
+      val saved = runBlocking {
         // Oura returns a new refresh token; if it ever does not, the old one is still the only one
         // there is, and dropping it would end the connection at the next expiry.
         store.save(renewed.copy(refreshToken = renewed.refreshToken ?: refreshToken))
+      }
+      if (saved != CredentialSaveResult.Success) {
+        // Keeping the expired token would make refreshState report Connected after the secure
+        // write failed. Drop it so the UI can never claim this connection is usable.
+        runBlocking { store.clear() }
+        onRefreshFailed()
+        return null
       }
       return response.request.retryWith(renewed.accessToken)
     }

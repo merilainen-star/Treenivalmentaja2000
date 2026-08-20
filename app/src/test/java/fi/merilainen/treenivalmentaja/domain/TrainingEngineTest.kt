@@ -170,7 +170,15 @@ class TrainingEngineTest {
         insertSession("s1", yesterday, SessionStatus.PLANNED)
         insertSession("s2", todayStr, SessionStatus.PLANNED)
 
-        engine.handleMissedSessions()
+        val proposal = engine.proposeMissedSessions()
+        assertEquals(
+            MissedSessionsProposal.MoveOne("s1", fixedToday.minusDays(1), fixedToday.plusDays(1)),
+            proposal,
+        )
+        // Previewing/rejecting is a pure read: the original remains open and unmoved.
+        assertEquals(yesterday, repository.getSessions().single { it.id == "s1" }.scheduledDate)
+
+        assertTrue(engine.applyMissedSessions(proposal))
 
         val activeSessions = repository.getSessions().filter { it.status.isOpen }
         val s1Rescheduled = activeSessions.find { it.originalSessionId == "s1" }
@@ -186,7 +194,17 @@ class TrainingEngineTest {
         insertSession("s1", d1, SessionStatus.PLANNED)
         insertSession("s2", d2, SessionStatus.PLANNED)
 
-        engine.handleMissedSessions()
+        val proposal = engine.proposeMissedSessions()
+        assertEquals(
+            MissedSessionsProposal.ShiftPlan(
+                missedSessionIds = listOf("s1", "s2"),
+                firstMissedDate = fixedToday.minusDays(3),
+                days = 3,
+                affectedSessions = 2,
+            ),
+            proposal,
+        )
+        assertTrue(engine.applyMissedSessions(proposal))
 
         val activeSessions = repository.getSessions().filter { it.status.isOpen }
         // Shift amount = fixedToday - d1 = 3 days
@@ -195,6 +213,71 @@ class TrainingEngineTest {
 
         val s2Rescheduled = activeSessions.find { it.originalSessionId == "s2" }
         assertEquals(fixedToday.plusDays(2).toString(), s2Rescheduled?.scheduledDate)
+
+        // The accepted proposal is stale after the first write and cannot shift the plan twice.
+        assertEquals(false, engine.applyMissedSessions(proposal))
+        assertEquals(2, repository.getSessions().count { it.status.isOpen })
+    }
+
+    @Test
+    fun proposeMissedSessions_whenNothingWasMissed_proposesNothing() = runBlocking {
+        insertSession("s1", fixedToday.toString(), SessionStatus.PLANNED)
+
+        assertEquals(MissedSessionsProposal.None, engine.proposeMissedSessions())
+    }
+
+    @Test
+    fun missedSessionDateUsesActivePlanZoneWhileTravelling() = runBlocking {
+        // 22:30 UTC is already 11 August in Helsinki but still 10 August in Los Angeles.
+        val travelClock = Clock.fixed(
+            java.time.Instant.parse("2026-08-10T22:30:00Z"),
+            ZoneId.of("America/Los_Angeles"),
+        )
+        val travelEngine = TrainingEngine(repository, travelClock)
+        insertSession("s1", "2026-08-10", SessionStatus.PLANNED)
+
+        val proposal = travelEngine.proposeMissedSessions()
+
+        assertTrue(proposal is MissedSessionsProposal.MoveOne)
+        assertEquals(LocalDate.of(2026, 8, 10), (proposal as MissedSessionsProposal.MoveOne).fromDate)
+    }
+
+    /**
+     * A proposal held while the world changed underneath it must not be applied.
+     *
+     * The twice-accepted case is already covered; this is the other half and the dangerous one. The
+     * user is shown "move one session to the next free day", a second session then goes missed
+     * — the card was raised on Tuesday and accepted on Thursday, or a background write landed
+     * between the two — and the correct action is now a whole-plan shift. Applying the stale
+     * `MoveOne` would move one session and quietly leave the other stranded in the past.
+     */
+    @Test
+    fun applyMissedSessions_rejectsAProposalTheSituationHasOutgrown() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+
+        val staleProposal = engine.proposeMissedSessions()
+        assertTrue(staleProposal is MissedSessionsProposal.MoveOne)
+
+        // A second session goes missed after the card was drawn.
+        insertSession("s2", fixedToday.minusDays(2).toString(), SessionStatus.PLANNED)
+        assertTrue(engine.proposeMissedSessions() is MissedSessionsProposal.ShiftPlan)
+
+        assertEquals(false, engine.applyMissedSessions(staleProposal))
+
+        // Nothing moved: both are still on the days they were inserted on.
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(fixedToday.minusDays(1).toString(), byId["s1"]?.scheduledDate)
+        assertEquals(fixedToday.minusDays(2).toString(), byId["s2"]?.scheduledDate)
+    }
+
+    /** `None` is not a proposal. Applying it must be a no-op rather than an empty write. */
+    @Test
+    fun applyMissedSessions_withNothingProposed_changesNothing() = runBlocking {
+        insertSession("s1", fixedToday.toString(), SessionStatus.PLANNED)
+
+        assertEquals(false, engine.applyMissedSessions(MissedSessionsProposal.None))
+
+        assertEquals(fixedToday.toString(), repository.getSessions().single().scheduledDate)
     }
 
     private suspend fun insertSession(id: String, date: String, status: SessionStatus) {

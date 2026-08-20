@@ -33,7 +33,7 @@ internal class OuraSyncWorker(
 
   override suspend fun doWork(): Result {
     val app = applicationContext as? TreenivalmentajaApplication ?: return Result.success()
-    val today = LocalDate.now()
+    val today = LocalDate.now(app.repository.activePlanTimeZone())
     return when (val outcome =
       app.ouraRepository.sync(from = today.minusDays(SYNC_DAYS - 1), to = today)) {
       is OuraSyncResult.Success -> Result.success()

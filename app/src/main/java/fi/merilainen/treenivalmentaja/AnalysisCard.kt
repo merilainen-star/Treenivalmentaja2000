@@ -17,14 +17,17 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.AnalysisModel
@@ -48,6 +51,7 @@ import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 @Composable
 fun AnalysisCard(
   configured: Set<AnalysisProvider>,
+  saveFailure: AnalysisProvider? = null,
   model: AnalysisModel,
   onModelChange: (AnalysisModel) -> Unit = {},
   onSaveApiKey: (AnalysisProvider, String) -> Unit = { _, _ -> },
@@ -95,6 +99,7 @@ fun AnalysisCard(
           provider = provider,
           hasKey = provider in configured,
           isSelected = provider == model.provider,
+          saveFailed = provider == saveFailure,
           onSave = { onSaveApiKey(provider, it) },
           onClear = { onClearApiKey(provider) },
         )
@@ -175,10 +180,26 @@ private fun ProviderKey(
   provider: AnalysisProvider,
   hasKey: Boolean,
   isSelected: Boolean,
+  saveFailed: Boolean,
   onSave: (String) -> Unit,
   onClear: () -> Unit,
 ) {
-  var apiKey by rememberSaveable(provider) { mutableStateOf("") }
+  var apiKey by remember(provider) { mutableStateOf("") }
+
+  /**
+   * The pasted key is wiped once it has been stored, and **only** once it has been stored.
+   *
+   * There used to be an unconditional `apiKey = ""` in the save button, which was removed when the
+   * field moved from `rememberSaveable` to `remember` — the saved-instance-state risk it guarded
+   * against was genuinely gone. The other half of its job was not: with `remember` the plaintext
+   * key simply stays in composition for as long as this card is on screen. Clearing it on success
+   * restores that, and keying it to [hasKey] rather than to the tap is what makes it *better* than
+   * the line it replaces — a failed write now leaves the key in the field, so retrying does not
+   * mean pasting a sixty-character secret a second time.
+   */
+  LaunchedEffect(hasKey) {
+    if (hasKey) apiKey = ""
+  }
 
   Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Text(
@@ -206,6 +227,14 @@ private fun ProviderKey(
         }
       }
     } else {
+      if (saveFailed) {
+        Text(
+          text =
+            "Avainta ei voitu tallentaa turvallisesti. Tarkista laitteen suojaus ja yritä uudelleen.",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.error,
+        )
+      }
       Text(
         text = keyHint(provider),
         style = MaterialTheme.typography.bodySmall,
@@ -217,14 +246,13 @@ private fun ProviderKey(
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         label = { Text("${provider.label}-avain") },
+        keyboardOptions =
+          KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
         visualTransformation = PasswordVisualTransformation(),
       )
       Button(
         onClick = {
           onSave(apiKey)
-          // Cleared immediately: the field has done its job, and leaving a secret in a saveable
-          // text field means it survives into the saved instance state.
-          apiKey = ""
         },
         modifier = Modifier.fillMaxWidth(),
         enabled = apiKey.isNotBlank(),

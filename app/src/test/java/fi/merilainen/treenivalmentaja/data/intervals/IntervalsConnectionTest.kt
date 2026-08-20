@@ -3,6 +3,7 @@ package fi.merilainen.treenivalmentaja.data.intervals
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -68,7 +69,7 @@ class IntervalsConnectionTest {
   fun `saving a key moves the card to configured`() = runTest {
     val connection = connection()
 
-    assertTrue(connection.saveApiKey("abc123"))
+    assertEquals(CredentialSaveResult.Success, connection.saveApiKey("abc123"))
 
     assertEquals(IntervalsConnectionState.Configured, connection.state.value)
     assertEquals("abc123", store.key)
@@ -78,8 +79,20 @@ class IntervalsConnectionTest {
   fun `a blank key is refused`() = runTest {
     val connection = connection()
 
-    assertEquals(false, connection.saveApiKey("   "))
+    assertEquals(CredentialSaveResult.InvalidInput, connection.saveApiKey("   "))
     assertNull(store.key)
+  }
+
+  @Test
+  fun `a secure storage failure is visible and does not configure the connection`() = runTest {
+    store.saveResult = CredentialSaveResult.StorageFailure
+    val connection = connection()
+
+    val result = connection.saveApiKey("abc123")
+
+    assertEquals(CredentialSaveResult.StorageFailure, result)
+    assertNull(store.key)
+    assertTrue(connection.state.value is IntervalsConnectionState.Failed)
   }
 
   /** Pasted values carry invisible whitespace; a trailing space must not become part of a key. */

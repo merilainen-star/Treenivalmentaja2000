@@ -4,11 +4,13 @@
 The testing strategy ensures the deterministic training engine works flawlessly and the UI reacts properly to state changes.
 
 ## Current Test Coverage
-**Status:** 354 unit tests + 36 instrumented tests, all passing.
 
-- `./gradlew :app:testDebugUnitTest` — 354 tests / 0 failures / 0 errors
-- `./gradlew :app:verifyRoborazziDebug` — 46 screenshot comparisons (a subset of the 354 above)
-- `./gradlew :app:connectedDebugAndroidTest` — 36 tests / 0 failures / 0 errors
+Run these checks for the current measured result; counts are recorded in one place only,
+[PROJECT_STATUS.md](../PROJECT_STATUS.md), after a complete verification run:
+
+- `./gradlew :app:testDebugUnitTest`
+- `./gradlew :app:verifyRoborazziDebug`
+- `./gradlew :app:connectedDebugAndroidTest` (when a device or emulator is available)
 
 | Suite | Covers |
 | --- | --- |

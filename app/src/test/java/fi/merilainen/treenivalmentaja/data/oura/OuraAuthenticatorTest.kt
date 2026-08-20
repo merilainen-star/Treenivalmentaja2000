@@ -2,6 +2,7 @@ package fi.merilainen.treenivalmentaja.data.oura
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -216,6 +217,18 @@ class OuraAuthenticatorTest {
     status = 400
     body = """{"error":"invalid_grant"}"""
     store.tokens = OuraTokens("access-1", "refresh-1", OuraTokens.UNKNOWN_EXPIRY)
+
+    val retry = authenticator().authenticate(null, unauthorized("access-1"))
+
+    assertNull(retry)
+    assertNull(store.tokens)
+    assertEquals(1, refreshFailures)
+  }
+
+  @Test
+  fun `a renewed token that cannot be stored never leaves the connection looking usable`() {
+    store.tokens = OuraTokens("access-1", "refresh-1", OuraTokens.UNKNOWN_EXPIRY)
+    store.saveResult = CredentialSaveResult.StorageFailure
 
     val retry = authenticator().authenticate(null, unauthorized("access-1"))
 

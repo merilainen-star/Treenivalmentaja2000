@@ -26,6 +26,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /** Why a status change was rejected. */
@@ -56,6 +57,15 @@ class TrainingRepository(
 
   fun observeSessions(): Flow<List<TrainingSession>> =
     sessionDao.observeActivePlanSessions().map { rows -> rows.map { it.toDomain() } }
+
+  /** The calendar zone of the plan currently shown, changing when an import activates another. */
+  fun observeActivePlanTimeZone(): Flow<ZoneId> =
+    planDao
+      .observeActivePlan()
+      .map { plan ->
+        plan?.let { runCatching { ZoneId.of(it.timeZone) }.getOrNull() } ?: clock.zone
+      }
+      .distinctUntilChanged()
 
   fun observeEvents(sessionId: String): Flow<List<SessionEvent>> =
     eventDao.observeForSession(sessionId).map { rows -> rows.map { it.toDomain() } }
@@ -481,11 +491,10 @@ class TrainingRepository(
    */
   private suspend fun shiftToStartToday(plan: ValidatedPlan): ValidatedPlan {
     val originalStart = LocalDate.parse(plan.startDate)
-    val today = LocalDate.now(clock)
+    val zone = runCatching { ZoneId.of(plan.timeZone) }.getOrDefault(clock.zone)
+    val today = LocalDate.now(clock.withZone(zone))
     val delta = today.toEpochDay() - originalStart.toEpochDay()
     if (delta == 0L) return plan
-
-    val zone = runCatching { ZoneId.of(plan.timeZone) }.getOrDefault(clock.zone)
 
     return plan.copy(
       startDate = today.toString(),

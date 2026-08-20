@@ -48,6 +48,7 @@ import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
+import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.formatDuration
 import fi.merilainen.treenivalmentaja.domain.Exercise
@@ -83,6 +84,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val analyses by viewModel.aiAnalyses.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
+    val missedProposal by viewModel.missedSessionsProposal.collectAsState()
 
     // On every **resume**, not merely on first composition.
     //
@@ -91,13 +93,12 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     // when the screen was composed, and nothing asked afterwards. Coming back to the app is exactly
     // when the answer is likely to have changed. A disconnected Oura makes it a no-op.
     LifecycleResumeEffect(ouraState, intervalsState) {
+        viewModel.refreshCurrentDate()
+        viewModel.checkMissedSessions()
         viewModel.syncOura()
         viewModel.syncIntervals()
         onPauseOrDispose {}
     }
-
-    // No automatic checkMissedSessions() here. Today is the start destination, so this ran on
-    // every launch and rewrote the calendar — see WorkoutViewModel.checkMissedSessions.
 
     TodayScreenContent(
         workouts = workouts,
@@ -121,6 +122,9 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onShiftProgramme = viewModel::shiftProgrammeForward,
         onStartLighter = viewModel::startTodayLighter,
         onDismissAdvice = viewModel::dismissReadinessAdvice,
+        missedSessionsProposal = missedProposal,
+        onAcceptMissedSessions = viewModel::acceptMissedSessionsProposal,
+        onRejectMissedSessions = viewModel::rejectMissedSessionsProposal,
         analyses = analyses,
         analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
@@ -153,6 +157,9 @@ fun TodayScreenContent(
     onShiftProgramme: () -> Unit = {},
     onStartLighter: () -> Unit = {},
     onDismissAdvice: () -> Unit = {},
+    missedSessionsProposal: MissedSessionsProposal = MissedSessionsProposal.None,
+    onAcceptMissedSessions: () -> Unit = {},
+    onRejectMissedSessions: () -> Unit = {},
     analyses: Map<String, AiAnalysisState> = emptyMap(),
     analysisConfigured: Boolean = false,
     onRequestAnalysis: (String) -> Unit = {},
@@ -181,6 +188,14 @@ fun TodayScreenContent(
             syncing = syncing,
             syncFailure = syncFailure,
         )
+
+        if (missedSessionsProposal != MissedSessionsProposal.None) {
+            MissedSessionsProposalCard(
+                proposal = missedSessionsProposal,
+                onAccept = onAcceptMissedSessions,
+                onReject = onRejectMissedSessions,
+            )
+        }
 
         // Directly under the reading it is about, and above the day's sessions — it asks what to
         // do with them, so it has to be read first.
@@ -255,6 +270,45 @@ fun TodayScreenContent(
                 onSelectSuggestion = onGuideSuggestionSelected,
                 onDismiss = onGuideDismiss,
             )
+        }
+    }
+}
+
+/** A calendar change shown before it is made; rejecting this card is a pure no-op. */
+@Composable
+private fun MissedSessionsProposalCard(
+    proposal: MissedSessionsProposal,
+    onAccept: () -> Unit,
+    onReject: () -> Unit,
+) {
+    val preview = when (proposal) {
+        is MissedSessionsProposal.MoveOne ->
+            "Yksi harjoitus jäi väliin ${proposal.fromDate}. Se siirretään seuraavalle " +
+                "vapaalle päivälle ${proposal.toDate}."
+        is MissedSessionsProposal.ShiftPlan ->
+            "${proposal.missedSessionIds.size} harjoitusta jäi väliin. Koko avoin ohjelma " +
+                "(${proposal.affectedSessions} harjoitusta) siirretään ${proposal.days} päivää eteenpäin."
+        MissedSessionsProposal.None -> return
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Väliin jääneet harjoitukset", fontWeight = FontWeight.Bold)
+            Text(preview, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Kalenteria muutetaan vasta, jos hyväksyt ehdotuksen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onAccept) { Text("Hyväksy siirto") }
+                OutlinedButton(onClick = onReject) { Text("Hylkää") }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.oura
 
 import fi.merilainen.treenivalmentaja.data.local.dao.OuraDao
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import java.security.SecureRandom
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,16 +88,22 @@ class OuraConnection internal constructor(
    *   they are the *right* credentials is a question only Oura can answer, and it does, at the
    *   token exchange.
    */
-  suspend fun saveCredentials(clientId: String, clientSecret: String): Boolean =
+  suspend fun saveCredentials(clientId: String, clientSecret: String): CredentialSaveResult =
     mutex.withLock {
       val entered = OuraCredentials(clientId, clientSecret).trimmed()
-      if (entered.clientId.isEmpty() || entered.clientSecret.isEmpty()) return false
-      store.saveCredentials(entered)
+      if (entered.clientId.isEmpty() || entered.clientSecret.isEmpty()) {
+        return CredentialSaveResult.InvalidInput
+      }
+      val saved = store.saveCredentials(entered)
+      if (saved != CredentialSaveResult.Success) {
+        _state.value = OuraConnectionState.Failed(SECURE_SAVE_ERROR)
+        return saved
+      }
       // A half-finished login started under the previous credentials cannot be completed under
       // these ones.
       store.clearPending()
       refreshState()
-      return true
+      return CredentialSaveResult.Success
     }
 
   /** Forgets the client credentials as well as the tokens — the full way back to a clean app. */
@@ -125,7 +132,10 @@ class OuraConnection internal constructor(
       }
       val verifier = OuraOAuth.newCodeVerifier(random)
       val state = OuraOAuth.newState(random)
-      store.savePending(verifier, state)
+      if (store.savePending(verifier, state) != CredentialSaveResult.Success) {
+        _state.value = OuraConnectionState.Failed(SECURE_SAVE_ERROR)
+        return null
+      }
       _state.value = OuraConnectionState.Connecting
       OuraOAuth.authorizationUrl(
         clientId = credentials.clientId,
@@ -188,8 +198,11 @@ class OuraConnection internal constructor(
     _state.value = OuraConnectionState.Connecting
     try {
       val tokens = authService.exchange(code, verifier)
-      store.save(tokens)
-      _state.value = OuraConnectionState.Connected
+      if (store.save(tokens) == CredentialSaveResult.Success) {
+        _state.value = OuraConnectionState.Connected
+      } else {
+        _state.value = OuraConnectionState.Failed(SECURE_SAVE_ERROR)
+      }
     } catch (e: OuraException) {
       _state.value = OuraConnectionState.Failed(e.message ?: "Oura-yhteys epäonnistui.")
     } finally {
@@ -229,6 +242,11 @@ class OuraConnection internal constructor(
 
   /** The access token for [OuraClient], read fresh from the store on every call. */
   fun tokenSource(): OuraTokenSource = OuraTokenSource { store.load()?.accessToken }
+
+  private companion object {
+    const val SECURE_SAVE_ERROR =
+      "Tunnuksia ei voitu tallentaa turvallisesti. Tarkista laitteen suojaus ja yritä uudelleen."
+  }
 }
 
 /** Disconnecting drops the cached biometric rows and nothing else. */

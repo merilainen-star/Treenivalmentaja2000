@@ -1,27 +1,24 @@
 # Architecture
 
 This document outlines the architecture for the Treenivalmentaja Android application. 
-*(Note: this architecture is **implemented**, Oura included — the client, the OAuth flow, the daily
-sync and the matching all run against a real account. What remains planned is the AI advisor, and
-acting on a recovery reading rather than merely showing it. Two other network callers predate the
-Oura work and are unlike it: the update check in `data/update` and the exercise-guide lookups in
-`data/guide`, both plain `HttpURLConnection`, single unauthenticated GETs with nothing to renew —
-[EXERCISE_GUIDE.md](EXERCISE_GUIDE.md), and [ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client)
-for why the Oura client is not one of them.)*
+*(This architecture is implemented. Oura and intervals.icu sync and matching run on-device. The
+optional AI feature is a direct, user-triggered, read-only workout analysis; AI-proposed plan
+changes remain future work. Update checks and exercise-guide lookups are the other network flows.)*
 
 ## System Context
 The application is a standalone Android app that acts as an offline-first training companion. It
 retrieves health data from Oura, synchronizes it locally, and provides notifications.
 
 Per [ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) the MVP has **no backend of its
-own**. The app talks to the Oura API V2 directly, including the OAuth2 token exchange. A future
-AI advisor is the only remote service beyond Oura, and it is out of MVP scope.
+own**. The app talks directly to Oura, intervals.icu, the selected AI provider, ExerciseDB/wger and
+the release metadata endpoint. AI providers are contacted only after an explicit analysis tap.
 
 ```mermaid
 graph TD
     A[Treenivalmentaja Android App] -->|OAuth2 + REST| C[Oura API V2]
     C -->|Workout & Health Data| A
-    A -.->|Future, out of MVP scope| D[Remote AI Advisor]
+    A -->|API key + REST| I[intervals.icu]
+    A -->|Explicit analysis request| D[Selected AI provider]
 ```
 
 ## Android Modules
@@ -93,7 +90,8 @@ clear of the exact-alarm permission, and only sessions belonging to the active p
   path, and duplicate plans/sessions are detected up front.
 - The deterministic engine can shift the schedule when sessions are missed, but **never on its
   own**. It used to run at every launch, which meant installing a build rewrote the calendar; it
-  now needs an explicit trigger. See `WorkoutViewModel.checkMissedSessions`.
+  now computes a read-only proposal on Today and requires the user to accept its exact preview.
+  Rejecting it writes nothing, and applying a stale proposal is refused.
 - Importing a plan **replaces** the previous one: the old plan and its sessions are deleted, not
   deactivated. See [DATA_MODEL.md](DATA_MODEL.md#replacing-a-plan).
 
@@ -103,6 +101,11 @@ and only when the activity fits** — see [TRAINING_ENGINE.md](TRAINING_ENGINE.m
 deliberately not compared: the plan's is what was asked for and Oura's is what happened, and the gap
 between them is the interesting part rather than grounds for rejecting the pair. A match attaches
 Oura's numbers to the session; it does not complete it.
+
+"Today", sync windows, missed-session classification and Oura/intervals.icu timestamp-to-day
+conversion all use the active plan's IANA timezone. The device timezone may change while travelling
+without moving the plan to another calendar day. The ViewModel refreshes the date at plan-zone
+midnight and again whenever a screen resumes, so a process can live across midnight safely.
 
 Workouts **imported into Oura from Strava or Suunto do not arrive here at all** — measured, not
 assumed. They reach only the daily activity and readiness scores. See

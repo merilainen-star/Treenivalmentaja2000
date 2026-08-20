@@ -2,6 +2,7 @@ package fi.merilainen.treenivalmentaja.data.analysis
 
 import fi.merilainen.treenivalmentaja.domain.AnalysisModel
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +33,8 @@ class AnalysisConnection internal constructor(
 
   /** The providers with a key stored. Observed by Settings and by every workout card. */
   val configured: StateFlow<Set<AnalysisProvider>> = _configured.asStateFlow()
+  private val _saveFailure = MutableStateFlow<AnalysisProvider?>(null)
+  val saveFailure: StateFlow<AnalysisProvider?> = _saveFailure.asStateFlow()
 
   /** One operation at a time; two taps of "save" would otherwise race to write the state. */
   private val mutex = Mutex()
@@ -48,14 +51,19 @@ class AnalysisConnection internal constructor(
    *   a question only the provider can answer, and asking costs money — so it is asked when the user
    *   wants an analysis anyway.
    */
-  suspend fun saveApiKey(provider: AnalysisProvider, key: String): Boolean =
+  suspend fun saveApiKey(provider: AnalysisProvider, key: String): CredentialSaveResult =
     mutex.withLock {
-      val store = stores[provider] ?: return false
+      val store = stores[provider] ?: return CredentialSaveResult.InvalidInput
       val trimmed = key.trim()
-      if (trimmed.isEmpty()) return false
-      store.saveApiKey(trimmed)
-      _configured.value = _configured.value + provider
-      return true
+      if (trimmed.isEmpty()) return CredentialSaveResult.InvalidInput
+      val result = store.saveApiKey(trimmed)
+      if (result == CredentialSaveResult.Success) {
+        _configured.value = _configured.value + provider
+        _saveFailure.value = null
+      } else {
+        _saveFailure.value = provider
+      }
+      return result
     }
 
   /**
@@ -68,6 +76,7 @@ class AnalysisConnection internal constructor(
     mutex.withLock {
       stores[provider]?.clearApiKey()
       _configured.value = _configured.value - provider
+      if (_saveFailure.value == provider) _saveFailure.value = null
     }
   }
 

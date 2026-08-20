@@ -3,6 +3,7 @@ package fi.merilainen.treenivalmentaja.data.oura
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -154,7 +155,7 @@ class OuraConnectionTest {
 
     val saved = connection.saveCredentials("client-abc", "secret-xyz")
 
-    assertTrue(saved)
+    assertEquals(CredentialSaveResult.Success, saved)
     assertEquals(OuraConnectionState.Disconnected, connection.state.value)
     assertEquals("client-abc", store.storedCredentials!!.clientId)
   }
@@ -174,9 +175,21 @@ class OuraConnectionTest {
   fun `a blank field saves nothing`() = runTest {
     val connection = connectionReadingStoredCredentials()
 
-    assertFalse(connection.saveCredentials("client-abc", "   "))
-    assertFalse(connection.saveCredentials("", "secret-xyz"))
+    assertEquals(CredentialSaveResult.InvalidInput, connection.saveCredentials("client-abc", "   "))
+    assertEquals(CredentialSaveResult.InvalidInput, connection.saveCredentials("", "secret-xyz"))
     assertNull(store.storedCredentials)
+  }
+
+  @Test
+  fun `a secure storage failure is visible and does not claim credentials were saved`() = runTest {
+    store.saveResult = CredentialSaveResult.StorageFailure
+    val connection = connectionReadingStoredCredentials()
+
+    val result = connection.saveCredentials("client-abc", "secret-xyz")
+
+    assertEquals(CredentialSaveResult.StorageFailure, result)
+    assertNull(store.storedCredentials)
+    assertTrue(connection.state.value is OuraConnectionState.Failed)
   }
 
   /** A login begun under the old credentials cannot be finished under the new ones. */

@@ -19,10 +19,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
@@ -93,8 +95,8 @@ fun OuraCard(
  */
 @Composable
 private fun CredentialsNeeded(onSave: (String, String) -> Unit) {
-  var clientId by rememberSaveable { mutableStateOf("") }
-  var clientSecret by rememberSaveable { mutableStateOf("") }
+  var clientId by remember { mutableStateOf("") }
+  var clientSecret by remember { mutableStateOf("") }
 
   Text(
     text = "Yhdistäminen vaatii Oura-sovelluksen tunnukset. Ne annetaan kerran, tässä.",
@@ -120,6 +122,8 @@ private fun CredentialsNeeded(onSave: (String, String) -> Unit) {
     modifier = Modifier.fillMaxWidth(),
     singleLine = true,
     label = { Text("Client ID") },
+    keyboardOptions =
+      KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
   )
   OutlinedTextField(
     value = clientSecret,
@@ -127,6 +131,8 @@ private fun CredentialsNeeded(onSave: (String, String) -> Unit) {
     modifier = Modifier.fillMaxWidth(),
     singleLine = true,
     label = { Text("Client Secret") },
+    keyboardOptions =
+      KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
     visualTransformation = PasswordVisualTransformation(),
   )
   Button(

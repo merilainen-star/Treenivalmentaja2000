@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
 import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,13 +65,17 @@ class IntervalsConnection internal constructor(
    * @return false when the field is blank, which is the only check possible here — whether the key
    *   is *valid* is a question only intervals.icu can answer, and [testKey] is how it is asked.
    */
-  suspend fun saveApiKey(key: String): Boolean =
+  suspend fun saveApiKey(key: String): CredentialSaveResult =
     mutex.withLock {
       val trimmed = key.trim()
-      if (trimmed.isEmpty()) return false
-      store.saveApiKey(trimmed)
-      _state.value = IntervalsConnectionState.Configured
-      return true
+      if (trimmed.isEmpty()) return CredentialSaveResult.InvalidInput
+      val result = store.saveApiKey(trimmed)
+      _state.value =
+        if (result == CredentialSaveResult.Success) IntervalsConnectionState.Configured
+        else IntervalsConnectionState.Failed(
+          "API-avainta ei voitu tallentaa turvallisesti. Tarkista laitteen suojaus ja yritä uudelleen."
+        )
+      return result
     }
 
   /**

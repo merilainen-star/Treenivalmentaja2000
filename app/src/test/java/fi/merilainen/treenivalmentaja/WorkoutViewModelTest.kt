@@ -1,5 +1,6 @@
 package fi.merilainen.treenivalmentaja
 
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler
@@ -9,6 +10,7 @@ import fi.merilainen.treenivalmentaja.data.guide.GuideProviders
 import fi.merilainen.treenivalmentaja.data.guide.GuideUnavailableException
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
+import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.oura.FakeOuraTokenStorage
 import fi.merilainen.treenivalmentaja.data.oura.OuraAuthService
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnection
@@ -25,12 +27,17 @@ import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
+import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -45,6 +52,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /**
  * The ViewModel's first tests.
@@ -65,6 +77,19 @@ class WorkoutViewModelTest {
 
   private lateinit var db: AppDatabase
   private lateinit var repository: TrainingRepository
+  private lateinit var clock: MutableClock
+
+  private class MutableClock(
+    var currentInstant: Instant,
+    private val currentZone: ZoneId,
+  ) : Clock() {
+    override fun getZone(): ZoneId = currentZone
+    override fun withZone(zone: ZoneId): Clock = Clock.fixed(currentInstant, zone)
+    override fun instant(): Instant = currentInstant
+    fun advance(duration: Duration) {
+      currentInstant = currentInstant.plus(duration)
+    }
+  }
 
   /** Answers with whatever the test set, and counts how often it was asked. */
   private class FakeProvider : ExerciseGuideProvider {
@@ -86,6 +111,7 @@ class WorkoutViewModelTest {
   @Before
   fun setUp() {
     Dispatchers.setMain(dispatcher)
+    clock = MutableClock(Instant.parse("2026-08-10T12:00:00Z"), ZoneId.of("UTC"))
     // Room runs its queries and transactions on its own executors by default, which are outside
     // the test scheduler: `advanceUntilIdle()` would return while a write was still in flight and
     // the assertions would read the database halfway through. Handing Room the test dispatcher
@@ -99,7 +125,7 @@ class WorkoutViewModelTest {
         .setTransactionExecutor(dispatcher.asExecutor())
         .allowMainThreadQueries()
         .build()
-    repository = TrainingRepository(db)
+    repository = TrainingRepository(db, clock)
   }
 
   @After
@@ -108,7 +134,9 @@ class WorkoutViewModelTest {
     Dispatchers.resetMain()
   }
 
-  private fun viewModel(): WorkoutViewModel {
+  private fun viewModel(
+    rolloverDispatcher: CoroutineDispatcher = Dispatchers.Default,
+  ): WorkoutViewModel {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     val settingsStore = NotificationSettingsStore(context)
     // Rescheduling reads DataStore, which lives outside the test scheduler; the alarm behaviour
@@ -130,7 +158,9 @@ class WorkoutViewModelTest {
       }
     return WorkoutViewModel(
       repository = repository,
-      engine = TrainingEngine(repository, rescheduleAlarmsUseCase = reschedule),
+      engine = TrainingEngine(repository, clock, reschedule),
+      clock = clock,
+      rolloverDispatcher = rolloverDispatcher,
       settingsStore = settingsStore,
       rescheduleAlarmsUseCase = reschedule,
       checkForUpdateUseCase =
@@ -160,6 +190,18 @@ class WorkoutViewModelTest {
           dao = db.ouraDao(),
         ),
     )
+  }
+
+  @Test
+  fun `refreshCurrentDate crosses midnight without recreating the ViewModel`() = runTest(dispatcher) {
+    val vm = viewModel()
+    advanceUntilIdle()
+    assertEquals(LocalDate.of(2026, 8, 10), vm.currentDate.value)
+
+    clock.advance(Duration.ofDays(1))
+    vm.refreshCurrentDate()
+
+    assertEquals(LocalDate.of(2026, 8, 11), vm.currentDate.value)
   }
 
   // ------------------------------------------------------------------ the guide sheet
@@ -333,6 +375,190 @@ class WorkoutViewModelTest {
 
     assertEquals(OuraConnectionState.NotConfigured, viewModel.ouraState.value)
     assertNull(viewModel.ouraAuthorizationUrl.value)
+  }
+
+  // ------------------------------------------------------------------ the date, and what hangs off it
+
+  /**
+   * The plan's timezone decides what "today" is, not the device clock's.
+   *
+   * 22:30 UTC is already the 11th in Helsinki. A ViewModel that read the device zone would call it
+   * the 10th and disagree with `TrainingEngine`, which resolves the same question against the plan
+   * — and the two disagreeing is how a session becomes missed on one screen and not on another.
+   */
+  @Test
+  fun `today comes from the active plan's zone, not the device clock's`() = runTest(dispatcher) {
+    clock.currentInstant = Instant.parse("2026-08-10T22:30:00Z")
+    repository.importPlan(PLAN)
+
+    val viewModel = viewModel()
+    advanceUntilIdle()
+
+    assertEquals(LocalDate.of(2026, 8, 11), viewModel.currentDate.value)
+  }
+
+  /**
+   * The regression the reactive date exists to prevent, asserted where it actually bit.
+   *
+   * `todayRecovery` used to bake `LocalDate.now()` into the Room query at construction, so a
+   * process alive across midnight kept showing yesterday's reading — on the one screen the app is
+   * opened in the morning to look at. This fails on the old code and passes on the new.
+   */
+  @Test
+  fun `today's recovery follows the date across midnight`() = runTest(dispatcher) {
+    clock.currentInstant = Instant.parse("2026-08-10T09:00:00Z")
+    repository.importPlan(PLAN)
+    db.ouraDao().upsertDailySummaries(
+      listOf(
+        OuraDailySummaryEntity(
+          date = "2026-08-10",
+          readinessScore = 55,
+          fetchedAtUtc = clock.millis(),
+        ),
+        OuraDailySummaryEntity(
+          date = "2026-08-11",
+          readinessScore = 88,
+          fetchedAtUtc = clock.millis(),
+        ),
+      )
+    )
+
+    val viewModel = viewModel()
+    // `stateIn(WhileSubscribed)` holds its initial value until something collects, so the flow has
+    // to be subscribed for this assertion to be about the query rather than about the default.
+    backgroundScope.launch { viewModel.todayRecovery.collect {} }
+    advanceUntilIdle()
+    assertEquals(55, viewModel.todayRecovery.value?.readiness)
+
+    clock.advance(Duration.ofDays(1))
+    viewModel.refreshCurrentDate()
+    advanceUntilIdle()
+
+    assertEquals(88, viewModel.todayRecovery.value?.readiness)
+  }
+
+  // ------------------------------------------------------------------ the missed-session proposal
+
+  /** Asking for a proposal is a pure read: the session it names must still be where it was. */
+  @Test
+  fun `checking for missed sessions writes nothing`() = runTest(dispatcher) {
+    clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
+    repository.importPlan(PLAN)
+
+    val viewModel = viewModel()
+    advanceUntilIdle()
+    viewModel.checkMissedSessions()
+    advanceUntilIdle()
+
+    assertTrue(viewModel.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
+    assertEquals("2026-08-10", repository.getSessions().single().scheduledDate)
+  }
+
+  /** Accepting moves the session once; the proposal is spent and a second tap cannot move it again. */
+  @Test
+  fun `accepting a proposal applies it exactly once`() = runTest(dispatcher) {
+    clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
+    repository.importPlan(PLAN)
+
+    val viewModel = viewModel()
+    advanceUntilIdle()
+    viewModel.checkMissedSessions()
+    advanceUntilIdle()
+    val proposal = viewModel.missedSessionsProposal.value as MissedSessionsProposal.MoveOne
+
+    viewModel.acceptMissedSessionsProposal()
+    advanceUntilIdle()
+    val afterFirst = repository.getSessions().single { it.status.isOpen }.scheduledDate
+    assertEquals(proposal.toDate.toString(), afterFirst)
+
+    // The card is gone, so there is nothing left to accept — and re-checking finds nothing either,
+    // because the session is no longer in the past.
+    assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
+    viewModel.checkMissedSessions()
+    advanceUntilIdle()
+    assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
+    assertEquals(afterFirst, repository.getSessions().single { it.status.isOpen }.scheduledDate)
+  }
+
+  /**
+   * "Ei nyt" survives leaving the screen, which is the only thing that makes it an answer.
+   *
+   * `checkMissedSessions()` runs on every resume of the Today screen. Without a memory of the
+   * refusal the card came straight back, so rejecting bought a few seconds of quiet — and the
+   * screen the app opens on would have asked the same question every time it was opened.
+   */
+  @Test
+  fun `a rejected proposal writes nothing and stays rejected for the rest of the day`() =
+    runTest(dispatcher) {
+      clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
+      repository.importPlan(PLAN)
+
+      val viewModel = viewModel()
+      advanceUntilIdle()
+      viewModel.checkMissedSessions()
+      advanceUntilIdle()
+
+      viewModel.rejectMissedSessionsProposal()
+      assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
+      assertEquals("2026-08-10", repository.getSessions().single().scheduledDate)
+
+      // What every later resume of the Today screen does.
+      viewModel.checkMissedSessions()
+      advanceUntilIdle()
+
+      assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
+    }
+
+  /** "Not today" and not "never": tomorrow is a new day, and the session is still in the past. */
+  @Test
+  fun `a refusal expires with the day it was given on`() = runTest(dispatcher) {
+    clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
+    repository.importPlan(PLAN)
+
+    val viewModel = viewModel()
+    advanceUntilIdle()
+    viewModel.checkMissedSessions()
+    advanceUntilIdle()
+    viewModel.rejectMissedSessionsProposal()
+
+    clock.advance(Duration.ofDays(1))
+    viewModel.refreshCurrentDate()
+    viewModel.checkMissedSessions()
+    advanceUntilIdle()
+
+    assertTrue(viewModel.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
+  }
+
+  /**
+   * The midnight rollover itself, driven rather than described.
+   *
+   * This is what the injectable rollover dispatcher exists for. The loop re-arms forever, so on the
+   * shared test dispatcher it would spin a fixed clock through the same midnight in every other
+   * test in this file; given its own dispatcher it can be advanced one deliberate step. Nothing
+   * calls `refreshCurrentDate()` here — the point is that the app left open on the Today screen
+   * turns the page by itself.
+   */
+  @Test
+  fun `the date turns at plan-zone midnight with no one touching the app`() = runTest(dispatcher) {
+    // 21:00 UTC is 00:00 in Helsinki, so midnight is one hour away in the plan's zone.
+    clock.currentInstant = Instant.parse("2026-08-12T20:00:00Z")
+    repository.importPlan(PLAN)
+    val rolloverDispatcher = StandardTestDispatcher(testScheduler)
+
+    val viewModel = viewModel(rolloverDispatcher)
+    // `advanceUntilIdle()` must not appear in this test. The rollover re-arms itself, and a clock
+    // that only moves when this test moves it would make "wait until there is nothing left to do"
+    // mean "recompute the same midnight forever". Every step here is bounded on purpose.
+    advanceTimeBy(Duration.ofMinutes(59).toMillis())
+    assertEquals(LocalDate.of(2026, 8, 12), viewModel.currentDate.value)
+
+    // The wall clock reaches midnight, and the coroutine that was waiting for it wakes.
+    clock.advance(Duration.ofHours(1))
+    advanceTimeBy(Duration.ofMinutes(2).toMillis())
+
+    assertEquals(LocalDate.of(2026, 8, 13), viewModel.currentDate.value)
+    // Re-armed for the *next* midnight, a day away, so nothing else fires while this test finishes.
+    viewModel.viewModelScope.coroutineContext.cancelChildren()
   }
 
   private companion object {

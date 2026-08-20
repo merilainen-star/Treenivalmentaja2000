@@ -22,6 +22,7 @@ import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuideRef
+import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
@@ -145,6 +146,20 @@ class ScreenScreenshotTest {
     @Test
     fun today_restDay() = capture("screen_today_rest_day") {
         TodayScreenContent(workouts = listOf(strength(1, "s-25")))
+    }
+
+    /** The calendar-changing decision must show its impact before either button can write it. */
+    @Test
+    fun today_missedSessionsProposal() = capture("screen_today_missed_proposal") {
+        TodayScreenContent(
+            workouts = listOf(strength(0, "s-25")),
+            missedSessionsProposal = MissedSessionsProposal.ShiftPlan(
+                missedSessionIds = listOf("s-23", "s-24"),
+                firstMissedDate = FIXED_TODAY.minusDays(3),
+                days = 3,
+                affectedSessions = 14,
+            ),
+        )
     }
 
     /**

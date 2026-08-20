@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
@@ -47,6 +48,7 @@ import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
+import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdviceUseCase
 import fi.merilainen.treenivalmentaja.domain.EventSource
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
@@ -54,18 +56,25 @@ import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
+import java.time.Clock
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /** What a screen needs to draw one session card. */
@@ -99,20 +108,7 @@ data class Workout(
    * and a description and left to guess how hard the session is meant to be.
    */
   val intensity: Intensity? = null,
-) {
-  val dayString: String
-    get() =
-      when (dayOffset) {
-        0 -> "Tänään"
-        1 -> "Huomenna"
-        2 -> "Keskiviikko"
-        3 -> "Torstai"
-        4 -> "Perjantai"
-        5 -> "Lauantai"
-        6 -> "Sunnuntai"
-        else -> "Päivä $dayOffset"
-      }
-}
+)
 
 // There was a RecoveryState here, with three readings and their advice. Nothing ever produced
 // anything but the middle one, so the Today screen showed the same verdict every day. It comes
@@ -138,6 +134,7 @@ data class PendingImportPrompt(
   val action: PendingImport,
 )
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class WorkoutViewModel(
   private val repository: TrainingRepository,
   private val engine: TrainingEngine,
@@ -160,12 +157,66 @@ class WorkoutViewModel(
   private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
+  /**
+   * **`systemDefaultZone`, not `systemUTC`** — and the difference is a bug, not a preference.
+   *
+   * Nothing in production passes a clock, so all three classes that must agree about "today" run on
+   * their defaults: this one, [TrainingEngine] and [TrainingRepository]. The other two default to
+   * the device zone. A UTC default here made this class disagree with both of them for the window
+   * between construction and the first emission of `observeActivePlanTimeZone` — which in Finland
+   * means the app briefly calls it yesterday between midnight and 03:00, and fires the first Room
+   * query for the wrong day. The plan's zone still wins once it arrives; this is only about what is
+   * true before it does.
+   */
+  private val clock: Clock = Clock.systemDefaultZone(),
+  /**
+   * Where the midnight rollover waits. Injectable **so that it can be tested at all**.
+   *
+   * It defaults to [Dispatchers.Default] rather than the ViewModel's main dispatcher on purpose: the
+   * loop below re-arms itself forever, so on a test dispatcher every existing test's
+   * `advanceUntilIdle()` would drive a fixed clock through the same midnight without end. Keeping
+   * the default off the test scheduler leaves those tests untouched, while a test that actually
+   * wants to watch a day turn can pass its own dispatcher and drive virtual time deliberately.
+   */
+  private val rolloverDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
+  private val _planZone = MutableStateFlow(clock.zone)
+  private val _currentDate = MutableStateFlow(LocalDate.now(clock))
+  val currentDate: StateFlow<LocalDate> = _currentDate.asStateFlow()
+  private var dateRolloverJob: Job? = null
+
+  /**
+   * Re-evaluates "today" without recreating the ViewModel.
+   *
+   * Screens call this on resume, and [scheduleDateRollover] also calls it at midnight while the app
+   * remains in the foreground. The active plan's zone is the authority: plan dates, reminders,
+   * matching windows and missed-session decisions must all agree even when the phone is travelling.
+   */
+  fun refreshCurrentDate() {
+    _currentDate.value = LocalDate.now(clock.withZone(_planZone.value))
+    scheduleDateRollover()
+  }
+
+  private fun scheduleDateRollover() {
+    dateRolloverJob?.cancel()
+    dateRolloverJob =
+      viewModelScope.launch(rolloverDispatcher) {
+        while (isActive) {
+          val zone = _planZone.value
+          val now = clock.instant()
+          val nextMidnight =
+            LocalDate.now(clock.withZone(zone)).plusDays(1).atStartOfDay(zone).toInstant()
+          delay(Duration.between(now, nextMidnight).toMillis().coerceAtLeast(1_000L))
+          _currentDate.value = LocalDate.now(clock.withZone(zone))
+        }
+      }
+  }
+
   val workouts: StateFlow<List<Workout>> =
-    repository
-      .observeSessions()
-      .map { sessions -> sessions.toWorkouts(LocalDate.now()) }
+    combine(repository.observeSessions(), currentDate) { sessions, today ->
+        sessions.toWorkouts(today)
+      }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
   val notificationSettings: StateFlow<NotificationSettings> =
@@ -196,8 +247,8 @@ class WorkoutViewModel(
    * a failed sync leaves this showing yesterday's truth rather than an error.
    */
   val todayRecovery: StateFlow<DailyRecovery?> =
-    ouraRepository
-      .observeDay(LocalDate.now())
+    currentDate
+      .flatMapLatest(ouraRepository::observeDay)
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
   /**
@@ -226,17 +277,19 @@ class WorkoutViewModel(
    * strength session, and without this it would simply disappear instead.
    */
   val unmatchedByDay: StateFlow<Map<LocalDate, List<CompletedSessionMetrics>>> =
-    ouraRepository
-      .observeUnmatchedByDay(
-        from = LocalDate.now().minusDays(CALENDAR_DAYS_BACK),
-        to = LocalDate.now().plusDays(1),
-        zone = ZoneId.systemDefault(),
-      )
+    combine(currentDate, _planZone) { today, zone -> today to zone }
+      .flatMapLatest { (today, zone) ->
+        ouraRepository.observeUnmatchedByDay(
+          from = today.minusDays(CALENDAR_DAYS_BACK),
+          to = today.plusDays(1),
+          zone = zone,
+        )
+      }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
   val unmatchedToday: StateFlow<List<CompletedSessionMetrics>> =
-    ouraRepository
-      .observeUnmatchedOn(LocalDate.now(), ZoneId.systemDefault())
+    combine(currentDate, _planZone) { today, zone -> today to zone }
+      .flatMapLatest { (today, zone) -> ouraRepository.observeUnmatchedOn(today, zone) }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
   /**
@@ -246,11 +299,13 @@ class WorkoutViewModel(
    * A day with no entry is a day Oura has never answered about, same as [todayRecovery]'s `null`.
    */
   val recoveryByDay: StateFlow<Map<LocalDate, DailyRecovery>> =
-    ouraRepository
-      .observeRecoveryRange(
-        from = LocalDate.now().minusDays(CALENDAR_DAYS_BACK),
-        to = LocalDate.now(),
-      )
+    currentDate
+      .flatMapLatest { today ->
+        ouraRepository.observeRecoveryRange(
+          from = today.minusDays(CALENDAR_DAYS_BACK),
+          to = today,
+        )
+      }
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
   /**
@@ -271,6 +326,12 @@ class WorkoutViewModel(
   private var guideExercise: Exercise? = null
 
   init {
+    viewModelScope.launch {
+      repository.observeActivePlanTimeZone().collect { zone ->
+        _planZone.value = zone
+        refreshCurrentDate()
+      }
+    }
     viewModelScope.launch {
       // Seeding only writes when the database is empty, so it cannot disturb an imported plan.
       repository.seedIfEmpty()
@@ -332,7 +393,7 @@ class WorkoutViewModel(
     if (_ouraSyncing.value) return
     viewModelScope.launch {
       _ouraSyncing.value = true
-      val today = LocalDate.now()
+      val today = currentDate.value
       _lastSyncFailure.value =
         when (val result = ouraRepository.sync(from = today.minusDays(SYNC_DAYS), to = today)) {
           is OuraSyncResult.Success -> null
@@ -351,8 +412,9 @@ class WorkoutViewModel(
    * already stored.
    */
   private suspend fun matchCompletedWorkouts(today: LocalDate) {
-    val from = today.minusDays(SYNC_DAYS).atStartOfDay(ZoneId.systemDefault()).toInstant()
-    val to = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    val zone = _planZone.value
+    val from = today.minusDays(SYNC_DAYS).atStartOfDay(zone).toInstant()
+    val to = today.plusDays(1).atStartOfDay(zone).toInstant()
     val earliest = today.minusDays(SYNC_DAYS)
     val sessions =
       repository
@@ -386,7 +448,7 @@ class WorkoutViewModel(
     viewModelScope.launch {
       _diagnostics.value = null
       _diagnosing.value = true
-      val today = LocalDate.now()
+      val today = currentDate.value
       _diagnostics.value = ouraRepository.diagnose(from = today.minusDays(SYNC_DAYS), to = today)
       _diagnosing.value = false
     }
@@ -425,7 +487,7 @@ class WorkoutViewModel(
   fun saveIntervalsApiKey(key: String) {
     val connection = intervalsConnection ?: return
     viewModelScope.launch {
-      if (connection.saveApiKey(key)) {
+      if (connection.saveApiKey(key) == CredentialSaveResult.Success) {
         // Tested immediately rather than at the next sync. A key pasted with a character missing
         // would otherwise look accepted and then quietly fetch nothing.
         connection.testKey()
@@ -465,14 +527,14 @@ class WorkoutViewModel(
     if (_intervalsSyncing.value) return
     viewModelScope.launch {
       _intervalsSyncing.value = true
-      val today = LocalDate.now()
+      val today = currentDate.value
       _intervalsSyncFailure.value =
         when (
           val result =
             repository.sync(
               from = today.minusDays(SYNC_DAYS),
               to = today,
-              zone = ZoneId.systemDefault(),
+              zone = _planZone.value,
             )
         ) {
           is IntervalsSyncResult.Success -> null
@@ -486,8 +548,9 @@ class WorkoutViewModel(
   /** The same pairing run the Oura workouts get, over the same window. */
   private suspend fun matchIntervalsActivities(today: LocalDate) {
     val intervalsRepository = intervalsRepository ?: return
-    val from = today.minusDays(SYNC_DAYS).atStartOfDay(ZoneId.systemDefault()).toInstant()
-    val to = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()
+    val zone = _planZone.value
+    val from = today.minusDays(SYNC_DAYS).atStartOfDay(zone).toInstant()
+    val to = today.plusDays(1).atStartOfDay(zone).toInstant()
     val earliest = today.minusDays(SYNC_DAYS)
     val sessions =
       repository
@@ -534,11 +597,11 @@ class WorkoutViewModel(
     viewModelScope.launch {
       _backfillProgress.value = 0
       _backfillResult.value = null
-      val today = LocalDate.now()
+      val today = currentDate.value
       val result =
         repository.backfill(
           today = today,
-          zone = ZoneId.systemDefault(),
+          zone = _planZone.value,
           onYearDone = { stored -> _backfillProgress.value = stored },
         )
       // Older activities have no planned sessions to belong to, so matching stays on its usual
@@ -588,7 +651,7 @@ class WorkoutViewModel(
     viewModelScope.launch {
       _rawLoading.value = true
       _rawError.value = null
-      val today = LocalDate.now()
+      val today = currentDate.value
       try {
         _rawResponse.value =
           repository.fetchRawActivities(from = today.minusDays(RAW_DAYS), to = today)
@@ -597,7 +660,7 @@ class WorkoutViewModel(
         _rawError.value = e.message
       }
       // Offered after the list has been fetched, so the picker is never empty for want of asking.
-      val zone = ZoneId.systemDefault()
+      val zone = _planZone.value
       _rawActivityRefs.value =
         repository.recentActivityRefs(
           fromUtc = today.minusDays(RAW_DAYS).atStartOfDay(zone).toInstant().toEpochMilli(),
@@ -656,13 +719,15 @@ class WorkoutViewModel(
   val readinessAdvice: StateFlow<ReadinessAdvice> =
     combine(
         repository.observeSessions(),
-        ouraRepository.observeRecoveryRange(
-          from = LocalDate.now().minusDays(ADVICE_DAYS_BACK),
-          to = LocalDate.now(),
-        ),
+        currentDate.flatMapLatest { today ->
+          ouraRepository.observeRecoveryRange(
+            from = today.minusDays(ADVICE_DAYS_BACK),
+            to = today,
+          )
+        },
         _dismissedAdviceFor,
-      ) { sessions, recovery, dismissedFor ->
-        val today = LocalDate.now()
+        currentDate,
+      ) { sessions, recovery, dismissedFor, today ->
         if (dismissedFor == today) ReadinessAdvice.None
         else readinessAdviceUseCase.execute(today, recovery, sessions)
       }
@@ -670,7 +735,7 @@ class WorkoutViewModel(
 
   /** "Ei nyt." Comes back tomorrow, deliberately. */
   fun dismissReadinessAdvice() {
-    _dismissedAdviceFor.value = LocalDate.now()
+    _dismissedAdviceFor.value = currentDate.value
   }
 
   /**
@@ -702,6 +767,11 @@ class WorkoutViewModel(
   val analysisConfigured: StateFlow<Set<AnalysisProvider>> =
     analysisConnection?.configured
       ?: MutableStateFlow<Set<AnalysisProvider>>(emptySet()).asStateFlow()
+
+  /** Provider whose last secure key write failed, if any. */
+  val analysisSaveFailure: StateFlow<AnalysisProvider?> =
+    analysisConnection?.saveFailure
+      ?: MutableStateFlow<AnalysisProvider?>(null).asStateFlow()
 
   /** Which model the next analysis will ask. Read fresh per request, not captured at launch. */
   val analysisModel: StateFlow<AnalysisModel> =
@@ -772,7 +842,7 @@ class WorkoutViewModel(
       // happens to do" is the reasoning that produced this bug in the first place.
       val session = repository.getSession(sessionId) ?: return@launch
       val date = runCatching { LocalDate.parse(session.scheduledDate) }.getOrNull() ?: return@launch
-      val offset = ChronoUnit.DAYS.between(LocalDate.now(), date).toInt()
+      val offset = ChronoUnit.DAYS.between(currentDate.value, date).toInt()
       // Decided from the same status and offset the button's visibility was, so the two cannot
       // disagree about what a session is.
       val kind = AiAnalysisAvailability.kindFor(session.status, offset) ?: return@launch
@@ -855,24 +925,46 @@ class WorkoutViewModel(
     }
   }
 
+  private val _missedSessionsProposal =
+    MutableStateFlow<MissedSessionsProposal>(MissedSessionsProposal.None)
+  val missedSessionsProposal: StateFlow<MissedSessionsProposal> =
+    _missedSessionsProposal.asStateFlow()
+
   /**
-   * Reschedules sessions that were not done. **Never called on startup** — see below.
+   * The day the user last said "not now", so that answer survives leaving the screen.
    *
-   * It used to run from `init`, which meant every launch, including the one right after an app
-   * update, rewrote the calendar. With a plan imported from a file whose dates had already
-   * passed, `TrainingEngine.handleMissedSessions` saw every past session as missed and applied
-   * its bulk-shift rule to all of them, moving the whole programme so that week 1 landed on
-   * today. An eight-week plan in its fourth week silently restarted from the beginning, and
-   * every session came back marked as moved.
+   * The same mechanism as [_dismissedAdviceFor], and here for the same reason. Without it,
+   * rejecting was worth nothing: [checkMissedSessions] runs on every resume of the Today screen, so
+   * the card came straight back the next time the screen was opened. A refusal the app forgets in
+   * seconds is not a refusal, it is a nag.
    *
-   * Installing a new build must not change what is in the calendar. Rescheduling is a training
-   * decision, so it needs a training decision to trigger it — this is left for an explicit
-   * action in the UI, which does not exist yet.
+   * Keyed by date rather than by proposal, so a *changed* situation does not get through on a
+   * technicality — if another session goes missed today, the answer for today still stands. It
+   * expires at the next plan-zone midnight, which is what makes this "not today" rather than
+   * "never".
    */
+  private val _missedProposalDismissedFor = MutableStateFlow<LocalDate?>(null)
+
+  /** Refreshes a read-only proposal. Calling this never writes the calendar. */
   fun checkMissedSessions() {
+    if (_missedProposalDismissedFor.value == currentDate.value) return
     viewModelScope.launch {
-      engine.handleMissedSessions()
+      _missedSessionsProposal.value = engine.proposeMissedSessions()
     }
+  }
+
+  /** Applies the preview the user saw; a stale or twice-accepted preview is rejected by the engine. */
+  fun acceptMissedSessionsProposal() {
+    val proposal = _missedSessionsProposal.value
+    if (proposal == MissedSessionsProposal.None) return
+    _missedSessionsProposal.value = MissedSessionsProposal.None
+    viewModelScope.launch { engine.applyMissedSessions(proposal) }
+  }
+
+  /** "Ei nyt." Writes nothing, and — unlike before — is still true when the screen is reopened. */
+  fun rejectMissedSessionsProposal() {
+    _missedProposalDismissedFor.value = currentDate.value
+    _missedSessionsProposal.value = MissedSessionsProposal.None
   }
 
   /** Opens the guide sheet for one movement and starts the lookup. */

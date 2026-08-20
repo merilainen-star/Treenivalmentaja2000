@@ -63,6 +63,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val backfillProgress by viewModel.backfillProgress.collectAsState()
     val backfillResult by viewModel.backfillResult.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
+    val analysisSaveFailure by viewModel.analysisSaveFailure.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
 
     /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
@@ -180,6 +181,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onIntervalsBackfill = viewModel::backfillIntervals,
         onDismissIntervalsBackfillResult = viewModel::dismissBackfillResult,
         analysisConfigured = analysisConfigured,
+        analysisSaveFailure = analysisSaveFailure,
         analysisModel = analysisModel,
         onSaveAnalysisApiKey = viewModel::saveAnalysisApiKey,
         onClearAnalysisApiKey = viewModel::clearAnalysisApiKey,
@@ -252,6 +254,7 @@ fun SettingsScreenContent(
     onIntervalsBackfill: () -> Unit = {},
     onDismissIntervalsBackfillResult: () -> Unit = {},
     analysisConfigured: Set<AnalysisProvider> = emptySet(),
+    analysisSaveFailure: AnalysisProvider? = null,
     analysisModel: AnalysisModel = AnalysisModel.DEFAULT,
     onSaveAnalysisApiKey: (AnalysisProvider, String) -> Unit = { _, _ -> },
     onClearAnalysisApiKey: (AnalysisProvider) -> Unit = {},
@@ -373,6 +376,7 @@ fun SettingsScreenContent(
 
         AnalysisCard(
             configured = analysisConfigured,
+            saveFailure = analysisSaveFailure,
             model = analysisModel,
             onModelChange = onAnalysisModelChange,
             onSaveApiKey = onSaveAnalysisApiKey,

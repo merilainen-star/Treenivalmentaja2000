@@ -1,6 +1,6 @@
 # Terms of Service — Treenivalmentaja
 
-**Last updated: 10 August 2026**
+**Last updated: 20 August 2026**
 
 Treenivalmentaja is a private, single-user Android training-companion app, built and installed by its
 author for their own use. It is not sold, not published to any app store, and not offered as a
@@ -10,8 +10,10 @@ they describe an application with one user rather than a product with customers.
 ## 1. What this software is
 
 A personal tool that keeps a training plan on a phone, reminds its user about sessions, and — with
-that user's explicit permission — reads their own Oura readiness, sleep and workout data to inform
-those sessions. The source code is public at
+that user's explicit permission — reads their own Oura readiness, sleep and workout data and
+intervals.icu activity data. It can send one workout and recent recovery readings to a
+user-selected AI provider for a read-only comment, but only after an explicit tap. The source code
+is public at
 <https://github.com/merilainen-star/Treenivalmentaja2000>.
 
 ## 2. Not medical or health advice
@@ -41,28 +43,35 @@ to authorise it against their own Oura account. Use of the Oura service and API 
 **Oura's own terms and privacy policy**, not by these terms. Access can be withdrawn at any time from
 Oura account settings, and from the app with "Katkaise Oura-yhteys".
 
-## 6. Data
+## 6. AI analysis
 
-See the [Privacy Policy](PRIVACY.md). In short: the app has no backend, it sends no personal or
-health data anywhere except to Oura's own API, and everything it stores stays on the device until
-deleted.
+AI output may be inaccurate, incomplete or inappropriate and is not medical or professional
+coaching advice. The user chooses the provider (Anthropic, OpenAI or Google), supplies their own API
+key and pays any provider charges. Each provider's own terms and privacy policy govern that request.
+AI output never modifies the training plan and is not stored by the app.
 
-## 7. Acceptable use
+## 7. Data
+
+See the [Privacy Policy](PRIVACY.md). In short: the app has no backend and sends data only to the
+services named in that policy. AI data is sent only on an explicit analysis request. Automatic
+Android backup and device transfer are disabled.
+
+## 8. Acceptable use
 
 The app is intended for its author's personal use with their own Oura account and their own training
 data. It must not be used to access anyone else's Oura account.
 
-## 8. Licence and source
+## 9. Licence and source
 
 The source code is public and may be read. Any reuse is subject to the repository's licence terms,
 where present. Third-party exercise data shown in the app belongs to its sources and is credited in
 the app: ExerciseDB (attribution required) and wger (CC-BY-SA).
 
-## 9. Changes and termination
+## 10. Changes and termination
 
 These terms may change; the file's history in the public repository is the record. The author may
 stop developing, publishing or using the app at any time, without notice.
 
-## 10. Contact
+## 11. Contact
 
 merilainen@gmail.com

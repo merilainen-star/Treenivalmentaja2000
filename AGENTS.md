@@ -18,7 +18,28 @@ Begin every completion report with the line: `AGENTS.md luettu (v4)`
   build. Editing the JSON by hand is always the wrong fix.
 - **Do not undo previous fixes.** Before touching resources, dependencies, or build config,
   check `git log -- <path>` for recent deliberate changes. Re-introducing something that was
-  removed on purpose is a regression, not a feature.
+  removed on purpose is a regression, not a feature. **The reverse counts too**, and it is the one
+  that slips through review: deleting a defensive line whose stated reason no longer fully applies.
+  A line usually does two jobs. `apiKey = ""` in `AnalysisCard` guarded against saved-instance state
+  *and* against a plaintext key sitting in composition; moving the field to `remember` retired the
+  first job only, and the line went with it. **If you remove something deliberate, say so in the
+  report, with the reason** — a diff that quietly loses a guard reads as a refactor.
+- **A stale measured number is fixed by measuring again, never by deleting the measurement.**
+  `PROJECT_STATUS.md` is append-only history: add a new "Last verified build" block, leave the old
+  reasoning under "Measurement history". It was once deleted wholesale — 392 lines — to resolve a
+  complaint that its numbers were out of date, taking the APK-measurement methodology with it.
+  Documentation that records how a figure was obtained is worth more than the figure.
+- **Defaults that decide "today" must agree across every class that has one.** `TrainingEngine`,
+  `TrainingRepository` and `WorkoutViewModel` each take a `Clock`, production passes none of them
+  one, and so each runs on its default. They must therefore all default to
+  `Clock.systemDefaultZone()`; a `Clock.systemUTC()` default in one of them made that class call it
+  yesterday between midnight and 03:00 Finnish time while the other two disagreed. The active
+  plan's zone is the authority once it has loaded — this rule is about what is true before it does.
+- **A mechanism that cannot be reached by a test is not finished.** If a coroutine must run off the
+  test scheduler — the midnight rollover re-arms forever and would spin a fixed clock in every
+  existing test's `advanceUntilIdle()` — then inject the dispatcher rather than hard-coding
+  `Dispatchers.Default`. Defaulting to the real dispatcher keeps existing tests untouched; the seam
+  is what lets one test drive virtual time deliberately.
 - **Stay in scope.** Do not change product or visual design while fixing tests or
   refactoring. Cosmetic changes belong in their own commit, proposed first.
 - **Throwaway scripts stay out of the repo.** Patch and migration helper scripts go in

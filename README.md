@@ -1,7 +1,11 @@
 # Treenivalmentaja
 
 ## Product Summary
-Treenivalmentaja is an Android application designed to manage a progressive training programme. It aims to replace calendar events with actionable Android training notifications. Users can start, complete, skip, lighten, reschedule, or pause sessions due to illness. The app will adapt the remaining programme when sessions are missed and will integrate with the Oura API V2 to retrieve recovery, sleep, activity, and workout data. A local deterministic rule engine acts as the default scheduler, with future support for an optional remote AI service for proposed plan changes. 
+Treenivalmentaja is an Android application for managing a progressive training programme with
+actionable notifications. Users can complete, skip, lighten, reschedule or pause sessions. When a
+session is missed, the deterministic engine previews the resulting calendar change and applies it
+only after approval. Oura and intervals.icu supply recovery and workout data; optional, on-demand
+AI analysis comments on one workout but never changes the plan.
 
 ## Current Implementation Status
 **Status:** MVP Prototype
@@ -9,12 +13,12 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 **Implemented:**
 - Jetpack Compose UI (Today, Week and Settings) with bottom-tab navigation; a Week row expands to
   show what that session is
-- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 5
+- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 12
   with tested migrations
 - Session state machine with an append-only event history
 - Training plan JSON import (file + clipboard) with validation and duplicate detection
-- Deterministic training engine: missed sessions, plan shifting, illness pause and the graduated
-  return
+- Deterministic training engine: user-approved missed-session proposals, plan shifting, illness
+  pause and the graduated return
 - AlarmManager reminders with a 7-day window, restored after reboot, reinstall and timezone change
 - Exercises shown as the plan wrote them, with loads, per-set ramps and clocks for timed movements
 - Exercise guides: tap a movement for an animation and instructions from ExerciseDB or wger,
@@ -28,13 +32,15 @@ Treenivalmentaja is an Android application designed to manage a progressive trai
 - A morning question when readiness was poor and a session went undone: shift the programme, or
   start lighter. Asked from a measurement, never acted on by itself
   ([docs](docs/TRAINING_ENGINE.md#readiness-advice--asking-never-acting))
+- Optional read-only AI analysis from Anthropic, OpenAI or Google, requested per workout with the
+  user's own API key; the exact prompt is visible and no analysis is stored
 - A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
 - Rolling test APK built by GitHub Actions, with an in-app check for whether the build is current
 - App icon and splash screen
 
 **Planned / Missing:**
-- Remote AI advisor. Planned in four phases, Strava first — see
-  [ROADMAP.md](docs/ROADMAP.md#next-milestone).
+- AI-proposed plan changes with explicit approval. Read-only workout analysis is already built;
+  autonomous plan modification is not — see [ROADMAP.md](docs/ROADMAP.md#next-milestone).
 - Acting on readiness beyond the morning question below — chronic load, multi-week adjustment,
   and anything needing judgement rather than a rule.
 

@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 10 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 12 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -307,7 +307,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-`app/schemas/` holds `3.json` through `10.json`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `12.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

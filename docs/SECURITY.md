@@ -4,11 +4,11 @@
 The app handles personal health data and training schedules. Threats include unauthorized access to biometric data, leakage of API keys, and unauthorized modification of the training schedule.
 
 ## Secret Management
-- **Rule:** Client secrets (Oura client secret, API keys for AI) must **never** be hardcoded in the
+- **Rule:** Client secrets (Oura client secret, intervals.icu and AI API keys) must **never** be hardcoded in the
   Android source code or committed to version control.
-- **Implementation:** all configuration, including the Oura client secret, lives in a git-ignored
-  `.env` at the repository root and is injected into `BuildConfig` by the Secrets Gradle Plugin.
-  `.env.example` documents the keys with placeholders only.
+- **Implementation:** credentials are entered in Settings and encrypted on the device. A
+  git-ignored `.env`/`BuildConfig` value remains only as an optional Oura fallback for local builds;
+  published test builds do not contain it. `.env.example` contains placeholders only.
 - **The Oura client secret is no longer in the APK.** It is typed into Settings and stored
   encrypted on the device
   ([ADR-009](DECISIONS.md#adr-009-the-oura-client-credentials-are-entered-in-the-app-not-compiled-into-it)),
@@ -22,6 +22,12 @@ The app handles personal health data and training schedules. Threats include una
   provider so clearing one key cannot touch another, and so a key pasted into the wrong field cannot
   authenticate somewhere it was not meant to. None is redisplayed once saved, and none is logged.
   These are further instances of the entered-at-run-time mechanism, not new mechanisms.
+- Credential fields use ordinary in-memory Compose state, password keyboards and disabled
+  autocorrection, so secrets do not enter Android saved-instance state. A Keystore or preferences
+  write returns a typed failure; connection/configuration state changes only after a successful
+  write and otherwise shows an error. **The field is also wiped once the key is stored**, so the
+  plaintext does not sit in composition for as long as the card is on screen — and only then, so a
+  failed write leaves the key in place to retry rather than demanding it be pasted again.
 - **Gemini's key travels in the `x-goog-api-key` header, never the `?key=` query parameter** that
   Google's own examples show. Both authenticate; only one keeps the secret out of proxy logs, crash
   reports and `Referer` headers. `AnalysisClientTest` asserts the header form rather than trusting
@@ -41,6 +47,8 @@ The app handles personal health data and training schedules. Threats include una
   under a non-extractable Android Keystore key
   ([ADR-008](DECISIONS.md#adr-008-android-keystore-directly-rather-than-encryptedsharedpreferences)).
   They are excluded from cloud backup and device transfer.
+- The application opts out of Android backup and device transfer entirely. XML exclusions also
+  name the Room database, DataStore and every credential file as defence in depth.
 - OAuth `state` validation prevents Cross-Site Request Forgery (CSRF). The check happens **before**
   the authorization code is read, so a redirect carrying a valid-looking code but the wrong state
   never reaches the token endpoint.
@@ -77,7 +85,8 @@ The app handles personal health data and training schedules. Threats include una
 There is none. The MVP has no server-side component, no Firebase project, and no remote token
 store, so there is no backend to secure, no service account to leak, and no Firestore rules to get
 wrong ([ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)). The trade-off is that the
-client secret lives in the APK — see "Secret Management" above.
+OAuth exchange and provider calls happen in the app; a local build that opts into the Oura
+`BuildConfig` fallback carries that secret in its APK — see "Secret Management" above.
 
 ## User Data Deletion & Privacy
 - Biometric data is strictly minimized. The app only requests scopes needed for scheduling (readiness, sleep, workouts).
@@ -105,6 +114,9 @@ client secret lives in the APK — see "Secret Management" above.
 - The app cannot revoke its own access, because the Oura specification documents no revoke
   endpoint. Disconnecting deletes everything locally; revoking the application is done from Oura's
   account settings.
-- The Room database is not encrypted (no SQLCipher). Contents are protected only by the Android
-  app sandbox. Accepted for a private single-user build; revisit alongside ADR-006.
-- The client secret ships in the APK — see "Secret Management".
+- The Room database is not encrypted (no SQLCipher). Contents are protected by the Android app
+  sandbox and cannot enter Android backup or device transfer. Accepted for a private single-user
+  build; physical access to a rooted/unlocked device remains outside this boundary and should be
+  revisited if distribution expands beyond the owner.
+- A local build can opt into compiling the Oura client secret into the APK. Published test builds
+  leave that fallback empty — see "Secret Management".

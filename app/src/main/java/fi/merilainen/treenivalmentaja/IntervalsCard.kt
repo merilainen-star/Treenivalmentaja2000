@@ -19,10 +19,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
@@ -151,7 +153,7 @@ private fun RawDataEntry(onOpen: () -> Unit) {
  */
 @Composable
 private fun KeyNeeded(onSave: (String) -> Unit) {
-  var apiKey by rememberSaveable { mutableStateOf("") }
+  var apiKey by remember { mutableStateOf("") }
 
   Text(
     text =
@@ -177,6 +179,8 @@ private fun KeyNeeded(onSave: (String) -> Unit) {
     modifier = Modifier.fillMaxWidth(),
     singleLine = true,
     label = { Text("API Key") },
+    keyboardOptions =
+      KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
     visualTransformation = PasswordVisualTransformation(),
   )
   Button(

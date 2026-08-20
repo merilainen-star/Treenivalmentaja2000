@@ -1,7 +1,9 @@
 # Privacy Policy — Treenivalmentaja
 
-**Last updated: 17 August 2026** *(revised: an optional **AI analysis** feature. When you tap
-"AI-analyysi" on a workout, that workout's data and your recent recovery readings are sent to the
+**Last updated: 20 August 2026** *(revised: automatic Android backup and device transfer are now
+disabled for the entire app, including the Room training/health database, settings and all
+credentials. In the optional **AI analysis** feature, data is sent only when you tap
+"AI-analyysi" on a workout: that workout's data and your recent recovery readings go to the
 **AI provider you selected** — Anthropic, OpenAI or Google. This is the first time any health data
 leaves your device for anything other than the service it came from, so read "What leaves your
 device" below. The same revision starts reading your **nightly HRV and resting heart rate** from
@@ -49,6 +51,10 @@ of them, and a key stored for a provider you are not using is never sent anywher
 - **App settings**, such as reminder times.
 
 All of it is stored inside the app's private storage, protected by the Android application sandbox.
+The app opts out of Android cloud backup and device-to-device transfer. Moving to a new device
+therefore requires setting up the app and importing a plan again; health caches and settings are
+not restored silently. The Room database is not encrypted with SQLCipher: for this private app the
+chosen boundary is Android's app sandbox plus the complete backup opt-out.
 
 ## What leaves your device, and where it goes
 

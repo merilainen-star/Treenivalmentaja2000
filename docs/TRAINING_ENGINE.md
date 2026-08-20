@@ -123,8 +123,20 @@ later be completed or skipped.
   - Resumes normal plan shifted by the total sick days.
 
 ### Missed Sessions Handling
-- **One missed session:** Usually ignored or shifted to the next rest day.
-- **Two or three missed sessions:** The engine shifts the entire plan forward or rebuilds the current week to prioritize key workouts (e.g., long run, heavy lift).
+- **One missed session:** propose moving it to the next day with no open session.
+- **Two or more missed sessions:** propose shifting every open session forward so the first missed
+  session lands on today; spacing is preserved.
+- Opening or resuming Today computes only a preview. The card states the source/target date or the
+  shift and affected count. Room changes only after **Hyväksy siirto**; **Hylkää** writes nothing.
+  Before applying, the engine recomputes the proposal under a mutex, so a stale or double-accepted
+  proposal cannot move the calendar twice. This flow requires neither Oura nor a recovery reading.
+- **Hylkää is remembered for the rest of the day**, keyed by the plan-zone date — the same
+  mechanism the readiness card uses. It has to be: the preview is recomputed on every resume of the
+  Today screen, which is the app's start destination, so without a memory of the refusal the card
+  returned every single time the screen was opened. Keyed by *date* rather than by proposal, so a
+  second session going missed later the same day does not get past the answer already given; the
+  question comes back at the next plan-zone midnight, which makes it "not today" rather than
+  "never".
 
 ### Matching imported workouts
 

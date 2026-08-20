@@ -3,15 +3,9 @@ package fi.merilainen.treenivalmentaja.data.oura
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import java.security.GeneralSecurityException
-import java.security.KeyStore
-import java.util.Base64
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
+import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
+import fi.merilainen.treenivalmentaja.data.security.EncryptionResult
+import fi.merilainen.treenivalmentaja.data.security.KeystoreCipher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,13 +22,13 @@ internal interface OuraTokenStorage {
 
   suspend fun load(): OuraTokens?
 
-  suspend fun save(tokens: OuraTokens)
+  suspend fun save(tokens: OuraTokens): CredentialSaveResult
 
   suspend fun clear()
 
   suspend fun hasTokens(): Boolean = load() != null
 
-  suspend fun savePending(codeVerifier: String, state: String)
+  suspend fun savePending(codeVerifier: String, state: String): CredentialSaveResult
 
   suspend fun pendingVerifier(): String?
 
@@ -50,7 +44,7 @@ internal interface OuraTokenStorage {
    */
   suspend fun credentials(): OuraCredentials?
 
-  suspend fun saveCredentials(credentials: OuraCredentials)
+  suspend fun saveCredentials(credentials: OuraCredentials): CredentialSaveResult
 
   suspend fun clearCredentials()
 }
@@ -80,31 +74,33 @@ internal class OuraTokenStore(context: Context) : OuraTokenStorage {
 
   private val prefs: SharedPreferences =
     context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+  private val cipher = KeystoreCipher(ALIAS)
 
   /** `null` when Oura has never been connected, or the stored bytes can no longer be read. */
   override suspend fun load(): OuraTokens? =
     withContext(Dispatchers.IO) {
-      val access = decrypt(prefs.getString(KEY_ACCESS, null)) ?: return@withContext null
+      val access = cipher.decrypt(prefs.getString(KEY_ACCESS, null)) ?: return@withContext null
       OuraTokens(
         accessToken = access,
-        refreshToken = decrypt(prefs.getString(KEY_REFRESH, null)),
+        refreshToken = cipher.decrypt(prefs.getString(KEY_REFRESH, null)),
         expiresAtUtc = prefs.getLong(KEY_EXPIRES_AT, OuraTokens.UNKNOWN_EXPIRY),
       )
     }
 
-  override suspend fun save(tokens: OuraTokens) {
+  override suspend fun save(tokens: OuraTokens): CredentialSaveResult =
     withContext(Dispatchers.IO) {
-      val access = encrypt(tokens.accessToken) ?: return@withContext
-      prefs.edit(commit = true) {
-        putString(KEY_ACCESS, access)
-        // Removed rather than left behind: a connection that came back without a refresh token
-        // must not keep the previous one, which belongs to a login that is over.
-        val refresh = tokens.refreshToken?.let { encrypt(it) }
-        if (refresh != null) putString(KEY_REFRESH, refresh) else remove(KEY_REFRESH)
-        putLong(KEY_EXPIRES_AT, tokens.expiresAtUtc)
-      }
+      val access = (cipher.encrypt(tokens.accessToken) as? EncryptionResult.Success)?.encoded
+        ?: return@withContext CredentialSaveResult.StorageFailure
+      val refresh =
+        tokens.refreshToken?.let {
+          (cipher.encrypt(it) as? EncryptionResult.Success)?.encoded
+            ?: return@withContext CredentialSaveResult.StorageFailure
+        }
+      val editor =
+        prefs.edit().putString(KEY_ACCESS, access).putLong(KEY_EXPIRES_AT, tokens.expiresAtUtc)
+      if (refresh != null) editor.putString(KEY_REFRESH, refresh) else editor.remove(KEY_REFRESH)
+      if (editor.commit()) CredentialSaveResult.Success else CredentialSaveResult.StorageFailure
     }
-  }
 
   /**
    * The tokens and any half-finished authorization — **not** the client credentials.
@@ -141,18 +137,19 @@ internal class OuraTokenStore(context: Context) : OuraTokenStorage {
    * failed exchange. Encrypted with the same key: the verifier is the secret half of PKCE, and
    * writing it in the clear would undo the point of using PKCE at all.
    */
-  override suspend fun savePending(codeVerifier: String, state: String) {
+  override suspend fun savePending(
+    codeVerifier: String,
+    state: String,
+  ): CredentialSaveResult =
     withContext(Dispatchers.IO) {
-      val verifier = encrypt(codeVerifier) ?: return@withContext
-      prefs.edit(commit = true) {
-        putString(KEY_VERIFIER, verifier)
-        putString(KEY_STATE, state)
-      }
+      val verifier = (cipher.encrypt(codeVerifier) as? EncryptionResult.Success)?.encoded
+        ?: return@withContext CredentialSaveResult.StorageFailure
+      val saved = prefs.edit().putString(KEY_VERIFIER, verifier).putString(KEY_STATE, state).commit()
+      if (saved) CredentialSaveResult.Success else CredentialSaveResult.StorageFailure
     }
-  }
 
   override suspend fun pendingVerifier(): String? =
-    withContext(Dispatchers.IO) { decrypt(prefs.getString(KEY_VERIFIER, null)) }
+    withContext(Dispatchers.IO) { cipher.decrypt(prefs.getString(KEY_VERIFIER, null)) }
 
   override suspend fun pendingState(): String? =
     withContext(Dispatchers.IO) { prefs.getString(KEY_STATE, null) }
@@ -161,21 +158,21 @@ internal class OuraTokenStore(context: Context) : OuraTokenStorage {
 
   override suspend fun credentials(): OuraCredentials? =
     withContext(Dispatchers.IO) {
-      val id = decrypt(prefs.getString(KEY_CLIENT_ID, null)) ?: return@withContext null
-      val secret = decrypt(prefs.getString(KEY_CLIENT_SECRET, null)) ?: return@withContext null
+      val id = cipher.decrypt(prefs.getString(KEY_CLIENT_ID, null)) ?: return@withContext null
+      val secret = cipher.decrypt(prefs.getString(KEY_CLIENT_SECRET, null)) ?: return@withContext null
       OuraCredentials(clientId = id, clientSecret = secret)
     }
 
-  override suspend fun saveCredentials(credentials: OuraCredentials) {
+  override suspend fun saveCredentials(credentials: OuraCredentials): CredentialSaveResult =
     withContext(Dispatchers.IO) {
-      val id = encrypt(credentials.clientId) ?: return@withContext
-      val secret = encrypt(credentials.clientSecret) ?: return@withContext
-      prefs.edit(commit = true) {
-        putString(KEY_CLIENT_ID, id)
-        putString(KEY_CLIENT_SECRET, secret)
-      }
+      val id = (cipher.encrypt(credentials.clientId) as? EncryptionResult.Success)?.encoded
+        ?: return@withContext CredentialSaveResult.StorageFailure
+      val secret = (cipher.encrypt(credentials.clientSecret) as? EncryptionResult.Success)?.encoded
+        ?: return@withContext CredentialSaveResult.StorageFailure
+      val saved =
+        prefs.edit().putString(KEY_CLIENT_ID, id).putString(KEY_CLIENT_SECRET, secret).commit()
+      if (saved) CredentialSaveResult.Success else CredentialSaveResult.StorageFailure
     }
-  }
 
   override suspend fun clearCredentials() {
     withContext(Dispatchers.IO) {
@@ -196,83 +193,10 @@ internal class OuraTokenStore(context: Context) : OuraTokenStorage {
     }
   }
 
-  // ------------------------------------------------------------------ crypto
-
-  private fun encrypt(plain: String): String? =
-    try {
-      val cipher = Cipher.getInstance(TRANSFORMATION)
-      cipher.init(Cipher.ENCRYPT_MODE, secretKey())
-      val encrypted = cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
-      val iv = cipher.iv
-      // [iv length][iv][ciphertext]: GCM's nonce is 12 bytes here, but the length is written down
-      // rather than assumed, so a future provider choosing differently does not silently corrupt.
-      val packed = ByteArray(1 + iv.size + encrypted.size)
-      packed[0] = iv.size.toByte()
-      iv.copyInto(packed, 1)
-      encrypted.copyInto(packed, 1 + iv.size)
-      Base64.getEncoder().encodeToString(packed)
-    } catch (e: GeneralSecurityException) {
-      null
-    }
-
-  /**
-   * `null` for anything that cannot be read back, and that is a deliberate outcome rather than a
-   * swallowed error: a Keystore key is gone after a factory reset, a restored backup, or the screen
-   * lock being removed on some devices. The honest reading of "the tokens cannot be decrypted" is
-   * "Oura is not connected", which asks the user to connect again — not a crash on startup.
-   */
-  private fun decrypt(stored: String?): String? {
-    if (stored.isNullOrEmpty()) return null
-    return try {
-      val packed = Base64.getDecoder().decode(stored)
-      val ivSize = packed[0].toInt()
-      if (ivSize <= 0 || packed.size <= 1 + ivSize) return null
-      val iv = packed.copyOfRange(1, 1 + ivSize)
-      val encrypted = packed.copyOfRange(1 + ivSize, packed.size)
-      val cipher = Cipher.getInstance(TRANSFORMATION)
-      cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(TAG_BITS, iv))
-      String(cipher.doFinal(encrypted), Charsets.UTF_8)
-    } catch (e: GeneralSecurityException) {
-      null
-    } catch (e: IllegalArgumentException) {
-      // Not base64 at all.
-      null
-    }
-  }
-
-  private fun secretKey(): SecretKey {
-    val keyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
-    (keyStore.getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.let {
-      return it.secretKey
-    }
-    val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)
-    generator.init(
-      KeyGenParameterSpec.Builder(
-          ALIAS,
-          KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-        )
-        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-        .setKeySize(256)
-        // Deliberately not requiring user authentication: reminders and a background sync have to
-        // work with the phone in a pocket, and a token the app cannot read while locked would make
-        // both impossible.
-        .setUserAuthenticationRequired(false)
-        .build()
-    )
-    return generator.generateKey()
-  }
-
   private companion object {
     const val FILE = "oura_tokens"
 
-    const val PROVIDER = "AndroidKeyStore"
-
     const val ALIAS = "treenivalmentaja.oura.tokens"
-
-    const val TRANSFORMATION = "AES/GCM/NoPadding"
-
-    const val TAG_BITS = 128
 
     const val KEY_ACCESS = "access_token"
     const val KEY_REFRESH = "refresh_token"

@@ -9,7 +9,7 @@ Individuals following a progressive training programme who want an adaptive, con
 ## Product Goals
 - Replace static calendar events with actionable Android training notifications.
 - Provide a flexible engine to easily complete, skip, reschedule, or lighten workouts.
-- Automatically adapt the training plan based on missed sessions or illness.
+- Propose deterministic adaptations for missed sessions and apply them only after user approval.
 - Utilize physiological data (recovery, sleep, activity) to inform training decisions.
 
 ## Primary User Journeys
@@ -27,8 +27,8 @@ Individuals following a progressive training programme who want an adaptive, con
   (implemented — see [INTERVALS_SETUP.md](INTERVALS_SETUP.md)).
 - Match imported Oura workouts to planned sessions (implemented — same day, nearest in time, and
   the activity must fit; a match attaches Oura's numbers and does not complete the session).
-- Import/Export training plans (JSON Treenivalmentaja Schema v1).
-- Generate exact Android notifications via AlarmManager.
+- Import training plans (JSON Treenivalmentaja Schema v1).
+- Generate actionable inexact Android notifications via AlarmManager.
 
 ## Non-Functional Requirements
 - **Offline First:** All core scheduling, rescheduling, and notifications must work offline.
@@ -40,17 +40,18 @@ Individuals following a progressive training programme who want an adaptive, con
   design contradicts; what it was protecting against was a secret in the source or in the APK, and
   that still holds.
 - **Performance:** UI must be responsive, relying on local Room database.
-- **Localization:** Finnish is the default UI language. Timezone defaults to Europe/Helsinki.
+- **Localization:** Finnish is the default UI language. Each plan carries its own IANA timezone;
+  plan days, matching and missed-session decisions use it even while the device is travelling.
 
 ## MVP Scope
 - UI for Today and Week views (implemented, backed by Room — the mock data is gone).
 - Local deterministic rule engine for rescheduling (implemented in `TrainingEngine`).
 - Manual completion/skipping of workouts (implemented, persisted in Room with an event log).
-- Local Room storage (implemented, schema version 5).
+- Local Room storage (implemented, schema version 12).
 - Android AlarmManager notifications (implemented).
 
 ## Excluded Scope (Out of MVP)
-- Remote AI advisor (Planned for future).
+- AI-proposed plan changes (planned; read-only per-workout AI analysis is implemented).
 - Complex analytics dashboards.
 - Direct integration with Garmin/Polar (reliant on Oura and intervals.icu pass-through).
 
