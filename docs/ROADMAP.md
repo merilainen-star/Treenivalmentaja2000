@@ -110,12 +110,14 @@ almost nothing to say about the sessions that matter most.
    change carries an author in the event log. A day the ring was not worn produces nothing — see
    [TRAINING_ENGINE.md](TRAINING_ENGINE.md#readiness-advice--asking-never-acting). This is the
    first point where the readiness number reaches the plan at all.
-3. **Easy-run drift, deterministic (Phase A′)** — designed 2026-08-16, not yet built. No AI, and
-   unusually for a rule here, **no engine operation either**: it changes nothing about the plan and
-   so needs none.
+3. ~~**Easy-run drift, deterministic (Phase A′)**~~ — designed 2026-08-16, built 2026-08-21. No AI,
+   and unusually for a rule here, **no engine operation either**: it changes nothing about the plan
+   and so needed none. `EasyRunDriftUseCase` is a pure function of the stored sessions and what the
+   watch measured for the completed ones, and `EasyRunDriftCard` is the only card in the app with
+   no action button under it.
 
-   *What it detects.* Not one hard easy run — that is a Tuesday, a hill, a headwind. Three in a
-   row is a finding: base training stops being base training, and the next hard session arrives on
+   *What it detects.* Not one hard easy run — that is a Tuesday, a hill, a headwind. Three in a row
+   is a finding: base training stops being base training, and the next hard session arrives on
    tired legs.
 
    *The measure is `icu_intensity`, not `icu_training_load`.* Load grows with duration, so a long
@@ -124,11 +126,11 @@ almost nothing to say about the sessions that matter most.
    "was this hard", which is the question.
 
    *The baseline is the athlete's own history, not a fixed band.* Writing "easy means under 75 % of
-   threshold" would put invented physiology in the code, which is what this project has avoided
-   everywhere else — `DailyRecovery.readinessLabel` shares Oura's own bands rather than inventing a
-   second opinion. The comparison is instead against the median of the athlete's own comparable
-   runs, which is self-calibrating, needs no invented number, and states a claim the person can
-   check for themselves.
+   threshold" would put invented physiology in the code, which this project has avoided everywhere
+   else — `DailyRecovery.readinessLabel` shares Oura's own bands rather than inventing a second
+   opinion. The comparison is instead against the median of the athlete's own comparable runs,
+   which is self-calibrating, needs no invented number, and states a claim the person can check for
+   themselves.
 
    *The rule, in one sentence:* the three most recent completed sessions of the same `WorkoutType`
    **and** the same planned `intensity` were each above the median intensity of all comparable
@@ -136,19 +138,29 @@ almost nothing to say about the sessions that matter most.
    silence, on the same discipline as the readiness rule: no measurement, no advice.
 
    *What it does.* A card on the morning a matching easy session is scheduled, saying that the last
-   three were run harder than usual and that this one is meant to be easy. It offers no button,
-   because there is nothing to change: the sessions in question are already done, and lightening a
-   session that is supposed to be easy is incoherent. The useful thing is the reminder arriving
-   before the run rather than a plan edit after it.
+   three were run harder than usual and that this one is meant to be easy. It offers no plan
+   button, because there is nothing to change: the sessions in question are already done, and
+   lightening a session that is supposed to be easy is incoherent. The one control puts the card
+   away for the day. The useful thing is the reminder arriving before the run rather than a plan
+   edit after it.
 
-   *What it needs that exists:* the plan's `intensity` (already in Plan Schema v1 and stored) and
-   `CompletedRunMetrics.intensityPercent` (stored since schema v9). Nothing new to fetch.
-   Activities synced before v9 carry no intensity and are correctly excluded from the comparison —
-   missing is not zero.
+   *What it needed that already existed:* the plan's `intensity` (Plan Schema v1) and
+   `CompletedRunMetrics.intensityPercent` (stored since schema v9). **Nothing new to fetch, no new
+   column, no migration** — the first feature in this milestone that cost the database nothing.
+   Activities synced before v9 carry no intensity and are excluded from the comparison rather than
+   read as 0 %: missing is not zero, and it is not easy either.
 
-   *Deliberately out of scope:* `icu_atl` and `icu_ctl` — acute and chronic load — are in the API
-   response and are **not** stored. They answer a different question ("has total load outrun the
-   plan?") and deserve their own rule rather than being folded into this one.
+   *Two decisions the design did not settle, taken while building it.* The comparison population is
+   what the app can **classify** — completed sessions of the active plan that a stored activity was
+   matched to — because a planned intensity is what makes a run comparable and only a session
+   carries one. And the median is taken over that population **including the three under
+   judgement**, which is the conservative direction: three drifting runs pull the median towards
+   themselves and make the rule harder to satisfy, never easier.
+
+   *Deliberately out of scope:* `icu_atl` and `icu_ctl` — acute and chronic load — answer a
+   different question ("has total load outrun the plan?") and deserve their own rule rather than
+   being folded into this one.
+
 4. ~~**AI coach comments, read-only (Phase B)**~~ — built. An "AI-analyysi" button under individual
    workouts, in two flavours: what a **completed** session cost against that morning's recovery, and
    how to execute an **upcoming** one against the current trend. BYOK — the user's own Anthropic key,

@@ -32,6 +32,10 @@ AI analysis comments on one workout but never changes the plan.
 - A morning question when readiness was poor and a session went undone: shift the programme, or
   start lighter. Asked from a measurement, never acted on by itself
   ([docs](docs/TRAINING_ENGINE.md#readiness-advice--asking-never-acting))
+- A note on the morning of an easy session when the last three comparable easy ones were each run
+  harder than this athlete's own easy sessions usually are. It has no button: the runs it reports on
+  are done, and lightening a session meant to be light changes nothing
+  ([docs](docs/TRAINING_ENGINE.md#easy-run-drift--a-fact-with-no-button-under-it))
 - Optional read-only AI analysis from Anthropic, OpenAI or Google, requested per workout with the
   user's own API key; the exact prompt is visible and no analysis is stored
 - A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
@@ -131,6 +135,10 @@ has been entered in the app.
 - The readiness rule asks about one day at a time and knows nothing about chronic load. It fires on
   yesterday's missed session or this morning's low score, and offers only what the app could
   already be asked to do by hand.
+- The easy-run drift note compares against the sessions of the **active plan** that a stored
+  activity was matched to, because a planned intensity is what makes a session comparable and only a
+  session carries one. A fresh plan therefore starts the count again, and fewer than six comparable
+  sessions means silence rather than a weaker claim.
 - Workouts recorded on another device and synced into Oura do not arrive through its workout
   collection, so they appear only in the day's scores. Measured, not assumed —
   [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md). This is what the intervals.icu integration exists

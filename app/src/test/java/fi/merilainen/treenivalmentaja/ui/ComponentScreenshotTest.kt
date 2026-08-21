@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.EasyRunDriftCard
 import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
 import fi.merilainen.treenivalmentaja.ImportConfirmDialog
 import fi.merilainen.treenivalmentaja.ImportStartDialog
@@ -27,6 +28,7 @@ import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.domain.Exercise
+import fi.merilainen.treenivalmentaja.domain.EasyRunDrift
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.ExerciseSet
 import fi.merilainen.treenivalmentaja.domain.GuideRef
@@ -193,6 +195,26 @@ class ComponentScreenshotTest {
     @Test
     fun recoveryCard() = capture("recovery_card") {
         RecoveryCard(onSickClicked = {}, onRecoveredClicked = {})
+    }
+
+    // ------------------------------------------------------------------ Easy-run drift
+
+    /**
+     * The card with no action button, which is the thing worth pinning: every number it asserts is
+     * on it — the three measurements, the median they are compared with, and how many sessions that
+     * median was taken over — and the only control puts it away.
+     */
+    @Test
+    fun easyRunDriftCard() = capture("card_easy_run_drift") {
+        EasyRunDriftCard(
+            finding = EasyRunDrift.Finding(
+                sessionId = "w-run",
+                type = WorkoutType.RUNNING,
+                recentIntensityPercent = listOf(84, 81, 80),
+                medianIntensityPercent = 73,
+                comparableSessions = 11,
+            )
+        )
     }
 
     // ------------------------------------------------------------------ Timed exercises
