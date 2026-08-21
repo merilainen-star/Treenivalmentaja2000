@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.repository
 
 import androidx.room.withTransaction
+import fi.merilainen.treenivalmentaja.data.SessionPayloadJson
 import fi.merilainen.treenivalmentaja.data.importer.ImportError
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
@@ -15,6 +16,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 import fi.merilainen.treenivalmentaja.data.toDomain
 import fi.merilainen.treenivalmentaja.data.toEntity
 import fi.merilainen.treenivalmentaja.domain.EventSource
+import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SessionEvent
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
@@ -127,6 +129,49 @@ class TrainingRepository(
       )
       TransitionResult.Applied
     }
+
+  /**
+   * Completes a guided strength session, recording how much of it was ticked off.
+   *
+   * A plain [transition] to `COMPLETED` says the person pressed the button and nothing else, which
+   * is what every completed strength session used to say. [progress] is the rest of the answer:
+   * the movements they walked through on the way there. It rides on the completion event rather
+   * than on the session row because it describes **that act of finishing**, not the plan — and the
+   * events table is append-only, so the record cannot later be quietly rewritten.
+   *
+   * `null` progress falls through to an ordinary completion. A session finished from a screen with
+   * no guided list has nothing to report, and inventing a zero for it would say the workout was
+   * abandoned.
+   */
+  suspend fun completeGuided(
+    sessionId: String,
+    progress: GuidedProgress?,
+    source: EventSource = EventSource.USER,
+  ): TransitionResult =
+    transition(
+      sessionId = sessionId,
+      target = SessionStatus.COMPLETED,
+      source = source,
+      payloadJson = progress?.let(SessionPayloadJson::encodeGuidedProgress),
+    )
+
+  /**
+   * What the guided workout recorded when this session was completed, or `null` if it recorded
+   * nothing.
+   *
+   * Read from the **last** completion carrying such a payload, searched newest first: a session can
+   * accumulate several events, and only one of them is the one that finished it. Rows written by
+   * anything else — a reschedule's payload, a completion from before this was recorded — decode to
+   * `null` and are passed over rather than misread.
+   */
+  suspend fun guidedProgressFor(sessionId: String): GuidedProgress? =
+    eventDao
+      .getForSession(sessionId)
+      .asReversed()
+      .firstNotNullOfOrNull { event ->
+        if (event.toStatus != SessionStatus.COMPLETED) null
+        else SessionPayloadJson.decodeGuidedProgress(event.payloadJson)
+      }
 
   /**
    * Applies the plan's lighter alternative. Falls back to cutting duration and distance by 40%

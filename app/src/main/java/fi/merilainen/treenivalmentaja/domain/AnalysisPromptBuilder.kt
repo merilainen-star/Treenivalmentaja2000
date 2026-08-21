@@ -10,6 +10,23 @@ data class CompletedAnalysisInput(
   val plannedDurationMin: Int? = null,
   val plannedIntensity: Intensity? = null,
   val description: String? = null,
+  /** Circuit rounds the movement list is repeated for, when the plan said. */
+  val plannedRounds: Int? = null,
+  /**
+   * The movements the plan asked for, in order.
+   *
+   * Empty for a plan that defines none — those sessions describe their work in [description] and
+   * there is nothing structured to render.
+   */
+  val exercises: List<Exercise> = emptyList(),
+  /**
+   * What the guided workout recorded: which of those movements were actually ticked off.
+   *
+   * `null` when nothing was recorded, which is a different fact from nothing being done — a
+   * session completed from a screen with no guided list, or one finished before the app recorded
+   * this at all. Both render no section rather than an empty one.
+   */
+  val guided: GuidedProgress? = null,
   /** What Oura recorded for the session, when it recorded anything. */
   val oura: CompletedSessionMetrics? = null,
   /** What the watch recorded, via intervals.icu. Richer than Oura for a run, absent for most else. */
@@ -69,6 +86,9 @@ class AnalysisPromptBuilder {
     input.plannedIntensity?.let { appendLine("- Suunniteltu teho: ${it.title}") }
     input.description?.takeIf { it.isNotBlank() }?.let { appendLine("- Sisältö: ${it.trim()}") }
     appendLine()
+
+    appendProgramme(input.exercises, input.plannedRounds)
+    appendGuided(input.guided, input.exercises)
 
     val performed = buildList {
       input.oura?.let { o ->
@@ -157,6 +177,126 @@ class AnalysisPromptBuilder {
   }
 
   /**
+   * The plan's own movements, in order, each with what it asked for.
+   *
+   * Without this the model was told a duration, an intensity and a free-text description, and had
+   * to guess the rest — which is why an answer about a strength session used to say that loads and
+   * rounds were unknown. They were in the database the whole time; nothing sent them.
+   */
+  private fun StringBuilder.appendProgramme(exercises: List<Exercise>, rounds: Int?) {
+    if (exercises.isEmpty()) return
+    appendLine("## Suunniteltu ohjelma")
+    // Only when the plan says more than one. "1 kierros" is noise, and a circuit is the only
+    // reason the count is interesting.
+    rounds?.takeIf { it > 1 }?.let {
+      appendLine("- $it kierrosta, ${exercises.size} liikettä kierroksella")
+    }
+    exercises.forEach { exercise ->
+      val work = exercise.promptPrescription()
+      appendLine(if (work.isEmpty()) "- ${exercise.name}" else "- ${exercise.name}: $work")
+    }
+    appendLine()
+  }
+
+  /**
+   * What the person ticked off, and — when the counts still line up — which movements those were.
+   *
+   * **The naming is guarded on purpose.** [progress] carries the shape it was counted against, and
+   * "Kevyempi versio" can swap the movement list under a session after the fact. When that shape no
+   * longer matches [exercises], the counts are still true and the names are not, so only the counts
+   * are written. Naming the wrong movements as done is worse than naming none.
+   */
+  private fun StringBuilder.appendGuided(progress: GuidedProgress?, exercises: List<Exercise>) {
+    if (progress == null || progress.total <= 0) return
+    appendLine("## Toteutunut (ohjattu treeni)")
+
+    if (progress.isComplete) {
+      appendLine(
+        "- Kaikki ${progress.total} liikesuoritusta kuitattiin tehdyksi, ja harjoitus " +
+          "kuitattiin valmiiksi."
+      )
+      // The sentence the whole feature exists for: it turns the programme above from a plan into
+      // a record of what happened, so the model stops reporting reps and loads as unknown.
+      appendLine(
+        "- Ohjelma toteutui suunnitellusti: yllä luetellut toistot, kuormat ja kestot ovat myös " +
+          "toteutuneet."
+      )
+      appendLine()
+      return
+    }
+
+    appendLine(
+      "- ${progress.done} / ${progress.total} liikesuoritusta kuitattiin tehdyksi. Harjoitus " +
+        "kuitattiin päättyneeksi ennen kuin lista oli lopussa."
+    )
+    if (exercises.size == progress.perRound) {
+      for (round in 1..progress.rounds) {
+        val doneInRound = (progress.done - (round - 1) * progress.perRound)
+          .coerceIn(0, progress.perRound)
+        val line =
+          when (doneInRound) {
+            progress.perRound -> "kaikki ${progress.perRound} liikettä tehty"
+            0 -> "ei tehty yhtään liikettä"
+            else ->
+              "tehty ${exercises.take(doneInRound).joinToString(", ") { it.name }}; " +
+                "tekemättä ${exercises.drop(doneInRound).joinToString(", ") { it.name }}"
+          }
+        appendLine(if (progress.rounds > 1) "- Kierros $round: $line" else "- $line")
+      }
+    }
+    appendLine()
+  }
+
+  /**
+   * One movement's prescription, written for a reader who is being asked to reason about it.
+   *
+   * Deliberately **not** the screen's `Exercise.prescription()` shorthand (`4 × 10 · 55 kg`). That
+   * one is read at a glance between sets, where the units are obvious from context; here rule 2
+   * above applies, and every number carries its own.
+   */
+  private fun Exercise.promptPrescription(): String {
+    // Appended only to a prescription that says something. An exercise the plan named and left
+    // otherwise blank must render as its name alone, not as a stray "/ puoli".
+    fun String.withSide(): String =
+      if (isEmpty()) "" else if (perSide == true) "$this / puoli" else this
+
+    // A ramp is spelled out set by set — differing loads are the entire reason a plan writes one.
+    setPlan?.takeIf { it.isNotEmpty() }?.let { plan ->
+      return plan
+        .joinToString(", ") { set ->
+          listOfNotNull(
+              set.weightKg?.let { kg(it) },
+              set.reps?.let { "$it toistoa" },
+              set.durationSec?.let { "$it s" },
+            )
+            .joinToString(" × ")
+        }
+        .withSide()
+    }
+
+    // The range when the plan gave one, rather than the single figure the screen shows. "6–8
+    // toistoa" is what the plan actually asks for, and a model reasoning about whether the session
+    // was hard enough needs the band, not its lower edge.
+    val repsText =
+      when {
+        repsMin != null && repsMax != null && repsMin != repsMax -> "$repsMin–$repsMax toistoa"
+        reps != null -> "$reps toistoa"
+        repsMin != null -> "$repsMin toistoa"
+        else -> null
+      }
+    val volume =
+      listOfNotNull(sets?.takeIf { it > 1 }?.let { "$it sarjaa" }, repsText, durationSec?.let { "$it s" })
+        .joinToString(" × ")
+    return listOfNotNull(volume.ifEmpty { null }, weightKg?.let { kg(it) })
+      .joinToString(", ")
+      .withSide()
+  }
+
+  /** 55.0 reads as "55 kg", 17.5 as "17,5 kg" — Finnish decimal comma, no trailing zero. */
+  private fun kg(value: Double): String =
+    if (value % 1.0 == 0.0) "${value.toInt()} kg" else String.format(FINNISH, "%.1f kg", value)
+
+  /**
    * The recovery block, one line per day that has something on it.
    *
    * Days the app has never fetched are absent from the map; days Oura answered about with no numbers
@@ -219,6 +359,10 @@ class AnalysisPromptBuilder {
     val COMPLETED_TASK =
       """
       ## Tehtävä
+      Ohjatun treenin kuittaukset kertovat, mitkä liikkeet tehtiin. Jos kaikki liikkeet on
+      kuitattu, käsittele suunnitellut toistot, kuormat ja kestot toteutuneina äläkä sano, ettei
+      niistä ole tietoa. Jos osa jäi kuittaamatta, ne jäivät tekemättä.
+
       Vastaa kolmeen kysymykseen yhtenäisenä tekstinä:
       1. Miten harjoitus meni suhteessa siihen, mitä oli suunniteltu?
       2. Miltä kuormitus näyttää sen aamun palautumislukemien ja viime päivien kehityksen valossa?

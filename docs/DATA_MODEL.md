@@ -115,6 +115,17 @@ The order of priority is:
   - `note` (String?) — short human-readable reason, e.g. `"Siirretty huomiselle"`
   - `payloadJson` (String?) — structured detail, e.g. the old and new date on a reschedule, or the
     id of the Oura workout that produced a match
+- **Payload shapes:** one column serves several kinds of detail, so **every payload is written
+  under a key that names it** rather than as a bare object (`SessionPayloadJson`). A reader asking
+  for one shape on a row that carries another gets `null` because its key is absent, not because
+  parsing happened to fail. Current keys:
+  - `guided` — `{"done": Int, "rounds": Int, "perRound": Int}`, written on the `COMPLETED` event of
+    a guided strength session: how many movements were ticked off, and the shape they were counted
+    against. The shape travels with the count because "Kevyempi versio" can swap the movement list
+    afterwards, and a count whose list has changed can still be reported honestly as a count while
+    its movements can no longer be named. The AI analysis reads it back to tell a workout carried
+    out in full from one abandoned half way; a session with no such payload has **nothing
+    recorded**, which is not the same as nothing done and never renders as zero.
 - **Ordering:** queried as `ORDER BY timestampUtc ASC, id ASC` so events written within the same
   millisecond still have a stable order.
 - **Lifecycle:** Insert-only. There is no `update` or `delete` method on `SessionEventDao`.

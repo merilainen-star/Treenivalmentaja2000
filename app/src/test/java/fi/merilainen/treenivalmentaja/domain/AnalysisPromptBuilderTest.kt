@@ -229,4 +229,209 @@ class AnalysisPromptBuilderTest {
 
     assertTrue(builder.completed(input) == builder.completed(input))
   }
+  // ------------------------------------------------------------------ the guided workout
+
+  private val programme =
+    listOf(
+      Exercise(name = "Bulgarialainen askelkyykky", reps = 8, perSide = true),
+      Exercise(name = "Kahvakuulaheilautus", reps = 15),
+      Exercise(name = "Penkkipunnerrus", sets = 3, reps = 8, weightKg = 40.0),
+      Exercise(name = "Sivulankku", durationSec = 20, perSide = true),
+    )
+
+  /**
+   * The gap this whole feature closes.
+   *
+   * Before it, a completed strength session reached the model as a duration, an intensity and a
+   * paragraph of prose, and the answer said — correctly — that the movements, reps and loads were
+   * unknown. They were in the database throughout; nothing sent them.
+   */
+  @Test
+  fun `sends the planned movements with their reps and loads`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          plannedRounds = 2,
+          exercises = programme,
+        )
+      )
+
+    assertTrue(prompt.contains("## Suunniteltu ohjelma"))
+    assertTrue(prompt.contains("- 2 kierrosta, 4 liikettä kierroksella"))
+    assertTrue(prompt.contains("- Bulgarialainen askelkyykky: 8 toistoa / puoli"))
+    assertTrue(prompt.contains("- Kahvakuulaheilautus: 15 toistoa"))
+    assertTrue(prompt.contains("- Penkkipunnerrus: 3 sarjaa × 8 toistoa, 40 kg"))
+    assertTrue(prompt.contains("- Sivulankku: 20 s / puoli"))
+  }
+
+  /** A ramp is the reason `setPlan` exists: every set's own load, spelled out. */
+  @Test
+  fun `spells out a ramp set by set`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises =
+            listOf(
+              Exercise(
+                name = "Maastaveto",
+                setPlan =
+                  listOf(
+                    ExerciseSet(weightKg = 25.0, reps = 5),
+                    ExerciseSet(weightKg = 35.0, reps = 5),
+                    ExerciseSet(weightKg = 47.5, reps = 3),
+                  ),
+              )
+            ),
+        )
+      )
+
+    assertTrue(prompt.contains("- Maastaveto: 25 kg × 5 toistoa, 35 kg × 5 toistoa, 47,5 kg × 3 toistoa"))
+  }
+
+  /** The plan's band, not its lower edge: "6–8" is what it asks for. */
+  @Test
+  fun `sends a rep range as a range`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = listOf(Exercise(name = "Timanttipunnerrus", reps = 6, repsMin = 6, repsMax = 8)),
+        )
+      )
+
+    assertTrue(prompt.contains("- Timanttipunnerrus: 6–8 toistoa"))
+  }
+
+  /**
+   * The sentence the feature is for: every movement ticked means the plan above **is** the record
+   * of what happened, and the model is told so rather than left to infer it.
+   */
+  @Test
+  fun `a fully ticked workout reports the plan as carried out`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          plannedRounds = 2,
+          exercises = programme,
+          guided = GuidedProgress(done = 8, rounds = 2, perRound = 4),
+        )
+      )
+
+    assertTrue(prompt.contains("## Toteutunut (ohjattu treeni)"))
+    assertTrue(prompt.contains("Kaikki 8 liikesuoritusta kuitattiin tehdyksi"))
+    assertTrue(prompt.contains("Ohjelma toteutui suunnitellusti"))
+    // Nothing may read as unfinished when everything was finished. Asserted on the sentence the
+    // partial branch writes, not on the word — the task instruction above legitimately uses it.
+    assertFalse(prompt.contains("kuitattiin päättyneeksi"))
+  }
+
+  /** Stopping early is the other half of the same signal, and has to name what was left. */
+  @Test
+  fun `an abandoned workout names what was not done`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          plannedRounds = 2,
+          exercises = programme,
+          guided = GuidedProgress(done = 5, rounds = 2, perRound = 4),
+        )
+      )
+
+    assertTrue(prompt.contains("5 / 8 liikesuoritusta kuitattiin tehdyksi"))
+    assertTrue(prompt.contains("- Kierros 1: kaikki 4 liikettä tehty"))
+    assertTrue(
+      prompt.contains(
+        "- Kierros 2: tehty Bulgarialainen askelkyykky; tekemättä Kahvakuulaheilautus, " +
+          "Penkkipunnerrus, Sivulankku"
+      )
+    )
+    assertFalse(prompt.contains("Ohjelma toteutui suunnitellusti"))
+  }
+
+  /**
+   * A session finished without a single tick says exactly that — not that nothing is known about
+   * it, and not that it was done.
+   */
+  @Test
+  fun `a workout finished with nothing ticked says so`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = programme,
+          guided = GuidedProgress(done = 0, rounds = 1, perRound = 4),
+        )
+      )
+
+    assertTrue(prompt.contains("0 / 4 liikesuoritusta kuitattiin tehdyksi"))
+    assertTrue(prompt.contains("- ei tehty yhtään liikettä"))
+  }
+
+  /**
+   * "Kevyempi versio" swaps the movement list under a started session. The counts were taken
+   * against the old one, so they stay; the names would be a different workout's, so they go.
+   *
+   * Naming the wrong movements as done is worse than naming none — it is the one failure mode
+   * here that produces a confident, wrong analysis rather than a vaguer one.
+   */
+  @Test
+  fun `does not name movements when the list no longer matches the count`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          // Two movements on screen, but the session was counted against four.
+          exercises = programme.take(2),
+          guided = GuidedProgress(done = 5, rounds = 2, perRound = 4),
+        )
+      )
+
+    assertTrue(prompt.contains("5 / 8 liikesuoritusta kuitattiin tehdyksi"))
+    assertFalse(prompt.contains("Kierros 1:"))
+    assertFalse(prompt.contains("; tekemättä"))
+  }
+
+  /**
+   * A session completed before any of this shipped, or from a screen with no guided list, has
+   * nothing recorded. That is not the same as nothing done, and must not render as zero.
+   */
+  @Test
+  fun `renders no guided section when nothing was recorded`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(type = WorkoutType.STRENGTH, date = day, exercises = programme)
+      )
+
+    assertFalse(prompt.contains("Toteutunut (ohjattu treeni)"))
+    assertFalse(prompt.contains("liikesuoritusta"))
+  }
+
+  /** A plan with no structured movements renders no programme section rather than an empty one. */
+  @Test
+  fun `renders no programme section for a plan that defines no movements`() {
+    val prompt =
+      builder.completed(CompletedAnalysisInput(type = WorkoutType.RUNNING, date = day))
+
+    assertFalse(prompt.contains("Suunniteltu ohjelma"))
+  }
+
+  /** Without this line the model keeps hedging about loads it has just been told were performed. */
+  @Test
+  fun `tells the model how to read a tick`() {
+    val prompt =
+      builder.completed(CompletedAnalysisInput(type = WorkoutType.STRENGTH, date = day))
+
+    assertTrue(prompt.contains("Ohjatun treenin kuittaukset kertovat, mitkä liikkeet tehtiin"))
+  }
 }

@@ -560,3 +560,62 @@
 - **Related Files:** `data/analysis/` (whole package), `domain/AnalysisModel.kt`,
   `domain/AnalysisPromptBuilder.kt`, `AnalysisCard.kt`, `data/settings/AnalysisSettingsStore.kt`,
   `WorkoutViewModel.kt`, `TreenivalmentajaApplication.kt`, `PRIVACY.md`, `SECURITY.md`, `AGENTS.md`
+
+## ADR-012: What the guided workout recorded travels on the completion event
+- **Status:** Accepted (2026-08-21), and built. Extends
+  [ADR-010](#adr-010-on-demand-ai-workout-analysis-called-directly-from-the-app-with-a-user-supplied-key);
+  changes nothing it decided about what the feature is.
+- **Context:** Asked to analyse a completed strength session, the model answered: *"Toteutuneista
+  liikkeistä, toistoista, kuormista tai kierroksista ei ole tietoa, joten suunnitelman tarkkaa
+  toteutumista tai voimatasoa ei voi arvioida."* It was telling the truth about what it had been
+  sent, and two separate gaps produced it.
+  - **The plan's own movements never reached the prompt.** `CompletedAnalysisInput` carried a type,
+    a duration, an intensity and a free-text description. `exercisesJson` — names, sets, reps,
+    `weightKg`, `setPlan` — and `rounds` sat in the database, structured, and were never read for
+    the analysis. Only the Oura and watch numbers described the session, and neither device knows
+    what a squat is.
+  - **The guided workout's ticks never left the screen.** The counter is a `rememberSaveable` inside
+    the card. Pressing "Valmis" called `updateWorkoutStatus(COMPLETED)`, which recorded that a
+    button had been pressed and nothing about the ten movements ticked off on the way there.
+- **Decision:**
+  - **The count rides on the completion event, in `payloadJson`, under a `guided` key.** It
+    describes *that act of finishing*, not the plan, and the events table is append-only, so the
+    record cannot later be quietly rewritten. No schema change: the column and
+    `transition(payloadJson = …)` already existed for the reschedule payload.
+  - **The shape is stored with the count.** `{"done", "rounds", "perRound"}`, never `done` alone. A
+    bare count cannot be read later — "6" is two thirds of one workout and a fifth of another — and
+    "Kevyempi versio" can swap the movement list under a started session. Stored together, a reader
+    can tell when the list it was counted against is no longer the list on screen.
+  - **The prompt names movements only while the shape still matches.** When it does not, the counts
+    are written and the names are not. Naming the wrong movements as done is the one failure mode
+    here that yields a confident wrong analysis rather than a vaguer one.
+  - **A full tick promotes the plan to the record.** The prompt says so in a sentence
+    (*"Ohjelma toteutui suunnitellusti"*) and the task instruction tells the model to read it that
+    way, because without the instruction all three providers keep hedging about loads they have just
+    been told were performed.
+  - **The counter stays in the card.** `rememberSaveable` is what carries it through the process
+    being killed mid-set; a ViewModel field would not. It is *mirrored* up on every change so that
+    the completion — which outlives the composition — has something to write down. One direction
+    only: the ViewModel never writes back.
+- **Consequences:**
+  - A tick says a movement was performed, **never at what load**. The plan's prescription is the
+    only account of that, so a session done at 45 kg where the plan said 55 reaches the model as 55.
+    Recording real loads means an entry field per set, which is a larger and different feature.
+  - Progress is not persisted while a workout is in progress — it lives in the card's saved state
+    until the session is completed. Force-stopping the app mid-workout keeps it; clearing the app
+    from memory in a way that discards saved state does not.
+  - Sessions completed before this shipped carry no payload. They render **no** guided section
+    rather than zero movements done: nothing recorded and nothing done are different facts.
+- **Alternatives Considered:**
+  - *A column on `workout_sessions`* — survives anything, and was the obvious place. Rejected for
+    this change: it needs a Room migration and a schema JSON for a count that is only read after the
+    session is over, and the event row already answers the question at the moment it is asked.
+  - *One event row per tick* — the events table is the natural home for "what happened when", and
+    this would have given a timeline of the workout. Rejected: `session_events` records *status
+    transitions*, and a tick is not one. Ten rows per workout to answer a question that one row
+    answers is a change to what the table means.
+  - *Sending only the ticks, not the plan* — half the fix, and the half that reads worse: "6 / 10
+    done" is meaningless to a model that was never told what the ten were.
+- **Related Files:** `domain/GuidedProgress.kt`, `data/SessionPayloadJson.kt`,
+  `domain/AnalysisPromptBuilder.kt`, `data/repository/TrainingRepository.kt`, `WorkoutViewModel.kt`,
+  `TodayScreen.kt`, `docs/DATA_MODEL.md`
