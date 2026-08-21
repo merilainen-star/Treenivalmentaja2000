@@ -38,6 +38,7 @@ import fi.merilainen.treenivalmentaja.domain.AnalysisModel
 import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.domain.CompletedAnalysisInput
+import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.UpcomingAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
@@ -892,6 +893,11 @@ class WorkoutViewModel(
             plannedDurationMin = session.durationMin?.takeIf { it > 0 },
             plannedIntensity = session.intensity,
             description = session.description,
+            plannedRounds = session.rounds,
+            exercises = session.exercises.orEmpty(),
+            // Read from the completion event, not from this class's own map: the analysis can be
+            // asked for days later, from a screen that never held the counter.
+            guided = repository.guidedProgressFor(session.id),
             oura = ouraRepository.observeMatchedMetrics().first()[session.id],
             run = runs[session.id],
             recoveryByDay = recovery,
@@ -999,12 +1005,33 @@ class WorkoutViewModel(
     _guideState.value = null
   }
 
+  /**
+   * How far each guided workout on screen has got, keyed by session id.
+   *
+   * **Mirrored from the screen rather than owned here.** The card keeps its own `rememberSaveable`
+   * counter — that is what survives the process being killed mid-workout — and reports every change
+   * up. This map exists so that pressing "Valmis" has something to write down: the counter's own
+   * scope ends with the composition, and the completion outlives it.
+   *
+   * Not persisted: a session still open when the app is killed keeps its count in the card's saved
+   * state, not here, and one that is finished has already had the count written to its completion
+   * event.
+   */
+  private val guidedProgress = MutableStateFlow<Map<String, GuidedProgress>>(emptyMap())
+
+  fun recordGuidedProgress(sessionId: String, progress: GuidedProgress) {
+    guidedProgress.update { it + (sessionId to progress) }
+  }
+
   fun updateWorkoutStatus(workoutId: String, newStatus: SessionStatus) {
     viewModelScope.launch {
-      if (newStatus == SessionStatus.REPLACED_WITH_LIGHTER_VERSION) {
-        repository.applyLighterVersion(workoutId)
-      } else {
-        repository.transition(workoutId, newStatus)
+      when (newStatus) {
+        SessionStatus.REPLACED_WITH_LIGHTER_VERSION -> repository.applyLighterVersion(workoutId)
+        // The one transition that has more to say than its own name: what was ticked off on the
+        // way there. Anything else, including a session with no guided list, completes as before.
+        SessionStatus.COMPLETED ->
+          repository.completeGuided(workoutId, guidedProgress.value[workoutId])
+        else -> repository.transition(workoutId, newStatus)
       }
     }
   }
