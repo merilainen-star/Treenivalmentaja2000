@@ -205,10 +205,41 @@ almost nothing to say about the sessions that matter most.
    user preferences carried in the prompt, and the advisor asks its clarifying questions before
    proposing.
 
+## Designed, not built
+
+- **Active Workout Mode V1** — specified 2026-08-22 in [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md). A
+  guided session that shows one thing at a time and carries the workout from the first movement to
+  the last: a start summary with the equipment needed, a **preparation step before every movement**,
+  the movement itself, a rest that counts down and names what follows, automatic round tracking, and
+  a finish with an optional session RPE.
+
+  *The principle it turns on:* the app may start a rest timer, advance the round number and announce
+  that a time has run out, but **it may not start the next movement**. That happens on "Olen valmis"
+  and nothing else — because in home training the gaps are real, and a kettlebell has to be fetched
+  before the set begins.
+
+  *What the survey found.* Most of it exists. The timer, the round counter, the prescriptions, the
+  exercise guide and the whole session state machine are built; `restSec` has been validated and
+  stored since Plan Schema v1 with **nothing reading it**, so the rest timer is a reader for a field
+  that has been waiting for one. The session's own duration is the gap between its `STARTED` and
+  `COMPLETED` events, so §8's summary needs no column either. What is genuinely new is the
+  full-screen mode, the preparation step, and recording a *skipped movement* and the RPE.
+
+  *The hard part is the clock.* The existing countdown counts ticks inside a composable, which is
+  fine for a plank being watched and wrong for a rest with the phone face-down and the process
+  frozen. It has to be computed from a wall-clock deadline, and the alarm and notification machinery
+  the reminders already use is what makes a sound with the screen off.
+
+  *Two schema questions:* Plan Schema v1 has **no equipment field** (the one in the exercise-guide
+  responses is English, fetched, and not cacheable, so it cannot serve), and `restSec` is per
+  exercise with nothing for the pause between rounds.
+
 ## Later (Phase 4 & Beyond)
 - Logging what was actually lifted, so a strength session can be compared with the last time it
   was done. Oura holds completed workouts but not per-set loads, so the "history lives in Oura"
-  reasoning does not cover this one.
+  reasoning does not cover this one. Active Workout Mode's §7 is a deliberately small slice of this
+  and is designed not to lock its shape in — see
+  [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md#3-recording-the-outcome-without-pre-empting-the-gym-log).
 
 ## Blocked
 - None. The Oura milestone is built end to end and a real account is connected.

@@ -47,6 +47,9 @@ AI analysis comments on one workout but never changes the plan.
   autonomous plan modification is not — see [ROADMAP.md](docs/ROADMAP.md#next-milestone).
 - Acting on readiness beyond the morning question below — chronic load, multi-week adjustment,
   and anything needing judgement rather than a rule.
+- Active Workout Mode: a guided session showing one movement at a time, with a preparation step
+  before each, rest timers and round tracking. Specified but not built —
+  [ACTIVE_WORKOUT.md](docs/ACTIVE_WORKOUT.md).
 
 ## Main Features
 Implemented today:
