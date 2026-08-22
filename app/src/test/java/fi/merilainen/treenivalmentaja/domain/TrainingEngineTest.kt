@@ -270,6 +270,79 @@ class TrainingEngineTest {
         assertEquals(fixedToday.minusDays(2).toString(), byId["s2"]?.scheduledDate)
     }
 
+    /**
+     * The backlog answered by closing it: the missed sessions end as COMPLETED, on their own dates.
+     *
+     * This is the case the card had no button for. A plan carrying sessions nobody will ever train
+     * — the rows left behind while the app was being built — could only be shifted forward or left
+     * alone, and both leave them missed, so the card returned every day.
+     */
+    @Test
+    fun completeMissedSessions_marksThePastOnesDoneAndMovesNothing() = runBlocking {
+        val d1 = fixedToday.minusDays(3).toString()
+        val d2 = fixedToday.minusDays(1).toString()
+        val future = fixedToday.plusDays(1).toString()
+
+        insertSession("s1", d1, SessionStatus.PLANNED)
+        insertSession("s2", d2, SessionStatus.NOTIFIED)
+        insertSession("s3", future, SessionStatus.PLANNED)
+
+        val proposal = engine.proposeMissedSessions()
+        assertEquals(2, engine.completeMissedSessions(proposal))
+
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(SessionStatus.COMPLETED, byId["s1"]?.status)
+        assertEquals(SessionStatus.COMPLETED, byId["s2"]?.status)
+        // Dates untouched: this closes history, it does not rewrite it.
+        assertEquals(d1, byId["s1"]?.scheduledDate)
+        assertEquals(d2, byId["s2"]?.scheduledDate)
+        // The future session is not the user's backlog and must be left alone.
+        assertEquals(SessionStatus.PLANNED, byId["s3"]?.status)
+
+        // And the question is now gone for good, which is the entire point.
+        assertEquals(MissedSessionsProposal.None, engine.proposeMissedSessions())
+    }
+
+    /** Why the sessions reached COMPLETED is recorded, since the status alone would imply training. */
+    @Test
+    fun completeMissedSessions_writesAnEventSayingItWasMarkedByHand() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+
+        assertEquals(1, engine.completeMissedSessions(engine.proposeMissedSessions()))
+
+        val notes = repository.getEvents("s1").mapNotNull { it.note }
+        assertTrue(notes.any { it.contains("Merkitty tehdyksi") })
+    }
+
+    /** A session paused by illness reaches COMPLETED the long way round, or not at all. */
+    @Test
+    fun completeMissedSessions_completesASessionPausedByIllness() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(2).toString(), SessionStatus.PAUSED_DUE_TO_ILLNESS)
+        insertSession("s2", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+
+        assertEquals(2, engine.completeMissedSessions(engine.proposeMissedSessions()))
+
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(SessionStatus.COMPLETED, byId["s1"]?.status)
+        assertEquals(SessionStatus.COMPLETED, byId["s2"]?.status)
+    }
+
+    /** The same staleness guard as accepting: a preview the situation has outgrown writes nothing. */
+    @Test
+    fun completeMissedSessions_rejectsAStaleProposal() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+        val staleProposal = engine.proposeMissedSessions()
+
+        insertSession("s2", fixedToday.minusDays(2).toString(), SessionStatus.PLANNED)
+
+        assertEquals(0, engine.completeMissedSessions(staleProposal))
+        assertEquals(0, engine.completeMissedSessions(MissedSessionsProposal.None))
+
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(SessionStatus.PLANNED, byId["s1"]?.status)
+        assertEquals(SessionStatus.PLANNED, byId["s2"]?.status)
+    }
+
     /** `None` is not a proposal. Applying it must be a no-op rather than an empty write. */
     @Test
     fun applyMissedSessions_withNothingProposed_changesNothing() = runBlocking {

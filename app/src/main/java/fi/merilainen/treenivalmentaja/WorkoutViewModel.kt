@@ -48,6 +48,7 @@ import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
+import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdviceUseCase
 import fi.merilainen.treenivalmentaja.domain.EventSource
@@ -157,6 +158,14 @@ class WorkoutViewModel(
   private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
+  /**
+   * Where a refusal of the missed-session card is written down, nullable for the same reason the
+   * collaborators above are: it is backed by DataStore, whose IO sits outside a test's scheduler,
+   * and the existing ViewModel tests cover the refusal itself without needing it to survive a
+   * process they never restart. Null means the refusal lives only in memory, which is what this
+   * class did everywhere before the store existed.
+   */
+  private val missedProposalDismissalStore: MissedProposalDismissalStore? = null,
   /**
    * **`systemDefaultZone`, not `systemUTC`** — and the difference is a bug, not a preference.
    *
@@ -945,12 +954,40 @@ class WorkoutViewModel(
    */
   private val _missedProposalDismissedFor = MutableStateFlow<LocalDate?>(null)
 
-  /** Refreshes a read-only proposal. Calling this never writes the calendar. */
+  /**
+   * Refreshes a read-only proposal. Calling this never writes the calendar.
+   *
+   * The refusal is read from [missedProposalDismissalStore] when this process has not seen one
+   * yet, which is what makes "ei nyt" outlive an app update. Both reads happen inside the
+   * coroutine, before the proposal is published, so a slow DataStore cannot let the card flash up
+   * on a launch where it had already been answered.
+   */
   fun checkMissedSessions() {
     if (_missedProposalDismissedFor.value == currentDate.value) return
     viewModelScope.launch {
+      val dismissedFor =
+        _missedProposalDismissedFor.value
+          ?: missedProposalDismissalStore?.dismissedFor()?.also {
+            _missedProposalDismissedFor.value = it
+          }
+      if (dismissedFor == currentDate.value) return@launch
       _missedSessionsProposal.value = engine.proposeMissedSessions()
     }
+  }
+
+  /**
+   * "Nämä on tehty." Closes the missed sessions where they are instead of moving them.
+   *
+   * The card's other two buttons both assume the training is still ahead of you: one moves the
+   * whole programme forward, the other changes nothing and lets the card return tomorrow. Neither
+   * fits a backlog of sessions that were never going to be done — the plan rows left behind while
+   * the app itself was being written — and this is the answer for those.
+   */
+  fun completeMissedSessionsProposal() {
+    val proposal = _missedSessionsProposal.value
+    if (proposal == MissedSessionsProposal.None) return
+    _missedSessionsProposal.value = MissedSessionsProposal.None
+    viewModelScope.launch { engine.completeMissedSessions(proposal) }
   }
 
   /** Applies the preview the user saw; a stale or twice-accepted preview is rejected by the engine. */
@@ -961,10 +998,17 @@ class WorkoutViewModel(
     viewModelScope.launch { engine.applyMissedSessions(proposal) }
   }
 
-  /** "Ei nyt." Writes nothing, and — unlike before — is still true when the screen is reopened. */
+  /**
+   * "Ei nyt." Writes no calendar change, and — unlike before — is still true after a restart.
+   *
+   * The date is persisted as well as remembered: the in-memory answer died with the process, so
+   * installing a new build re-asked about the same sessions minutes after they had been refused.
+   */
   fun rejectMissedSessionsProposal() {
-    _missedProposalDismissedFor.value = currentDate.value
+    val today = currentDate.value
+    _missedProposalDismissedFor.value = today
     _missedSessionsProposal.value = MissedSessionsProposal.None
+    viewModelScope.launch { missedProposalDismissalStore?.setDismissedFor(today) }
   }
 
   /** Opens the guide sheet for one movement and starts the lookup. */
@@ -1183,6 +1227,7 @@ class WorkoutViewModel(
           analysisClients = application.analysisClients,
           analysisSettingsStore = application.analysisSettingsStore,
           analysisPromptBuilder = application.analysisPromptBuilder,
+          missedProposalDismissalStore = application.missedProposalDismissalStore,
         )
       }
     }

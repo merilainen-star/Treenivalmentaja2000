@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.domain
 
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
+import fi.merilainen.treenivalmentaja.data.repository.TransitionResult
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.sync.Mutex
@@ -191,6 +192,69 @@ class TrainingEngine(
       true
     }
 
+  /**
+   * Clears the backlog the other way: the missed sessions are marked done where they stand, and
+   * nothing on the calendar moves.
+   *
+   * The shift proposal assumes the training still has to happen. That is the wrong assumption for a
+   * backlog that accumulated while the app itself was being built — sessions nobody ever intended
+   * to do — and with only "siirrä" and "hylkää" on offer there was no way to say so: rejecting is a
+   * pure no-op, so the same 35 sessions were still missed tomorrow, and the card came back. This is
+   * the third answer, and the only one that ends the question for good.
+   *
+   * It marks exactly the sessions named by [proposal] — the past-dated open ones — and never a
+   * future session. Each transition is an ordinary user-sourced status change through the
+   * repository, so every session gets its `SessionEvent` saying it was ticked off by hand rather
+   * than recorded as it happened; the history stays honest about how these rows reached COMPLETED.
+   *
+   * A session paused by illness cannot go straight to COMPLETED (see [SessionStatus]), so it is
+   * first returned to PLANNED — the transition table's own route back out of the pause — and
+   * completed from there. Both writes are events, so that detour is visible too.
+   *
+   * @return how many sessions were marked done.
+   */
+  suspend fun completeMissedSessions(proposal: MissedSessionsProposal): Int =
+    missedSessionsMutex.withLock {
+      // The same staleness guard as applyMissedSessions: a preview the user is no longer looking
+      // at must never decide what gets written.
+      if (proposal == MissedSessionsProposal.None || proposeMissedSessions() != proposal) {
+        return@withLock 0
+      }
+      val missedIds =
+        when (proposal) {
+          is MissedSessionsProposal.MoveOne -> listOf(proposal.sessionId)
+          is MissedSessionsProposal.ShiftPlan -> proposal.missedSessionIds
+          MissedSessionsProposal.None -> return@withLock 0
+        }
+      var completed = 0
+      for (id in missedIds) {
+        if (markDone(id)) completed++
+      }
+      // Reminders for sessions that are now closed have nothing left to remind about.
+      rescheduleAlarmsUseCase?.execute()
+      completed
+    }
+
+  /** One session to COMPLETED, via PLANNED when the transition table demands it. */
+  private suspend fun markDone(sessionId: String): Boolean {
+    val session = repository.getSession(sessionId) ?: return false
+    if (!session.status.canTransitionTo(SessionStatus.COMPLETED)) {
+      if (!session.status.canTransitionTo(SessionStatus.PLANNED)) return false
+      repository.transition(
+        sessionId = sessionId,
+        target = SessionStatus.PLANNED,
+        source = EventSource.USER,
+        note = MARKED_DONE_NOTE,
+      )
+    }
+    return repository.transition(
+      sessionId = sessionId,
+      target = SessionStatus.COMPLETED,
+      source = EventSource.USER,
+      note = MARKED_DONE_NOTE,
+    ) == TransitionResult.Applied
+  }
+
   /** Kept for explicit readiness actions; unlike the old launch path this is never automatic. */
   suspend fun handleMissedSessions() {
     applyMissedSessions(proposeMissedSessions())
@@ -207,4 +271,9 @@ class TrainingEngine(
 
   private suspend fun todayInPlanZone(): LocalDate =
     LocalDate.now(clock.withZone(repository.activePlanTimeZone()))
+
+  private companion object {
+    /** Says in the event log what the status alone cannot: nobody trained, the row was ticked. */
+    const val MARKED_DONE_NOTE = "Merkitty tehdyksi jälkikäteen"
+  }
 }

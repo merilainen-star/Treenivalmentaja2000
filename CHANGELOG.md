@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-22
+
+### Added
+- **"Merkitse tehdyiksi"** on the "Väliin jääneet harjoitukset" card. It closes the missed
+  sessions where they stand — `COMPLETED`, on the dates they were planned for, nothing moved — and
+  it is the only one of the card's three buttons that ends the question for good.
+  The card had two answers and both assumed the training was still ahead of you: "Hyväksy siirto"
+  moves the whole programme forward and keeps every session, "Hylkää" writes nothing and expires at
+  midnight. Neither fits a plan carrying sessions that will never be trained — the rows left behind
+  while the app itself was being written — so a backlog of 35 of them asked the same question every
+  single morning, and there was no way in the app to say "those are done with".
+  The event log stays honest about it: each session gets `Merkitty tehdyksi jälkikäteen` under
+  `EventSource.USER`, so a row that reached `COMPLETED` by being ticked off can be told from one
+  that was trained. A session paused by illness gets there via `PLANNED` — the transition table's
+  own route out of the pause — and that detour is an event too.
+
+### Fixed
+- **"Hylkää" now survives a restart.** The refusal lived in a `MutableStateFlow` in the ViewModel
+  and nowhere else, so it lasted exactly as long as the process: installing a new APK over the app
+  re-asked about the same old sessions, which is how the nag was first noticed. It is written to
+  the `settings` DataStore under `missed_proposal_dismissed_for` and read back before the card is
+  drawn, so a slow read cannot flash the card up on a launch where it had already been answered.
+  Still keyed by the plan-zone date and still expiring at midnight: this makes "ei nyt" survive a
+  restart, not become "never".
+
 ## [Unreleased] - 2026-08-16 (second entry)
 
 ### Added

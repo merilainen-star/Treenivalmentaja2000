@@ -125,6 +125,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         missedSessionsProposal = missedProposal,
         onAcceptMissedSessions = viewModel::acceptMissedSessionsProposal,
         onRejectMissedSessions = viewModel::rejectMissedSessionsProposal,
+        onCompleteMissedSessions = viewModel::completeMissedSessionsProposal,
         analyses = analyses,
         analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
@@ -160,6 +161,7 @@ fun TodayScreenContent(
     missedSessionsProposal: MissedSessionsProposal = MissedSessionsProposal.None,
     onAcceptMissedSessions: () -> Unit = {},
     onRejectMissedSessions: () -> Unit = {},
+    onCompleteMissedSessions: () -> Unit = {},
     analyses: Map<String, AiAnalysisState> = emptyMap(),
     analysisConfigured: Boolean = false,
     onRequestAnalysis: (String) -> Unit = {},
@@ -194,6 +196,7 @@ fun TodayScreenContent(
                 proposal = missedSessionsProposal,
                 onAccept = onAcceptMissedSessions,
                 onReject = onRejectMissedSessions,
+                onComplete = onCompleteMissedSessions,
             )
         }
 
@@ -274,13 +277,30 @@ fun TodayScreenContent(
     }
 }
 
-/** A calendar change shown before it is made; rejecting this card is a pure no-op. */
+/**
+ * A calendar change shown before it is made; rejecting this card is a pure no-op.
+ *
+ * Three answers, because two were not enough. Shifting the programme forward assumes the sessions
+ * are still to be done, and rejecting changes nothing — so a backlog that will never be trained
+ * came back as the same card every day. "Merkitse tehdyiksi" closes those sessions where they
+ * stand, which is the only one of the three that ends the question.
+ *
+ * The two writing actions are laid out one per row rather than three across: "Merkitse tehdyiksi"
+ * closes sessions for good, and a button that does that should not be a narrow one squeezed in
+ * beside the others on a phone.
+ */
 @Composable
 private fun MissedSessionsProposalCard(
     proposal: MissedSessionsProposal,
     onAccept: () -> Unit,
     onReject: () -> Unit,
+    onComplete: () -> Unit,
 ) {
+    val missedCount = when (proposal) {
+        is MissedSessionsProposal.MoveOne -> 1
+        is MissedSessionsProposal.ShiftPlan -> proposal.missedSessionIds.size
+        MissedSessionsProposal.None -> return
+    }
     val preview = when (proposal) {
         is MissedSessionsProposal.MoveOne ->
             "Yksi harjoitus jäi väliin ${proposal.fromDate}. Se siirretään seuraavalle " +
@@ -290,6 +310,8 @@ private fun MissedSessionsProposalCard(
                 "(${proposal.affectedSessions} harjoitusta) siirretään ${proposal.days} päivää eteenpäin."
         MissedSessionsProposal.None -> return
     }
+    val completeLabel =
+        if (missedCount == 1) "Merkitse tehdyksi" else "Merkitse $missedCount tehdyiksi"
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -301,13 +323,18 @@ private fun MissedSessionsProposalCard(
             Text("Väliin jääneet harjoitukset", fontWeight = FontWeight.Bold)
             Text(preview, style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Kalenteria muutetaan vasta, jos hyväksyt ehdotuksen.",
+                "Kalenteria muutetaan vasta, jos hyväksyt ehdotuksen. " +
+                    "Jos harjoitukset ovat vanhoja etkä aio tehdä niitä, merkitse ne tehdyiksi — " +
+                    "silloin ne poistuvat listalta eikä tätä kysytä uudelleen.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onAccept) { Text("Hyväksy siirto") }
                 OutlinedButton(onClick = onReject) { Text("Hylkää") }
+            }
+            OutlinedButton(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
+                Text(completeLabel)
             }
         }
     }

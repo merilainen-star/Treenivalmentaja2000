@@ -27,8 +27,10 @@ import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
+import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
+import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import kotlinx.coroutines.CoroutineDispatcher
@@ -134,8 +136,19 @@ class WorkoutViewModelTest {
     Dispatchers.resetMain()
   }
 
+  /** An in-memory [MissedProposalDismissalStore]: DataStore's persistence without its IO. */
+  private class FakeDismissalStore(var dismissedFor: LocalDate? = null) :
+    MissedProposalDismissalStore {
+    override suspend fun dismissedFor(): LocalDate? = dismissedFor
+
+    override suspend fun setDismissedFor(date: LocalDate) {
+      dismissedFor = date
+    }
+  }
+
   private fun viewModel(
     rolloverDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    dismissalStore: MissedProposalDismissalStore? = null,
   ): WorkoutViewModel {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     val settingsStore = NotificationSettingsStore(context)
@@ -189,6 +202,7 @@ class WorkoutViewModelTest {
           client = OuraClient(tokens = { null }, baseUrl = "http://127.0.0.1:1"),
           dao = db.ouraDao(),
         ),
+      missedProposalDismissalStore = dismissalStore,
     )
   }
 
@@ -527,6 +541,75 @@ class WorkoutViewModelTest {
     advanceUntilIdle()
 
     assertTrue(viewModel.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
+  }
+
+  /**
+   * The third answer: the missed sessions are closed as done, and the card cannot come back.
+   *
+   * Shifting the plan and refusing both leave the sessions missed, so a backlog of training that
+   * will never happen — a plan left half-finished while the app was being written — asked the same
+   * question every single day. This is the button that ends it.
+   */
+  @Test
+  fun `marking the missed sessions done closes them and ends the question`() =
+    runTest(dispatcher) {
+      clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
+      repository.importPlan(PLAN)
+
+      val viewModel = viewModel()
+      advanceUntilIdle()
+      viewModel.checkMissedSessions()
+      advanceUntilIdle()
+      assertTrue(viewModel.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
+
+      viewModel.completeMissedSessionsProposal()
+      advanceUntilIdle()
+
+      assertEquals(SessionStatus.COMPLETED, repository.getSessions().single().status)
+      // Unmoved: the session stays on the day it was planned for.
+      assertEquals("2026-08-10", repository.getSessions().single().scheduledDate)
+
+      // Not a refusal that expires tomorrow — there is nothing left to propose at all.
+      viewModel.checkMissedSessions()
+      advanceUntilIdle()
+      assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
+    }
+
+  /**
+   * A refusal survives the process, which is what "ei nyt" has to mean on a phone.
+   *
+   * The answer used to live only in this ViewModel, so every new build installed over the app —
+   * and every ordinary cold start — asked again about the same sessions on the same day. A fresh
+   * ViewModel here is exactly that restart.
+   */
+  @Test
+  fun `a refusal survives a restart on the same day`() = runTest(dispatcher) {
+    clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
+    repository.importPlan(PLAN)
+    val store = FakeDismissalStore()
+
+    val first = viewModel(dismissalStore = store)
+    advanceUntilIdle()
+    first.checkMissedSessions()
+    advanceUntilIdle()
+    first.rejectMissedSessionsProposal()
+    advanceUntilIdle()
+    assertEquals(LocalDate.of(2026, 8, 12), store.dismissedFor)
+
+    val restarted = viewModel(dismissalStore = store)
+    advanceUntilIdle()
+    restarted.checkMissedSessions()
+    advanceUntilIdle()
+
+    assertEquals(MissedSessionsProposal.None, restarted.missedSessionsProposal.value)
+
+    // Still "not today" rather than "never": yesterday's answer does not silence tomorrow.
+    store.dismissedFor = LocalDate.of(2026, 8, 11)
+    val nextDay = viewModel(dismissalStore = store)
+    advanceUntilIdle()
+    nextDay.checkMissedSessions()
+    advanceUntilIdle()
+    assertTrue(nextDay.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
   }
 
   /**
