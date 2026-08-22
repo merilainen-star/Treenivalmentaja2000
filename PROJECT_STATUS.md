@@ -5,27 +5,37 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
-- Date: 2026-08-20
-- Base commit: `65d0f5a` plus the audit fixes and their follow-up review, committed together
+- Date: 2026-08-21
+- Base commit: `3e2ee7b` plus the easy-run drift rule, committed together
 - Toolchain: JDK 21, Gradle 9.6.1 via wrapper
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 539 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 51 comparisons, 0 changed, 51 unchanged |
-| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug` | 21,219,444 bytes |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 564 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 52 comparisons, 0 changed, 52 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 44 warnings |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 20,925,399 bytes |
 | Instrumented | `adb devices -l` | Not run: no device or emulator attached |
+
+The 44 lint warnings are 40 dependency-update notices, two `UseKtx` suggestions on the two API-key
+stores, one `RedundantLabel` and one `ObsoleteSdkInt` that must stay. None of them is in the code
+added here, and the count moved from 43 because upstream releases keep arriving, not because this
+change introduced one.
+
+The previous block's 21,219,444 B is **not** comparable with the figure above: it was not taken with
+`clean`, and this page's own methodology says such a number should never have been quoted. Measured
+the way the method requires — `./gradlew clean :app:assembleDebug`, both sides, same machine — the
+parent commit `3e2ee7b` builds 20,909,015 B and this change builds 20,925,399 B.
 
 **Read `--rerun` and a cleared `app/build/test-results` as part of the method, not as decoration.**
 `org.gradle.caching=true` means a plain re-run can report `testDebugUnitTest FROM-CACHE` and execute
 nothing, and a run interrupted partway leaves XML files that look like a complete pass. Both
-happened while taking the numbers above. Check that the task line reads `> Task
+happened while taking the 2026-08-20 numbers. Check that the task line reads `> Task
 :app:testDebugUnitTest` with no `FROM-CACHE` or `UP-TO-DATE` suffix before quoting a count, and
 check Gradle's own last line rather than the shell's exit code — a run that printed `BUILD FAILED`
 here still exited 0.
 
-Twice during this session `:app:testDebugUnitTest` failed with `NoSuchFileException:
+Twice during the 2026-08-20 session `:app:testDebugUnitTest` failed with `NoSuchFileException:
 …/binary/in-progress-results-generic.bin` after every test had already run and been written. It
 recurred both with and without `--no-daemon`, so the cause is not established; deleting
 `app/build/test-results` before the run has cleared it each time.
@@ -42,6 +52,11 @@ recurred both with and without `--no-daemon`, so the cause is not established; d
   the screen the app opens on.
 - Oura OAuth, intervals.icu activity sync and optional Anthropic/OpenAI/Google workout analysis are
   implemented. AI analysis is requested manually, stored only in memory and never edits the plan.
+- Two deterministic rules read the stored measurements and speak on the Today screen. The readiness
+  rule offers to shift the programme or lighten a session; the easy-run drift rule offers nothing at
+  all — it reports that the last three comparable easy sessions each exceeded the median intensity
+  of this athlete's own comparable sessions, and has no plan-changing button because there is
+  nothing to change. Both stay silent without a measurement behind them.
 - Credential fields do not enter saved-instance state, and are cleared once the key is stored —
   only on success, so a failed write leaves the key in the field to retry. Each service keeps its
   own preferences file and Keystore alias while sharing one AES-GCM implementation. Failed secure
@@ -70,6 +85,11 @@ numbers — including the one methodological finding on this page that cost a fu
 establish, and that anyone measuring an APK here needs before they start. Restored below,
 unchanged, as it was written when each figure was taken.
 
+
+**2026-08-21.** The easy-run drift rule cost **16,384 B (+0.078 %)** — 20,909,015 B before and
+20,925,399 B after, both from `./gradlew clean :app:assembleDebug` on one machine. One dex page, the
+same quantum the diagnostics screen came to, and unsurprising: the whole feature is a pure function,
+a card, no new dependency, no new column and nothing new fetched.
 
 Replacing the Strava client with the intervals.icu one **shrank** the APK by 16,472 B — 20,761,315 B
 before, 20,744,843 B after — which is the clearest measure of how much smaller a personal API key is

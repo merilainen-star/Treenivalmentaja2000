@@ -200,6 +200,50 @@ Dismissal ("Ei nyt") is held in memory for the current day rather than persisted
 comes back tomorrow morning against a fresh reading is the intended behaviour; a stored flag would
 need its own table and its own expiry rules to achieve something worse.
 
+### Easy-run drift — a fact, with no button under it
+
+Implemented in `EasyRunDriftUseCase`, and it goes one step further than the readiness rule: it is
+not part of the engine **and it needs no engine operation at all**, because it proposes no change.
+It reads the plan's sessions and what the watch measured for the completed ones, and returns either
+a finding or nothing.
+
+*What it detects.* Not one hard easy run — that is a Tuesday, a hill, a headwind. Three in a row is
+a finding: base training stops being base training, and the next hard session arrives on tired legs.
+
+*The measure is `icu_intensity`, not `icu_training_load`.* Load grows with duration, so a long calm
+run scores high without being hard — it answers "what did this cost". Intensity is a percentage of
+threshold and therefore comparable across runs of different lengths; it answers "was this hard",
+which is the question.
+
+*The baseline is the athlete's own history, not a fixed band.* "Easy means under 75 % of threshold"
+would be invented physiology, which this project has avoided everywhere else. The comparison is
+against the median of the athlete's own comparable sessions: self-calibrating, needing no invented
+number, and stating a claim the person can check.
+
+**The rule, in one sentence:** the three most recent completed sessions of the same `WorkoutType`
+and the same planned `intensity` were each above the median intensity of all comparable stored
+sessions.
+
+What it will not do:
+
+- **Fewer than six comparable sessions produces silence** — three to judge plus three of baseline.
+  The same discipline as the readiness rule: no measurement, no advice.
+- **A session with no matched activity, or one synced before schema v9 and carrying no intensity,
+  is excluded rather than counted.** Missing is not zero, and it is not easy either.
+- **Equal to the median is not above it.** A flat history raises nothing, which is the correct
+  answer for an athlete whose easy runs are all alike.
+- **It only speaks on a morning an easy session is still open**, because a session already run
+  cannot be run differently. Today's session is the one it can still change; the three it reports
+  on are already done.
+- **The median includes the three being judged.** They are comparable sessions like any other, and
+  this is the conservative direction: three drifting runs pull the median towards themselves and
+  make the rule harder to satisfy, never easier.
+
+The card carries every number the claim rests on — the three measurements, the median, and how many
+sessions that median was taken over. Its only control is "Selvä", which puts it away for the day
+the way the readiness card's "Ei nyt" does; there is no plan-changing button, because lightening a
+session that is meant to be light is incoherent.
+
 ## Future AI Advisor
 - **Role:** Replaces the local deterministic rules for complex, multi-week plan adjustments based on chronic load and Oura readiness scores.
 - **Constraint:** The AI **never** modifies the Room database directly.

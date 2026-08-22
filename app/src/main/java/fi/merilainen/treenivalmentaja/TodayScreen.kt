@@ -47,6 +47,7 @@ import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
+import fi.merilainen.treenivalmentaja.domain.EasyRunDrift
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
@@ -81,6 +82,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val intervalsState by viewModel.intervalsState.collectAsState()
     val runMetrics by viewModel.runMetrics.collectAsState()
     val advice by viewModel.readinessAdvice.collectAsState()
+    val drift by viewModel.easyRunDrift.collectAsState()
     val analyses by viewModel.aiAnalyses.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
@@ -122,6 +124,8 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onShiftProgramme = viewModel::shiftProgrammeForward,
         onStartLighter = viewModel::startTodayLighter,
         onDismissAdvice = viewModel::dismissReadinessAdvice,
+        easyRunDrift = drift,
+        onDismissDrift = viewModel::dismissEasyRunDrift,
         missedSessionsProposal = missedProposal,
         onAcceptMissedSessions = viewModel::acceptMissedSessionsProposal,
         onRejectMissedSessions = viewModel::rejectMissedSessionsProposal,
@@ -157,6 +161,8 @@ fun TodayScreenContent(
     onShiftProgramme: () -> Unit = {},
     onStartLighter: () -> Unit = {},
     onDismissAdvice: () -> Unit = {},
+    easyRunDrift: EasyRunDrift = EasyRunDrift.None,
+    onDismissDrift: () -> Unit = {},
     missedSessionsProposal: MissedSessionsProposal = MissedSessionsProposal.None,
     onAcceptMissedSessions: () -> Unit = {},
     onRejectMissedSessions: () -> Unit = {},
@@ -206,6 +212,13 @@ fun TodayScreenContent(
                 onStartLighter = onStartLighter,
                 onDismiss = onDismissAdvice,
             )
+        }
+
+        // After the readiness question and before the sessions, in the order a morning is read:
+        // what the body says, what to do about it, then what the last three easy ones actually
+        // were. It asks for nothing, so it sits below the card that does.
+        (easyRunDrift as? EasyRunDrift.Finding)?.let { finding ->
+            EasyRunDriftCard(finding = finding, onDismiss = onDismissDrift)
         }
 
         if (todayWorkouts.isNotEmpty()) {
