@@ -29,6 +29,36 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   drawn, so a slow read cannot flash the card up on a launch where it had already been answered.
   Still keyed by the plan-zone date and still expiring at midnight: this makes "ei nyt" survive a
   restart, not become "never".
+## [Unreleased] - 2026-08-21
+
+### Added
+- **The guided workout now tells the AI coach what was actually done.** Tick every movement and
+  press "Valmis" and the analysis is told the session was carried out in full; stop half way and
+  press it anyway and the analysis is told which movements were left. The count is written to the
+  session's `COMPLETED` event, under a `guided` key in `payloadJson` — no schema change; that column
+  already existed for the reschedule payload. See
+  [ADR-012](docs/DECISIONS.md#adr-012-what-the-guided-workout-recorded-travels-on-the-completion-event).
+- **The plan's own movements now reach the prompt** — names, sets, reps, loads, rep ranges, ramps
+  and rounds, each number written with its unit. They were in the database, structured, all along;
+  nothing read them for the analysis.
+
+### Fixed
+- Asked about a completed strength session, the model used to answer *"Toteutuneista liikkeistä,
+  toistoista, kuormista tai kierroksista ei ole tietoa"* — and it was right. It had been sent a
+  duration, an intensity and a paragraph of prose. Both halves of that gap are closed above: the
+  plan is now sent, and so is what was ticked off against it.
+
+### Notes
+- **A tick says a movement was performed, not at what load.** The plan's prescription is the only
+  account of that, so a set done at 45 kg where the plan asked for 55 reaches the model as 55.
+  Recording real loads means an entry field per set — a larger and different feature.
+- The counter stays in the card's `rememberSaveable` rather than moving to the ViewModel, because
+  that is what carries it through the process being killed mid-set. It is mirrored up on every
+  change so the completion, which outlives the composition, has something to record. One direction
+  only.
+- A session completed before this shipped carries no payload and renders **no** guided section
+  rather than zero movements done. Nothing recorded and nothing done are different facts — the same
+  rule the whole Oura layer follows.
 
 ## [Unreleased] - 2026-08-16 (second entry)
 

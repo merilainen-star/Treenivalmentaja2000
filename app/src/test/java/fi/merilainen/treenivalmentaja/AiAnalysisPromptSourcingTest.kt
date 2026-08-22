@@ -20,7 +20,9 @@ import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.AnalysisModel
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
+import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
+import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
@@ -178,6 +180,101 @@ class AiAnalysisPromptSourcingTest {
       )
     }
 
+  /**
+   * The guided workout, end to end: tick every movement, press "Valmis", ask for the analysis.
+   *
+   * **This is the seam that matters and the one nothing else covers.** The counter used to live in
+   * the card's own `rememberSaveable` and go no further, so the completion recorded that a button
+   * was pressed and nothing about what had been done — and the model, correctly, reported the
+   * movements, reps and loads as unknown. Every prompt-builder test passed throughout, because the
+   * builder was handed no progress and faithfully rendered none.
+   *
+   * No screen is composed here. What is asserted is that the value the card reports up survives the
+   * completion, the database, and the rebuild of the prompt days later.
+   */
+  @Test
+  fun `a fully ticked guided workout reaches the prompt as carried out`() =
+    runTest(dispatcher) {
+      val today = LocalDate.now()
+      repository.importPlan(guidedPlanOn(today))
+      advanceUntilIdle()
+
+      val vm = viewModel()
+      advanceUntilIdle()
+
+      // What the card reports as the last box is ticked.
+      vm.recordGuidedProgress(SESSION_ID, GuidedProgress(done = 4, rounds = 2, perRound = 2))
+      vm.updateWorkoutStatus(SESSION_ID, SessionStatus.COMPLETED)
+      advanceUntilIdle()
+
+      vm.requestAiAnalysis(SESSION_ID)
+      advanceUntilIdle()
+
+      val prompt = client.prompt
+      assertNotNull("the client was never called at all", prompt)
+      // The plan's own movements, which never used to be sent at all.
+      assertTrue(
+        "the planned movements did not reach the prompt",
+        prompt!!.contains("- Penkkipunnerrus: 3 sarjaa × 8 toistoa, 40 kg"),
+      )
+      assertTrue("the rounds did not reach the prompt", prompt.contains("2 kierrosta"))
+      // And what was actually done with them.
+      assertTrue(
+        "the completion was not recorded as carried out",
+        prompt.contains("Ohjelma toteutui suunnitellusti"),
+      )
+    }
+
+  /** Stopping early has to survive the same path, and say so rather than going quiet. */
+  @Test
+  fun `an abandoned guided workout reaches the prompt as unfinished`() =
+    runTest(dispatcher) {
+      val today = LocalDate.now()
+      repository.importPlan(guidedPlanOn(today))
+      advanceUntilIdle()
+
+      val vm = viewModel()
+      advanceUntilIdle()
+
+      vm.recordGuidedProgress(SESSION_ID, GuidedProgress(done = 3, rounds = 2, perRound = 2))
+      vm.updateWorkoutStatus(SESSION_ID, SessionStatus.COMPLETED)
+      advanceUntilIdle()
+
+      vm.requestAiAnalysis(SESSION_ID)
+      advanceUntilIdle()
+
+      val prompt = client.prompt!!
+      assertTrue(prompt.contains("3 / 4 liikesuoritusta kuitattiin tehdyksi"))
+      assertTrue(prompt.contains("- Kierros 2: tehty Kissanlehmä; tekemättä Penkkipunnerrus"))
+    }
+
+  /**
+   * A session completed without the guided workout ever reporting anything must not acquire a
+   * zero. "Nothing recorded" and "nothing done" are different facts, and only one of them is true.
+   */
+  @Test
+  fun `a completion with no guided progress sends no guided section`() =
+    runTest(dispatcher) {
+      val today = LocalDate.now()
+      repository.importPlan(guidedPlanOn(today))
+      advanceUntilIdle()
+
+      val vm = viewModel()
+      advanceUntilIdle()
+      vm.updateWorkoutStatus(SESSION_ID, SessionStatus.COMPLETED)
+      advanceUntilIdle()
+
+      vm.requestAiAnalysis(SESSION_ID)
+      advanceUntilIdle()
+
+      val prompt = client.prompt!!
+      assertTrue("the plan itself should still be sent", prompt.contains("Suunniteltu ohjelma"))
+      assertTrue(
+        "an unrecorded workout must not report movements as undone",
+        !prompt.contains("liikesuoritusta kuitattiin"),
+      )
+    }
+
   // ------------------------------------------------------------------ harness
 
   private suspend fun seedRecovery(today: LocalDate) {
@@ -254,6 +351,44 @@ class AiAnalysisPromptSourcingTest {
     const val SESSION_ID = "s-1"
 
     val CREDENTIALS = OuraCredentials(clientId = "id", clientSecret = "secret")
+
+    /**
+     * A strength session the guided workout can actually be walked through: two movements, two
+     * rounds, and a load on one of them so the prompt has a number to carry.
+     */
+    fun guidedPlanOn(day: LocalDate): String =
+      """
+      {
+        "schemaVersion": 1,
+        "plan": {
+          "id": "plan-ohjattu",
+          "name": "Ohjattu treeni",
+          "timeZone": "Europe/Helsinki",
+          "startDate": "$day"
+        },
+        "weeks": [
+          {
+            "weekNumber": 1,
+            "sessions": [
+              {
+                "id": "$SESSION_ID",
+                "type": "STRENGTH",
+                "date": "$day",
+                "time": "09:00",
+                "durationMin": 20,
+                "intensity": "MODERATE",
+                "rounds": 2,
+                "description": "Voima A.",
+                "exercises": [
+                  { "name": "Kissanlehmä", "reps": 10 },
+                  { "name": "Penkkipunnerrus", "sets": 3, "reps": 8, "weightKg": 40.0 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+      """
 
     /** One planned strength session on the given day, so it falls inside the upcoming window. */
     fun planWithSessionOn(day: LocalDate): String =
