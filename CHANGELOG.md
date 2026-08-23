@@ -59,6 +59,54 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 - A session completed before this shipped carries no payload and renders **no** guided section
   rather than zero movements done. Nothing recorded and nothing done are different facts — the same
   rule the whole Oura layer follows.
+## [Unreleased] - 2026-08-21
+
+### Added
+- **"Kevyet lenkit ovat kiristyneet"** — a card on the morning of an easy session, when the last
+  three comparable easy sessions were each run harder than this athlete's own easy sessions usually
+  are. `EasyRunDriftUseCase` and `EasyRunDriftCard`, the Phase A′ rule
+  [ROADMAP.md](docs/ROADMAP.md) has carried as designed-but-unbuilt since 2026-08-16, now built to
+  the specification written then.
+
+  **It is the first card in the app with no action button under it**, and that is the design rather
+  than an omission. The three sessions it reports on are already run, and lightening a session that
+  is *meant* to be light is incoherent — so the rule needs no engine operation at all, the first one
+  here that changes nothing about the plan. The single control, "Selvä", puts the card away for the
+  day the way the readiness card's "Ei nyt" does.
+
+  The measure is `icu_intensity` rather than `icu_training_load`: load grows with duration, so a
+  long calm run scores high without being hard. Intensity is a percentage of threshold and therefore
+  comparable across runs of different lengths. The baseline is the median of the athlete's own
+  comparable sessions — same `WorkoutType`, same planned `intensity` — rather than a fixed band,
+  because "easy means under 75 % of threshold" would be invented physiology, and this project has
+  put none of that in the code anywhere else.
+
+  Every number the claim rests on is on the card: the three measurements, the median, and how many
+  sessions that median was taken over.
+
+### Notes
+- **It cost the database nothing.** No new column, no migration, no new field fetched — the first
+  step of this milestone that needed neither. The plan's `intensity` has been in Plan Schema v1
+  since the beginning and `CompletedRunMetrics.intensityPercent` has been stored since schema v9.
+  Set against the standing rule that "adding a column does not fill it", a rule built entirely from
+  columns that are already full is the cheap kind.
+- **Two things the design left open, decided while building.** The comparison population is what the
+  app can *classify* — completed sessions of the active plan that a stored activity was matched to —
+  because a planned intensity is what makes a session comparable and only a session carries one; an
+  unmatched activity is a run with no stated intention behind it. And the median is taken over that
+  population **including the three under judgement**: excluding them would quietly change the claim
+  from "harder than usual" to "harder than it used to be", and keeping them in is the conservative
+  direction, since three drifting runs pull the median towards themselves and make the rule harder
+  to satisfy rather than easier.
+- **Silence is most of what it does.** Fewer than six comparable sessions produces nothing, three
+  judged plus three of baseline; a session with no matched activity, or one synced before schema v9
+  and so carrying no intensity, is excluded rather than counted as calm; equal to the median is not
+  above it; and an easy session already completed today gets no card, because this is a word before
+  a session rather than a verdict on one. Twenty of the twenty-five new tests are about those cases.
+- **`EasyRunDriftWiringTest` exists for the reason the AI prompt taught.** That bug was correct
+  logic reading a `StateFlow` nothing was subscribed to, and every test of the logic passed
+  throughout. So the rule is proved twice: once as a pure function, and once from a real Room
+  database through the ViewModel flow the Today screen collects.
 
 ## [Unreleased] - 2026-08-16 (second entry)
 

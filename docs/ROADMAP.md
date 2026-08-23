@@ -110,12 +110,14 @@ almost nothing to say about the sessions that matter most.
    change carries an author in the event log. A day the ring was not worn produces nothing — see
    [TRAINING_ENGINE.md](TRAINING_ENGINE.md#readiness-advice--asking-never-acting). This is the
    first point where the readiness number reaches the plan at all.
-3. **Easy-run drift, deterministic (Phase A′)** — designed 2026-08-16, not yet built. No AI, and
-   unusually for a rule here, **no engine operation either**: it changes nothing about the plan and
-   so needs none.
+3. ~~**Easy-run drift, deterministic (Phase A′)**~~ — designed 2026-08-16, built 2026-08-21. No AI,
+   and unusually for a rule here, **no engine operation either**: it changes nothing about the plan
+   and so needed none. `EasyRunDriftUseCase` is a pure function of the stored sessions and what the
+   watch measured for the completed ones, and `EasyRunDriftCard` is the only card in the app with
+   no action button under it.
 
-   *What it detects.* Not one hard easy run — that is a Tuesday, a hill, a headwind. Three in a
-   row is a finding: base training stops being base training, and the next hard session arrives on
+   *What it detects.* Not one hard easy run — that is a Tuesday, a hill, a headwind. Three in a row
+   is a finding: base training stops being base training, and the next hard session arrives on
    tired legs.
 
    *The measure is `icu_intensity`, not `icu_training_load`.* Load grows with duration, so a long
@@ -124,11 +126,11 @@ almost nothing to say about the sessions that matter most.
    "was this hard", which is the question.
 
    *The baseline is the athlete's own history, not a fixed band.* Writing "easy means under 75 % of
-   threshold" would put invented physiology in the code, which is what this project has avoided
-   everywhere else — `DailyRecovery.readinessLabel` shares Oura's own bands rather than inventing a
-   second opinion. The comparison is instead against the median of the athlete's own comparable
-   runs, which is self-calibrating, needs no invented number, and states a claim the person can
-   check for themselves.
+   threshold" would put invented physiology in the code, which this project has avoided everywhere
+   else — `DailyRecovery.readinessLabel` shares Oura's own bands rather than inventing a second
+   opinion. The comparison is instead against the median of the athlete's own comparable runs,
+   which is self-calibrating, needs no invented number, and states a claim the person can check for
+   themselves.
 
    *The rule, in one sentence:* the three most recent completed sessions of the same `WorkoutType`
    **and** the same planned `intensity` were each above the median intensity of all comparable
@@ -136,19 +138,29 @@ almost nothing to say about the sessions that matter most.
    silence, on the same discipline as the readiness rule: no measurement, no advice.
 
    *What it does.* A card on the morning a matching easy session is scheduled, saying that the last
-   three were run harder than usual and that this one is meant to be easy. It offers no button,
-   because there is nothing to change: the sessions in question are already done, and lightening a
-   session that is supposed to be easy is incoherent. The useful thing is the reminder arriving
-   before the run rather than a plan edit after it.
+   three were run harder than usual and that this one is meant to be easy. It offers no plan
+   button, because there is nothing to change: the sessions in question are already done, and
+   lightening a session that is supposed to be easy is incoherent. The one control puts the card
+   away for the day. The useful thing is the reminder arriving before the run rather than a plan
+   edit after it.
 
-   *What it needs that exists:* the plan's `intensity` (already in Plan Schema v1 and stored) and
-   `CompletedRunMetrics.intensityPercent` (stored since schema v9). Nothing new to fetch.
-   Activities synced before v9 carry no intensity and are correctly excluded from the comparison —
-   missing is not zero.
+   *What it needed that already existed:* the plan's `intensity` (Plan Schema v1) and
+   `CompletedRunMetrics.intensityPercent` (stored since schema v9). **Nothing new to fetch, no new
+   column, no migration** — the first feature in this milestone that cost the database nothing.
+   Activities synced before v9 carry no intensity and are excluded from the comparison rather than
+   read as 0 %: missing is not zero, and it is not easy either.
 
-   *Deliberately out of scope:* `icu_atl` and `icu_ctl` — acute and chronic load — are in the API
-   response and are **not** stored. They answer a different question ("has total load outrun the
-   plan?") and deserve their own rule rather than being folded into this one.
+   *Two decisions the design did not settle, taken while building it.* The comparison population is
+   what the app can **classify** — completed sessions of the active plan that a stored activity was
+   matched to — because a planned intensity is what makes a run comparable and only a session
+   carries one. And the median is taken over that population **including the three under
+   judgement**, which is the conservative direction: three drifting runs pull the median towards
+   themselves and make the rule harder to satisfy, never easier.
+
+   *Deliberately out of scope:* `icu_atl` and `icu_ctl` — acute and chronic load — answer a
+   different question ("has total load outrun the plan?") and deserve their own rule rather than
+   being folded into this one.
+
 4. ~~**AI coach comments, read-only (Phase B)**~~ — built. An "AI-analyysi" button under individual
    workouts, in two flavours: what a **completed** session cost against that morning's recovery, and
    how to execute an **upcoming** one against the current trend. BYOK — the user's own Anthropic key,
@@ -193,10 +205,41 @@ almost nothing to say about the sessions that matter most.
    user preferences carried in the prompt, and the advisor asks its clarifying questions before
    proposing.
 
+## Designed, not built
+
+- **Active Workout Mode V1** — specified 2026-08-22 in [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md). A
+  guided session that shows one thing at a time and carries the workout from the first movement to
+  the last: a start summary with the equipment needed, a **preparation step before every movement**,
+  the movement itself, a rest that counts down and names what follows, automatic round tracking, and
+  a finish with an optional session RPE.
+
+  *The principle it turns on:* the app may start a rest timer, advance the round number and announce
+  that a time has run out, but **it may not start the next movement**. That happens on "Olen valmis"
+  and nothing else — because in home training the gaps are real, and a kettlebell has to be fetched
+  before the set begins.
+
+  *What the survey found.* Most of it exists. The timer, the round counter, the prescriptions, the
+  exercise guide and the whole session state machine are built; `restSec` has been validated and
+  stored since Plan Schema v1 with **nothing reading it**, so the rest timer is a reader for a field
+  that has been waiting for one. The session's own duration is the gap between its `STARTED` and
+  `COMPLETED` events, so §8's summary needs no column either. What is genuinely new is the
+  full-screen mode, the preparation step, and recording a *skipped movement* and the RPE.
+
+  *The hard part is the clock.* The existing countdown counts ticks inside a composable, which is
+  fine for a plank being watched and wrong for a rest with the phone face-down and the process
+  frozen. It has to be computed from a wall-clock deadline, and the alarm and notification machinery
+  the reminders already use is what makes a sound with the screen off.
+
+  *Two schema questions:* Plan Schema v1 has **no equipment field** (the one in the exercise-guide
+  responses is English, fetched, and not cacheable, so it cannot serve), and `restSec` is per
+  exercise with nothing for the pause between rounds.
+
 ## Later (Phase 4 & Beyond)
 - Logging what was actually lifted, so a strength session can be compared with the last time it
   was done. Oura holds completed workouts but not per-set loads, so the "history lives in Oura"
-  reasoning does not cover this one.
+  reasoning does not cover this one. Active Workout Mode's §7 is a deliberately small slice of this
+  and is designed not to lock its shape in — see
+  [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md#3-recording-the-outcome-without-pre-empting-the-gym-log).
 
 ## Blocked
 - None. The Oura milestone is built end to end and a real account is connected.
