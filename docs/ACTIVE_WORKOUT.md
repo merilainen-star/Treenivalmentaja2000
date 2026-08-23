@@ -1,8 +1,14 @@
 # Active Workout Mode
 
 **Status: designed 2026-08-22, not built.** This page is the specification and the survey of what
-building it would cost, written against the code as it stands at `0d274cc`. Nothing here is
-implemented; where the text says "already exists" it names the file that proves it.
+building it would cost. Nothing in §1–§8 is implemented; where the text says "already exists" it
+names the file that proves it.
+
+Surveyed against `0d274cc` and **re-checked against `2f79a9e`**, which is where one of its
+recommendations had already been built by the time this landed: §3 below proposed recording the
+outcome as a payload on the `COMPLETED` event, and `GuidedProgress`, `SessionPayloadJson` and
+`TrainingRepository.completeGuided` now do exactly that for the count of ticked movements. The
+sections concerned say so rather than still proposing it.
 
 ## What it is
 
@@ -105,6 +111,7 @@ More than the specification assumes. This is mostly a rearrangement of built par
 | Ending early, skipping the session (§6) | The session state machine: `SKIPPED`, `CANCELLED`, and the append-only event log — [TRAINING_ENGINE.md](TRAINING_ENGINE.md). |
 | Saving the session (§8) | The existing `COMPLETED` transition. Nothing new. |
 | "Kesto: 24 min" (§8) | **Derivable without a new column**: the gap between the `STARTED` and `COMPLETED` event timestamps. |
+| Recording an outcome at all (§7, §8) | `TrainingRepository.completeGuided` writes a `GuidedProgress` — how many movements were ticked, against how long a sequence — as JSON on the `COMPLETED` event, and `guidedProgressFor` reads it back from the newest completion carrying one. The mechanism the feel answers and the RPE need is therefore built; only the fields are missing. |
 | Rest lengths (§4) | **The data is already stored.** `restSec` is validated (`PlanValidator`) and persisted with every exercise — and nothing reads it. The rest timer is a reader for a field that has been waiting for one, the same shape as `icu_atl`/`icu_ctl` before the analysis feature. |
 
 ## What has to be built
@@ -120,7 +127,9 @@ More than the specification assumes. This is mostly a rearrangement of built par
    under ExerciseDB's terms, so it cannot serve this. Either derive a partial line from `weightKg`,
    or add an optional field to the schema.
 5. **Skipping one movement, as recorded data.** Unticking a row is not the same as "skipped".
-6. **The feel and RPE answers (§7, §8).** No storage exists for either.
+6. **The feel and RPE answers (§7, §8).** No *fields* exist for either — but the place to put them
+   does, and it is already carrying the movement count: one more key in `SessionPayloadJson`'s
+   payload, written by the same `completeGuided` call.
 7. **Keeping the screen awake, and vibration.** Neither exists: no `FLAG_KEEP_SCREEN_ON` anywhere,
    no `Vibrator`, no `VIBRATE` permission. Without the first the whole mode is unusable.
 
@@ -167,12 +176,20 @@ an interrupted session starts again.
 [ROADMAP.md](ROADMAP.md) already carries "logging what was actually lifted" as later work. §7 is a
 small slice of that and should not lock its design in.
 
-The cheapest reversible answer: **one `payloadJson` on the `COMPLETED` event** — duration, skipped
-movements, per-movement feel, RPE. No migration, the append-only log stays the single history, and a
-real per-set table later can read it. Note the constraint that shapes this: `TrainingRepository.transition`
+**This one is settled, and by code rather than by argument.** `completeGuided` writes the guided
+count as a `payloadJson` on the `COMPLETED` event and `guidedProgressFor` reads it back — no
+migration, the append-only log stays the single history, and a real per-set table later can read
+what is already there. The skipped movements, the per-movement feel and the RPE extend that same
+payload rather than needing anything new.
+
+Note the constraint that shaped it, because it also shapes what §7 can be: `TrainingRepository.transition`
 writes an event only with a status change, so nothing can be logged movement by movement as it
-happens. It is collected in memory and written once at the end — which is exactly what §8's
-"Tallenna treeni" button is.
+happens. It is collected in memory — `WorkoutViewModel.recordGuidedProgress` — and written once at
+the end, which is exactly what §8's "Tallenna treeni" button is.
+
+`GuidedProgress` also demonstrates the discipline the rest of the outcome data should follow: it
+stores the *shape* it was counted against (`rounds`, `perRound`) beside the count, because "6"
+alone cannot be read later once "Kevyempi versio" has swapped the list underneath it.
 
 ### 4. Two schema questions
 

@@ -222,8 +222,11 @@ almost nothing to say about the sessions that matter most.
   exercise guide and the whole session state machine are built; `restSec` has been validated and
   stored since Plan Schema v1 with **nothing reading it**, so the rest timer is a reader for a field
   that has been waiting for one. The session's own duration is the gap between its `STARTED` and
-  `COMPLETED` events, so §8's summary needs no column either. What is genuinely new is the
-  full-screen mode, the preparation step, and recording a *skipped movement* and the RPE.
+  `COMPLETED` events, so §8's summary needs no column either. And the outcome's storage arrived
+  before the feature did: `completeGuided` already writes a `GuidedProgress` as a payload on the
+  completion event, so the feel answers and the RPE extend a mechanism rather than inventing one.
+  What is genuinely new is the full-screen mode, the preparation step, and recording a *skipped
+  movement*.
 
   *The hard part is the clock.* The existing countdown counts ticks inside a composable, which is
   fine for a plank being watched and wrong for a rest with the phone face-down and the process
