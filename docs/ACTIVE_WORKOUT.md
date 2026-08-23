@@ -211,6 +211,26 @@ Decide these before building, not during:
   no repetitions and no rests. V1 should require a real array and fall back to today's card
   otherwise.
 
+## The other document about this screen
+
+[UI_REDESIGN_SPEC.md](UI_REDESIGN_SPEC.md) — written from a separate brief and stored on the same
+day — has a section called **"Aktiivinen Treeni (Workout in Progress)"**, and its mockups include
+that screen in both themes. The two pages are about the same thing from opposite ends, and neither
+replaces the other: this one settles **what happens and when**, that one settles **what it looks
+like**. Read both before building it.
+
+They agree on the substance — a progress meter across the top, a hero card for the movement in
+hand, a circular ring for a timed one, and exercise imagery through the existing Coil path.
+
+**One point needs reconciling, and it is a real design question rather than a wording clash.** The
+redesign asks for a compact *"Seuraavat harjoitukset"* list of what is still to come in the round;
+this page's whole principle is one thing at a time, with the next movement disclosed on its own
+preparation screen. The two can be had together — a short "next up" strip is not the same as the
+day's full list, and knowing what is coming while you finish a set is genuinely useful — but
+whoever builds it should decide deliberately, because the failure mode is exactly the one this
+design exists to avoid: a screen that shows the whole session again and leaves the person to find
+their own place in it.
+
 ## Suggested slices
 
 1. **Full-screen route, step list, preparation step**, reusing the existing timer. No schema change,
