@@ -6,27 +6,31 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-08-23
-- Base commit: `5ba8831` — the theme preference, on top of `9cb8e49`
+- Base commit: the theme preference merged with `2f79a9e`; measured on the merge result
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36.1 and
-  build-tools 36.1.0 installed for this measurement
+  build-tools 36.1.0
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `rm -rf app/build/test-results && ./gradlew :app:testDebugUnitTest --rerun` | 564 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 53 comparisons, 0 changed, 53 unchanged |
+| Unit tests | `rm -rf app/build/test-results && ./gradlew :app:testDebugUnitTest --rerun` | 589 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 54 comparisons, 0 changed, 54 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 44 warnings |
-| Debug APK | `./gradlew :app:assembleDebug` in a fresh `git worktree` | 20,941,783 bytes |
+| Debug APK | `./gradlew clean :app:assembleDebug`, and a fresh `git worktree` for the comparison | 20,941,783 bytes |
 | Instrumented | `adb devices -l` | Not run: no device or emulator attached |
+
+The 44 warnings are the same set as on 2026-08-21 — dependency-update notices, two `UseKtx`
+suggestions on the API-key stores, one `RedundantLabel` and one `ObsoleteSdkInt` that must stay.
+None is in the code added here.
 
 **Read `--rerun` and a cleared `app/build/test-results` as part of the method, not as decoration.**
 `org.gradle.caching=true` means a plain re-run can report `testDebugUnitTest FROM-CACHE` and execute
 nothing, and a run interrupted partway leaves XML files that look like a complete pass. Both
-happened while taking the numbers above. Check that the task line reads `> Task
+happened while taking the 2026-08-20 numbers. Check that the task line reads `> Task
 :app:testDebugUnitTest` with no `FROM-CACHE` or `UP-TO-DATE` suffix before quoting a count, and
 check Gradle's own last line rather than the shell's exit code — a run that printed `BUILD FAILED`
 here still exited 0.
 
-Twice during this session `:app:testDebugUnitTest` failed with `NoSuchFileException:
+Twice during the 2026-08-20 session `:app:testDebugUnitTest` failed with `NoSuchFileException:
 …/binary/in-progress-results-generic.bin` after every test had already run and been written. It
 recurred both with and without `--no-daemon`, so the cause is not established; deleting
 `app/build/test-results` before the run has cleared it each time.
@@ -43,6 +47,11 @@ recurred both with and without `--no-daemon`, so the cause is not established; d
   the screen the app opens on.
 - Oura OAuth, intervals.icu activity sync and optional Anthropic/OpenAI/Google workout analysis are
   implemented. AI analysis is requested manually, stored only in memory and never edits the plan.
+- Two deterministic rules read the stored measurements and speak on the Today screen. The readiness
+  rule offers to shift the programme or lighten a session; the easy-run drift rule offers nothing at
+  all — it reports that the last three comparable easy sessions each exceeded the median intensity
+  of this athlete's own comparable sessions, and has no plan-changing button because there is
+  nothing to change. Both stay silent without a measurement behind them.
 - Credential fields do not enter saved-instance state, and are cleared once the key is stored —
   only on success, so a failed write leaves the key in the field to retry. Each service keeps its
   own preferences file and Keystore alias while sharing one AES-GCM implementation. Failed secure
@@ -75,6 +84,11 @@ numbers — including the one methodological finding on this page that cost a fu
 establish, and that anyone measuring an APK here needs before they start. Restored below,
 unchanged, as it was written when each figure was taken.
 
+
+**2026-08-21.** The easy-run drift rule cost **16,384 B (+0.078 %)** — 20,909,015 B before and
+20,925,399 B after, both from `./gradlew clean :app:assembleDebug` on one machine. One dex page, the
+same quantum the diagnostics screen came to, and unsurprising: the whole feature is a pure function,
+a card, no new dependency, no new column and nothing new fetched.
 
 Replacing the Strava client with the intervals.icu one **shrank** the APK by 16,472 B — 20,761,315 B
 before, 20,744,843 B after — which is the clearest measure of how much smaller a personal API key is
@@ -119,7 +133,60 @@ other 38 are — one is a `RedundantLabel`, and one is an `ObsoleteSdkInt` that 
 
 ### 2026-08-23 — the theme preference
 
-The previous block, kept because a measurement is history rather than a status line:
+**It costs nothing measurable.** Built from fresh `git worktree`s with their own empty `build/`
+directories, on one machine, in one sitting: the merge base `2f79a9e` builds **20,941,783 B** and
+the same tree with the theme preference builds **20,941,783 B**. The two APKs differ (`sha256`
+`c175228a…` and `0bf3edc0…`); their sizes do not.
+
+**That is the 16 KiB quantum, and it is worth writing down before someone quotes a page as a
+cost.** Measured here, `9cb8e49` builds 20,925,399 B, and *either* feature added on top of it —
+the easy-run drift rule (`2f79a9e`) or this one — builds 20,941,783 B, as does the tree carrying
+both. Each real cost is a few KB of dex; the APK reports them only when their sum crosses an
+alignment page. An earlier draft of this entry read the 16,384 B between `9cb8e49` and this branch
+as "what the theme preference cost". It was a page boundary that the drift rule had already
+crossed, and the corrected figure is the one above.
+
+**Do not read across machines, including the two dates below.** The 2026-08-21 block reports
+`2f79a9e` at 20,925,399 B; this machine builds that same commit at 20,941,783 B — one page more.
+20,925,399 B is also exactly what this machine builds `9cb8e49` at, which is a coincidence of the
+quantum and not an agreement about anything. Only the same-machine, same-sitting pair at the top of
+this entry is a delta. The 21,219,444 B from 2026-08-20 stays non-comparable for the reason that
+block already gives: it was not taken with `clean`.
+
+The theme preference adds three unit tests and two screenshot baselines; with main's easy-run drift
+rule merged in, the counts stand at 589 and 54. No new dependency: one enum, one DataStore class
+reusing the `settings` file three other stores already share, and one card.
+
+**The instrumented suite was not run for this change.** There is no device or emulator in the
+environment it was written in, so `MigrationTest`, `OuraTokenStoreTest` and the rest are unverified
+here; nothing in this change touches Room, the Keystore or the image loader they cover.
+
+**2026-08-21.** The block that stood before this one, kept because a measurement is history rather
+than a status line:
+
+- Date: 2026-08-21
+- Base commit: `3e2ee7b` plus the easy-run drift rule, committed together
+- Toolchain: JDK 21, Gradle 9.6.1 via wrapper
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 564 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 52 comparisons, 0 changed, 52 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 44 warnings |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 20,925,399 bytes |
+| Instrumented | `adb devices -l` | Not run: no device or emulator attached |
+
+Its 44 lint warnings were 40 dependency-update notices, two `UseKtx` suggestions on the two API-key
+stores, one `RedundantLabel` and one `ObsoleteSdkInt` that must stay; none in the code added there,
+and the count moved from 43 because upstream releases keep arriving.
+
+Its APK note, kept verbatim: "The previous block's 21,219,444 B is **not** comparable with the
+figure above: it was not taken with `clean`, and this page's own methodology says such a number
+should never have been quoted. Measured the way the method requires — `./gradlew clean
+:app:assembleDebug`, both sides, same machine — the parent commit `3e2ee7b` builds 20,909,015 B and
+this change builds 20,925,399 B."
+
+**2026-08-20.** The block that stood before that one:
 
 - Date: 2026-08-20
 - Base commit: `65d0f5a` plus the audit fixes and their follow-up review, committed together
@@ -132,28 +199,6 @@ The previous block, kept because a measurement is history rather than a status l
 | Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 43 warnings |
 | Debug APK | `./gradlew :app:assembleDebug` | 21,219,444 bytes |
 | Instrumented | `adb devices -l` | Not run: no device or emulator attached |
-
-**The 21,219,444 B above and the 20,941,783 B in the current block are not a delta.** They were
-produced by different Android SDK installs — platform 36.1 and build-tools 36.1.0 were installed
-from scratch for this measurement — and this page has already been wrong once about attributing a
-cross-toolchain difference to source. Subtracting them would say the theme card removed 277,661 B,
-which is nonsense.
-
-**What the theme preference cost is 16,384 B**, measured the only way this page accepts: both sides
-built from a fresh `git worktree` with its own empty `build/` directory, on one machine, in one
-sitting — `9cb8e49` at 20,925,399 B and `5ba8831` at 20,941,783 B. That is one 16 KiB alignment
-page, and the same figure an incremental build of each side gave, which is the agreement that makes
-it worth quoting. No new dependency: the preference is one enum, one DataStore class reusing the
-`settings` file three other stores already share, and one card.
-
-The three unit tests and two screenshot baselines the feature adds account for the counts moving to
-564 and 53. The 44th lint warning is not from this change — every warning is a
-`GradleDependency`/`NewerVersionAvailable` notice, a `RedundantLabel` or the `ObsoleteSdkInt` that
-must stay, and dependency notices appear as versions are published elsewhere.
-
-**The instrumented suite was not run for this change.** There is no device or emulator in the
-environment it was written in, so `MigrationTest`, `OuraTokenStoreTest` and the rest are unverified
-here; nothing in this change touches Room, the Keystore or the image loader they cover.
 
 Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)).
 `assembleDebug` needs a local `debug.keystore` at the repository root; it is git-ignored, see

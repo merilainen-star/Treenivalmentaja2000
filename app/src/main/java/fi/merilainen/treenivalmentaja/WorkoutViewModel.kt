@@ -49,6 +49,8 @@ import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.EasyRunDrift
+import fi.merilainen.treenivalmentaja.domain.EasyRunDriftUseCase
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
 import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
@@ -151,6 +153,7 @@ class WorkoutViewModel(
   private val intervalsConnection: IntervalsConnection? = null,
   private val intervalsRepository: IntervalsRepository? = null,
   private val readinessAdviceUseCase: ReadinessAdviceUseCase = ReadinessAdviceUseCase(),
+  private val easyRunDriftUseCase: EasyRunDriftUseCase = EasyRunDriftUseCase(),
   /**
    * The AI analysis collaborators, all nullable for the reason [intervalsConnection] is: the
    * existing unit tests have no Keystore to build a real key store against, and a ViewModel that
@@ -778,6 +781,41 @@ class WorkoutViewModel(
       advice.lightenableSessionIds.forEach { repository.applyLighterVersion(it, EventSource.ENGINE) }
       dismissReadinessAdvice()
     }
+  }
+
+  // ------------------------------------------------------------------ easy-run drift
+
+  /** Put away for today, on the same reasoning as [_dismissedAdviceFor] and with the same reach. */
+  private val _dismissedDriftFor = MutableStateFlow<LocalDate?>(null)
+
+  /**
+   * Whether the last three comparable easy sessions were each run harder than this athlete's own
+   * easy sessions usually are, on a morning where another easy one is still ahead.
+   *
+   * Built from the repositories rather than from the screen's own state, which is the lesson the AI
+   * prompt learned the expensive way: a flow only the Week screen collects supplies nothing to a
+   * rule evaluated from Today. [runMetrics] above holds exactly this map, but it is the ViewModel's
+   * view of it for the cards; this reads the source, so the rule cannot depend on who is looking.
+   *
+   * Nothing is written and nothing is proposed — see [EasyRunDriftUseCase]. It needs no engine
+   * operation because it changes nothing about the plan.
+   */
+  val easyRunDrift: StateFlow<EasyRunDrift> =
+    combine(
+        repository.observeSessions(),
+        intervalsRepository?.observeMatchedRunMetrics()
+          ?: MutableStateFlow(emptyMap<String, CompletedRunMetrics>()),
+        _dismissedDriftFor,
+        currentDate,
+      ) { sessions, metrics, dismissedFor, today ->
+        if (dismissedFor == today) EasyRunDrift.None
+        else easyRunDriftUseCase.execute(today, sessions, metrics)
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EasyRunDrift.None)
+
+  /** "Selvä." Comes back on the next easy morning the numbers still say it. */
+  fun dismissEasyRunDrift() {
+    _dismissedDriftFor.value = currentDate.value
   }
 
   // ------------------------------------------------------------------ AI analysis
