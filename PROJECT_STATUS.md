@@ -5,16 +5,17 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
-- Date: 2026-08-20
-- Base commit: `65d0f5a` plus the audit fixes and their follow-up review, committed together
-- Toolchain: JDK 21, Gradle 9.6.1 via wrapper
+- Date: 2026-08-23
+- Base commit: `5ba8831` — the theme preference, on top of `9cb8e49`
+- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36.1 and
+  build-tools 36.1.0 installed for this measurement
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 539 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 51 comparisons, 0 changed, 51 unchanged |
-| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug` | 21,219,444 bytes |
+| Unit tests | `rm -rf app/build/test-results && ./gradlew :app:testDebugUnitTest --rerun` | 564 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 53 comparisons, 0 changed, 53 unchanged |
+| Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 44 warnings |
+| Debug APK | `./gradlew :app:assembleDebug` in a fresh `git worktree` | 20,941,783 bytes |
 | Instrumented | `adb devices -l` | Not run: no device or emulator attached |
 
 **Read `--rerun` and a cleared `app/build/test-results` as part of the method, not as decoration.**
@@ -46,6 +47,10 @@ recurred both with and without `--no-daemon`, so the cause is not established; d
   only on success, so a failed write leaves the key in the field to retry. Each service keeps its
   own preferences file and Keystore alias while sharing one AES-GCM implementation. Failed secure
   writes are visible and never produce a connected/configured state.
+- The colour scheme is a preference: vaalea, tumma, or järjestelmä, kept in the `settings`
+  DataStore under `theme_preference` and read in `MainActivity` so it covers the splash and the
+  system bars as well as the screens. It defaults to following the phone, which is what the app did
+  before the preference existed. Dynamic colour on Android 12+ is unaffected.
 - Android backup and device transfer are disabled for the whole app. Defence-in-depth XML rules
   separately exclude Room, DataStore and all credential files. Room is not SQLCipher-encrypted; the
   accepted boundary is Android private storage plus backup opt-out for this single-user build.
@@ -111,6 +116,44 @@ and its workflow says so rather than implying the suite ran.
 The 41 lint warnings are all non-functional: 39 are dependency-update notices — one of them for
 the WorkManager added in this change, which is left at 2.10.0 rather than chased to 2.11.2, as the
 other 38 are — one is a `RedundantLabel`, and one is an `ObsoleteSdkInt` that must stay.
+
+### 2026-08-23 — the theme preference
+
+The previous block, kept because a measurement is history rather than a status line:
+
+- Date: 2026-08-20
+- Base commit: `65d0f5a` plus the audit fixes and their follow-up review, committed together
+- Toolchain: JDK 21, Gradle 9.6.1 via wrapper
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 539 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 51 comparisons, 0 changed, 51 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug` | 21,219,444 bytes |
+| Instrumented | `adb devices -l` | Not run: no device or emulator attached |
+
+**The 21,219,444 B above and the 20,941,783 B in the current block are not a delta.** They were
+produced by different Android SDK installs — platform 36.1 and build-tools 36.1.0 were installed
+from scratch for this measurement — and this page has already been wrong once about attributing a
+cross-toolchain difference to source. Subtracting them would say the theme card removed 277,661 B,
+which is nonsense.
+
+**What the theme preference cost is 16,384 B**, measured the only way this page accepts: both sides
+built from a fresh `git worktree` with its own empty `build/` directory, on one machine, in one
+sitting — `9cb8e49` at 20,925,399 B and `5ba8831` at 20,941,783 B. That is one 16 KiB alignment
+page, and the same figure an incremental build of each side gave, which is the agreement that makes
+it worth quoting. No new dependency: the preference is one enum, one DataStore class reusing the
+`settings` file three other stores already share, and one card.
+
+The three unit tests and two screenshot baselines the feature adds account for the counts moving to
+564 and 53. The 44th lint warning is not from this change — every warning is a
+`GradleDependency`/`NewerVersionAvailable` notice, a `RedundantLabel` or the `ObsoleteSdkInt` that
+must stay, and dependency notices appear as versions are published elsewhere.
+
+**The instrumented suite was not run for this change.** There is no device or emulator in the
+environment it was written in, so `MigrationTest`, `OuraTokenStoreTest` and the rest are unverified
+here; nothing in this change touches Room, the Keystore or the image loader they cover.
 
 Backend deployment: N/A by design ([ADR-006](docs/DECISIONS.md#adr-006-no-separate-backend-in-the-mvp)).
 `assembleDebug` needs a local `debug.keystore` at the repository root; it is git-ignored, see
