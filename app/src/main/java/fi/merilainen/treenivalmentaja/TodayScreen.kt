@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,7 @@ import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.formatDuration
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
+import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
@@ -108,6 +110,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onSickClicked = viewModel::markSick,
         onRecoveredClicked = viewModel::markRecovered,
         onStatusChange = viewModel::updateWorkoutStatus,
+        onGuidedProgressChange = viewModel::recordGuidedProgress,
         onMoveToTomorrow = viewModel::moveWorkoutToTomorrow,
         onExerciseClick = viewModel::openExerciseGuide,
         onGuideRetry = viewModel::retryExerciseGuide,
@@ -129,6 +132,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         missedSessionsProposal = missedProposal,
         onAcceptMissedSessions = viewModel::acceptMissedSessionsProposal,
         onRejectMissedSessions = viewModel::rejectMissedSessionsProposal,
+        onCompleteMissedSessions = viewModel::completeMissedSessionsProposal,
         analyses = analyses,
         analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
@@ -145,6 +149,7 @@ fun TodayScreenContent(
     onSickClicked: () -> Unit = {},
     onRecoveredClicked: () -> Unit = {},
     onStatusChange: (String, SessionStatus) -> Unit = { _, _ -> },
+    onGuidedProgressChange: (String, GuidedProgress) -> Unit = { _, _ -> },
     onMoveToTomorrow: (String) -> Unit = {},
     onExerciseClick: (Exercise) -> Unit = {},
     onGuideRetry: () -> Unit = {},
@@ -166,6 +171,7 @@ fun TodayScreenContent(
     missedSessionsProposal: MissedSessionsProposal = MissedSessionsProposal.None,
     onAcceptMissedSessions: () -> Unit = {},
     onRejectMissedSessions: () -> Unit = {},
+    onCompleteMissedSessions: () -> Unit = {},
     analyses: Map<String, AiAnalysisState> = emptyMap(),
     analysisConfigured: Boolean = false,
     onRequestAnalysis: (String) -> Unit = {},
@@ -200,6 +206,7 @@ fun TodayScreenContent(
                 proposal = missedSessionsProposal,
                 onAccept = onAcceptMissedSessions,
                 onReject = onRejectMissedSessions,
+                onComplete = onCompleteMissedSessions,
             )
         }
 
@@ -226,6 +233,9 @@ fun TodayScreenContent(
                 WorkoutCardToday(
                     workout = workout,
                     onStatusChange = { newStatus -> onStatusChange(workout.id, newStatus) },
+                    onGuidedProgressChange = { progress ->
+                        onGuidedProgressChange(workout.id, progress)
+                    },
                     onMoveToTomorrow = { onMoveToTomorrow(workout.id) },
                     onExerciseClick = onExerciseClick,
                     completed = completedMetrics[workout.id],
@@ -287,13 +297,30 @@ fun TodayScreenContent(
     }
 }
 
-/** A calendar change shown before it is made; rejecting this card is a pure no-op. */
+/**
+ * A calendar change shown before it is made; rejecting this card is a pure no-op.
+ *
+ * Three answers, because two were not enough. Shifting the programme forward assumes the sessions
+ * are still to be done, and rejecting changes nothing — so a backlog that will never be trained
+ * came back as the same card every day. "Merkitse tehdyiksi" closes those sessions where they
+ * stand, which is the only one of the three that ends the question.
+ *
+ * The two writing actions are laid out one per row rather than three across: "Merkitse tehdyiksi"
+ * closes sessions for good, and a button that does that should not be a narrow one squeezed in
+ * beside the others on a phone.
+ */
 @Composable
 private fun MissedSessionsProposalCard(
     proposal: MissedSessionsProposal,
     onAccept: () -> Unit,
     onReject: () -> Unit,
+    onComplete: () -> Unit,
 ) {
+    val missedCount = when (proposal) {
+        is MissedSessionsProposal.MoveOne -> 1
+        is MissedSessionsProposal.ShiftPlan -> proposal.missedSessionIds.size
+        MissedSessionsProposal.None -> return
+    }
     val preview = when (proposal) {
         is MissedSessionsProposal.MoveOne ->
             "Yksi harjoitus jäi väliin ${proposal.fromDate}. Se siirretään seuraavalle " +
@@ -303,6 +330,8 @@ private fun MissedSessionsProposalCard(
                 "(${proposal.affectedSessions} harjoitusta) siirretään ${proposal.days} päivää eteenpäin."
         MissedSessionsProposal.None -> return
     }
+    val completeLabel =
+        if (missedCount == 1) "Merkitse tehdyksi" else "Merkitse $missedCount tehdyiksi"
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -314,13 +343,18 @@ private fun MissedSessionsProposalCard(
             Text("Väliin jääneet harjoitukset", fontWeight = FontWeight.Bold)
             Text(preview, style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Kalenteria muutetaan vasta, jos hyväksyt ehdotuksen.",
+                "Kalenteria muutetaan vasta, jos hyväksyt ehdotuksen. " +
+                    "Jos harjoitukset ovat vanhoja etkä aio tehdä niitä, merkitse ne tehdyiksi — " +
+                    "silloin ne poistuvat listalta eikä tätä kysytä uudelleen.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onAccept) { Text("Hyväksy siirto") }
                 OutlinedButton(onClick = onReject) { Text("Hylkää") }
+            }
+            OutlinedButton(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
+                Text(completeLabel)
             }
         }
     }
@@ -590,6 +624,7 @@ fun WorkoutCardToday(
     workout: Workout,
     onStatusChange: (SessionStatus) -> Unit,
     onMoveToTomorrow: () -> Unit,
+    onGuidedProgressChange: (GuidedProgress) -> Unit = {},
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
@@ -680,10 +715,30 @@ fun WorkoutCardToday(
                 // is undone by walking back, not by reaching into the middle. One counter says
                 // all of that — a row is done below it, current at it, and not yet reachable
                 // above it — and there is no way to represent an order that never happened.
-                var completed by rememberSaveable(workout.id) { mutableIntStateOf(0) }
-                // The plan can change under a started session ("Kevyempi versio" swaps the list),
-                // so the counter is read through a clamp rather than trusted blindly.
+                //
+                // **Keyed by the length of the sequence as well as the session**, because
+                // "Kevyempi versio" swaps the movement list under a session that has already been
+                // walked part-way through. Carrying the old count across that swap and clamping it
+                // reads as further along than it is — three of five movements became "2 / 2 done"
+                // on the shorter list, which is a finished workout. A different sequence starts at
+                // the beginning.
+                var completed by rememberSaveable(workout.id, total) { mutableIntStateOf(0) }
+                // Still read through a clamp: the key covers a list that changed length, and this
+                // covers everything else.
                 val done = completed.coerceIn(0, total)
+
+                // Mirrored upwards on every change, and once on entry so that finishing a workout
+                // without ticking anything is still recorded as that rather than as silence.
+                //
+                // The counter stays here rather than moving to the ViewModel: `rememberSaveable`
+                // is what carries it through the process being killed mid-set, and a ViewModel
+                // field would not. What is sent up is the clamped value together with the shape it
+                // was counted against, so a reader can never pair a count with the wrong list.
+                LaunchedEffect(workout.id, done, rounds, perRound) {
+                    onGuidedProgressChange(
+                        GuidedProgress(done = done, rounds = rounds, perRound = perRound)
+                    )
+                }
 
                 for (round in 1..rounds) {
                     if (rounds > 1) {

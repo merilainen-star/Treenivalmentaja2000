@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-22
+
+### Added
+- **"Merkitse tehdyiksi"** on the "Väliin jääneet harjoitukset" card. It closes the missed
+  sessions where they stand — `COMPLETED`, on the dates they were planned for, nothing moved — and
+  it is the only one of the card's three buttons that ends the question for good.
+  The card had two answers and both assumed the training was still ahead of you: "Hyväksy siirto"
+  moves the whole programme forward and keeps every session, "Hylkää" writes nothing and expires at
+  midnight. Neither fits a plan carrying sessions that will never be trained — the rows left behind
+  while the app itself was being written — so a backlog of 35 of them asked the same question every
+  single morning, and there was no way in the app to say "those are done with".
+  The event log stays honest about it: each session gets `Merkitty tehdyksi jälkikäteen` under
+  `EventSource.USER`, so a row that reached `COMPLETED` by being ticked off can be told from one
+  that was trained. A session paused by illness gets there via `PLANNED` — the transition table's
+  own route out of the pause — and that detour is an event too.
+
+### Fixed
+- **"Hylkää" now survives a restart.** The refusal lived in a `MutableStateFlow` in the ViewModel
+  and nowhere else, so it lasted exactly as long as the process: installing a new APK over the app
+  re-asked about the same old sessions, which is how the nag was first noticed. It is written to
+  the `settings` DataStore under `missed_proposal_dismissed_for` and read back before the card is
+  drawn, so a slow read cannot flash the card up on a launch where it had already been answered.
+  Still keyed by the plan-zone date and still expiring at midnight: this makes "ei nyt" survive a
+  restart, not become "never".
+## [Unreleased] - 2026-08-21
+
+### Added
+- **The guided workout now tells the AI coach what was actually done.** Tick every movement and
+  press "Valmis" and the analysis is told the session was carried out in full; stop half way and
+  press it anyway and the analysis is told which movements were left. The count is written to the
+  session's `COMPLETED` event, under a `guided` key in `payloadJson` — no schema change; that column
+  already existed for the reschedule payload. See
+  [ADR-012](docs/DECISIONS.md#adr-012-what-the-guided-workout-recorded-travels-on-the-completion-event).
+- **The plan's own movements now reach the prompt** — names, sets, reps, loads, rep ranges, ramps
+  and rounds, each number written with its unit. They were in the database, structured, all along;
+  nothing read them for the analysis.
+
+### Fixed
+- Asked about a completed strength session, the model used to answer *"Toteutuneista liikkeistä,
+  toistoista, kuormista tai kierroksista ei ole tietoa"* — and it was right. It had been sent a
+  duration, an intensity and a paragraph of prose. Both halves of that gap are closed above: the
+  plan is now sent, and so is what was ticked off against it.
+
+### Notes
+- **A tick says a movement was performed, not at what load.** The plan's prescription is the only
+  account of that, so a set done at 45 kg where the plan asked for 55 reaches the model as 55.
+  Recording real loads means an entry field per set — a larger and different feature.
+- The counter stays in the card's `rememberSaveable` rather than moving to the ViewModel, because
+  that is what carries it through the process being killed mid-set. It is mirrored up on every
+  change so the completion, which outlives the composition, has something to record. One direction
+  only.
+- A session completed before this shipped carries no payload and renders **no** guided section
+  rather than zero movements done. Nothing recorded and nothing done are different facts — the same
+  rule the whole Oura layer follows.
 ## [Unreleased] - 2026-08-21
 
 ### Added

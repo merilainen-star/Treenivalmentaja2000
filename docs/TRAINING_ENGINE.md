@@ -130,6 +130,17 @@ later be completed or skipped.
   shift and affected count. Room changes only after **Hyväksy siirto**; **Hylkää** writes nothing.
   Before applying, the engine recomputes the proposal under a mutex, so a stale or double-accepted
   proposal cannot move the calendar twice. This flow requires neither Oura nor a recovery reading.
+- **Merkitse tehdyiksi** is the third answer, and the only one that ends the question. It moves
+  exactly the missed sessions — the past-dated open ones, never a future session — to `COMPLETED`
+  on the dates they were planned for, changing no dates at all. It exists because the other two
+  answers both assume the training is still ahead of you: a shift keeps it, a refusal expires at
+  midnight, and a backlog that will never be trained (a plan left half-finished while the app
+  itself was being developed) therefore asked the same question every single day. Each session's
+  event carries `Merkitty tehdyksi jälkikäteen` under `EventSource.USER`, so the history says these
+  rows were ticked off by hand rather than recorded as they happened; a session paused by illness
+  goes via `PLANNED`, which is the transition table's own route out of the pause, and both writes
+  are events. The staleness guard is the one `applyMissedSessions` uses: the proposal is recomputed
+  under the same mutex, and one the situation has outgrown writes nothing.
 - **Hylkää is remembered for the rest of the day**, keyed by the plan-zone date — the same
   mechanism the readiness card uses. It has to be: the preview is recomputed on every resume of the
   Today screen, which is the app's start destination, so without a memory of the refusal the card
@@ -137,6 +148,13 @@ later be completed or skipped.
   second session going missed later the same day does not get past the answer already given; the
   question comes back at the next plan-zone midnight, which makes it "not today" rather than
   "never".
+- **The refusal is persisted**, in the `settings` DataStore under `missed_proposal_dismissed_for`.
+  It used to live only in the ViewModel, which meant it lasted exactly as long as the process:
+  installing a new APK over the app — or any ordinary cold start — asked again about the same
+  sessions on the same day, minutes after they had been refused. The stored value is still a
+  plan-zone date and still expires at midnight, so this makes the answer survive a restart without
+  turning "ei nyt" into "never"; an unparseable value reads as "never refused", because a corrupt
+  preference should ask again rather than silence the card for good.
 
 ### Matching imported workouts
 
@@ -200,6 +218,11 @@ Dismissal ("Ei nyt") is held in memory for the current day rather than persisted
 comes back tomorrow morning against a fresh reading is the intended behaviour; a stored flag would
 need its own table and its own expiry rules to achieve something worse.
 
+This is deliberately *not* what the missed-session card does, and the difference is the question
+each one asks. This card asks about **this morning's measurement**, so a restart that loses the
+answer costs one re-ask of a question that was about to expire anyway. The missed-session card asks
+about **sessions that will still be missed next week**, and losing that answer meant a stale
+backlog re-asking on every install — hence the stored date there and only there.
 ### Easy-run drift — a fact, with no button under it
 
 Implemented in `EasyRunDriftUseCase`, and it goes one step further than the readiness rule: it is

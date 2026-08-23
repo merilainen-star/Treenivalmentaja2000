@@ -38,6 +38,7 @@ import fi.merilainen.treenivalmentaja.domain.AnalysisModel
 import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.domain.CompletedAnalysisInput
+import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.UpcomingAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
@@ -50,6 +51,7 @@ import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.EasyRunDrift
 import fi.merilainen.treenivalmentaja.domain.EasyRunDriftUseCase
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
+import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdviceUseCase
 import fi.merilainen.treenivalmentaja.domain.EventSource
@@ -160,6 +162,14 @@ class WorkoutViewModel(
   private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
+  /**
+   * Where a refusal of the missed-session card is written down, nullable for the same reason the
+   * collaborators above are: it is backed by DataStore, whose IO sits outside a test's scheduler,
+   * and the existing ViewModel tests cover the refusal itself without needing it to survive a
+   * process they never restart. Null means the refusal lives only in memory, which is what this
+   * class did everywhere before the store existed.
+   */
+  private val missedProposalDismissalStore: MissedProposalDismissalStore? = null,
   /**
    * **`systemDefaultZone`, not `systemUTC`** — and the difference is a bug, not a preference.
    *
@@ -930,6 +940,11 @@ class WorkoutViewModel(
             plannedDurationMin = session.durationMin?.takeIf { it > 0 },
             plannedIntensity = session.intensity,
             description = session.description,
+            plannedRounds = session.rounds,
+            exercises = session.exercises.orEmpty(),
+            // Read from the completion event, not from this class's own map: the analysis can be
+            // asked for days later, from a screen that never held the counter.
+            guided = repository.guidedProgressFor(session.id),
             oura = ouraRepository.observeMatchedMetrics().first()[session.id],
             run = runs[session.id],
             recoveryByDay = recovery,
@@ -983,12 +998,40 @@ class WorkoutViewModel(
    */
   private val _missedProposalDismissedFor = MutableStateFlow<LocalDate?>(null)
 
-  /** Refreshes a read-only proposal. Calling this never writes the calendar. */
+  /**
+   * Refreshes a read-only proposal. Calling this never writes the calendar.
+   *
+   * The refusal is read from [missedProposalDismissalStore] when this process has not seen one
+   * yet, which is what makes "ei nyt" outlive an app update. Both reads happen inside the
+   * coroutine, before the proposal is published, so a slow DataStore cannot let the card flash up
+   * on a launch where it had already been answered.
+   */
   fun checkMissedSessions() {
     if (_missedProposalDismissedFor.value == currentDate.value) return
     viewModelScope.launch {
+      val dismissedFor =
+        _missedProposalDismissedFor.value
+          ?: missedProposalDismissalStore?.dismissedFor()?.also {
+            _missedProposalDismissedFor.value = it
+          }
+      if (dismissedFor == currentDate.value) return@launch
       _missedSessionsProposal.value = engine.proposeMissedSessions()
     }
+  }
+
+  /**
+   * "Nämä on tehty." Closes the missed sessions where they are instead of moving them.
+   *
+   * The card's other two buttons both assume the training is still ahead of you: one moves the
+   * whole programme forward, the other changes nothing and lets the card return tomorrow. Neither
+   * fits a backlog of sessions that were never going to be done — the plan rows left behind while
+   * the app itself was being written — and this is the answer for those.
+   */
+  fun completeMissedSessionsProposal() {
+    val proposal = _missedSessionsProposal.value
+    if (proposal == MissedSessionsProposal.None) return
+    _missedSessionsProposal.value = MissedSessionsProposal.None
+    viewModelScope.launch { engine.completeMissedSessions(proposal) }
   }
 
   /** Applies the preview the user saw; a stale or twice-accepted preview is rejected by the engine. */
@@ -999,10 +1042,17 @@ class WorkoutViewModel(
     viewModelScope.launch { engine.applyMissedSessions(proposal) }
   }
 
-  /** "Ei nyt." Writes nothing, and — unlike before — is still true when the screen is reopened. */
+  /**
+   * "Ei nyt." Writes no calendar change, and — unlike before — is still true after a restart.
+   *
+   * The date is persisted as well as remembered: the in-memory answer died with the process, so
+   * installing a new build re-asked about the same sessions minutes after they had been refused.
+   */
   fun rejectMissedSessionsProposal() {
-    _missedProposalDismissedFor.value = currentDate.value
+    val today = currentDate.value
+    _missedProposalDismissedFor.value = today
     _missedSessionsProposal.value = MissedSessionsProposal.None
+    viewModelScope.launch { missedProposalDismissalStore?.setDismissedFor(today) }
   }
 
   /** Opens the guide sheet for one movement and starts the lookup. */
@@ -1037,12 +1087,33 @@ class WorkoutViewModel(
     _guideState.value = null
   }
 
+  /**
+   * How far each guided workout on screen has got, keyed by session id.
+   *
+   * **Mirrored from the screen rather than owned here.** The card keeps its own `rememberSaveable`
+   * counter — that is what survives the process being killed mid-workout — and reports every change
+   * up. This map exists so that pressing "Valmis" has something to write down: the counter's own
+   * scope ends with the composition, and the completion outlives it.
+   *
+   * Not persisted: a session still open when the app is killed keeps its count in the card's saved
+   * state, not here, and one that is finished has already had the count written to its completion
+   * event.
+   */
+  private val guidedProgress = MutableStateFlow<Map<String, GuidedProgress>>(emptyMap())
+
+  fun recordGuidedProgress(sessionId: String, progress: GuidedProgress) {
+    guidedProgress.update { it + (sessionId to progress) }
+  }
+
   fun updateWorkoutStatus(workoutId: String, newStatus: SessionStatus) {
     viewModelScope.launch {
-      if (newStatus == SessionStatus.REPLACED_WITH_LIGHTER_VERSION) {
-        repository.applyLighterVersion(workoutId)
-      } else {
-        repository.transition(workoutId, newStatus)
+      when (newStatus) {
+        SessionStatus.REPLACED_WITH_LIGHTER_VERSION -> repository.applyLighterVersion(workoutId)
+        // The one transition that has more to say than its own name: what was ticked off on the
+        // way there. Anything else, including a session with no guided list, completes as before.
+        SessionStatus.COMPLETED ->
+          repository.completeGuided(workoutId, guidedProgress.value[workoutId])
+        else -> repository.transition(workoutId, newStatus)
       }
     }
   }
@@ -1221,6 +1292,7 @@ class WorkoutViewModel(
           analysisClients = application.analysisClients,
           analysisSettingsStore = application.analysisSettingsStore,
           analysisPromptBuilder = application.analysisPromptBuilder,
+          missedProposalDismissalStore = application.missedProposalDismissalStore,
         )
       }
     }
