@@ -118,6 +118,22 @@ assumed. They reach only the daily activity and readiness scores. See
 4. App validates the JSON and presents it to the user.
 5. User explicitly approves -> applied to Room.
 
+### Theme selection flow
+1. `ThemeSettingsStore` reads `theme_preference` from the `settings` DataStore — the same file the
+   notification times, the AI model and the missed-session refusal live in — as a
+   `Flow<ThemePreference>`.
+2. `WorkoutViewModel` exposes it as `themePreference`, falling back to `ThemePreference.SYSTEM`
+   until DataStore answers.
+3. **`MainActivity` collects it**, not a screen: `MyApplicationTheme` wraps everything the app
+   draws, splash included, so the preference has to be read above the navigation graph. This is
+   why the ViewModel is built in `MainActivity` and passed into `TreenivalmentajaApp` rather than
+   being created there.
+4. `ThemePreference.SYSTEM` resolves through `isSystemInDarkTheme()` at composition time, so a
+   phone that switches to dark at sunset takes the app with it without a restart. `LIGHT` and
+   `DARK` ignore the system setting entirely.
+5. Settings writes back through `WorkoutViewModel.setThemePreference`; the recolour follows the tap
+   because step 3 is upstream of the card that produced it.
+
 ## Offline Behaviour
 The app is fully functional offline. The local deterministic engine reschedules workouts based on existing local data. Notifications rely on AlarmManager and do not require internet access.
 

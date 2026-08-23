@@ -31,6 +31,7 @@ import fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient
 import fi.merilainen.treenivalmentaja.data.analysis.AnalysisConnection
 import fi.merilainen.treenivalmentaja.data.analysis.AnalysisException
 import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
+import fi.merilainen.treenivalmentaja.data.settings.ThemeSettingsStore
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
@@ -54,6 +55,7 @@ import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdviceUseCase
 import fi.merilainen.treenivalmentaja.domain.EventSource
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
+import fi.merilainen.treenivalmentaja.domain.ThemePreference
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
@@ -167,6 +169,13 @@ class WorkoutViewModel(
    * class did everywhere before the store existed.
    */
   private val missedProposalDismissalStore: MissedProposalDismissalStore? = null,
+  /**
+   * Where the light/dark choice is kept, nullable for the same reason the collaborators above are:
+   * it is DataStore-backed, and a ViewModel that could not be built without one would make every
+   * existing unit test stand up a preferences file. Null reads as [ThemePreference.DEFAULT], which
+   * is what the app did before the preference existed.
+   */
+  private val themeSettingsStore: ThemeSettingsStore? = null,
   /**
    * **`systemDefaultZone`, not `systemUTC`** — and the difference is a bug, not a preference.
    *
@@ -810,6 +819,22 @@ class WorkoutViewModel(
     viewModelScope.launch { connection.clearApiKey(provider) }
   }
 
+  /**
+   * Which colour scheme the app draws itself in.
+   *
+   * Collected by `MainActivity` rather than by a screen, because it decides the theme the whole app
+   * — splash included — is wrapped in. Until DataStore answers it holds [ThemePreference.DEFAULT];
+   * the splash covers that read, so a stored "vaalea" never flashes dark on the way in.
+   */
+  val themePreference: StateFlow<ThemePreference> =
+    (themeSettingsStore?.themeFlow ?: MutableStateFlow(ThemePreference.DEFAULT))
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemePreference.DEFAULT)
+
+  fun setThemePreference(preference: ThemePreference) {
+    val store = themeSettingsStore ?: return
+    viewModelScope.launch { store.setTheme(preference) }
+  }
+
   fun setAnalysisModel(model: AnalysisModel) {
     val store = analysisSettingsStore ?: return
     viewModelScope.launch { store.setModel(model) }
@@ -1255,6 +1280,7 @@ class WorkoutViewModel(
           analysisSettingsStore = application.analysisSettingsStore,
           analysisPromptBuilder = application.analysisPromptBuilder,
           missedProposalDismissalStore = application.missedProposalDismissalStore,
+          themeSettingsStore = application.themeSettingsStore,
         )
       }
     }

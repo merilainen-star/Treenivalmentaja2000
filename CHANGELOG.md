@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-23
+
+### Added
+- **Vaalea / tumma / järjestelmä** under a new "Ulkoasu" card in Settings. The app drew itself by
+  whatever the phone's dark-mode setting said and offered no way to disagree with it; now it can be
+  pinned light or dark, and "Järjestelmä" keeps the old behaviour — which is also the default, so
+  an install that is updated and never opens the card looks exactly as it did.
+  The choice is kept in the `settings` DataStore under `theme_preference`, beside the notification
+  times, the AI model and the missed-session refusal — a colour scheme is a preference, not a
+  secret, and nothing here goes near the Keystore.
+  Three radio options rather than a switch, deliberately: a two-state "tumma tila" toggle has no
+  way to say "follow the system", so adding one would have silently dropped the behaviour every
+  existing install has.
+
+### Notes
+- **The ViewModel now lives in `MainActivity`** rather than in `TreenivalmentajaApp`. The theme has
+  to wrap everything the app draws, splash included, so the preference must be read above the
+  navigation graph. It is the same activity-scoped instance either way — `viewModel()` resolved to
+  it from both places — and it is passed down so there is one obvious place it comes from.
+- **The system bars follow the choice too.** `enableEdgeToEdge` is re-applied whenever the resolved
+  scheme changes, because it otherwise keeps deciding by the phone's dark-mode setting: "Vaalea"
+  picked on a dark phone would leave white status-bar icons on a white background, and the clock
+  with them. The navigation-bar scrims are the ones `enableEdgeToEdge()` uses by default, copied so
+  that passing a style does not quietly change the bar on the API levels that still draw one.
+- "Järjestelmä" resolves through `isSystemInDarkTheme()` at composition time, so a phone that turns
+  dark at sunset still takes the app with it, without a restart. The two pinned options ignore that
+  setting entirely, which is the whole point of choosing one.
+- The stored value is the enum constant name, the same as the AI model's, and anything unrecognised
+  reads as "Järjestelmä" rather than throwing: a preference written by a build with an option this
+  one does not have must not stop Settings from drawing.
+- Dynamic colour on Android 12+ is untouched. The preference decides light or dark; the phone still
+  decides the hues.
+
 ## [Unreleased] - 2026-08-22
 
 ### Added

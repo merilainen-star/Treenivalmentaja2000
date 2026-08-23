@@ -31,6 +31,7 @@ import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState
 import fi.merilainen.treenivalmentaja.data.repository.IntervalsBackfillResult
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
+import fi.merilainen.treenivalmentaja.domain.ThemePreference
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +66,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisSaveFailure by viewModel.analysisSaveFailure.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
+    val themePreference by viewModel.themePreference.collectAsState()
 
     /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
     var rawDataOpen by rememberSaveable { mutableStateOf(false) }
@@ -186,6 +188,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onSaveAnalysisApiKey = viewModel::saveAnalysisApiKey,
         onClearAnalysisApiKey = viewModel::clearAnalysisApiKey,
         onAnalysisModelChange = viewModel::setAnalysisModel,
+        themePreference = themePreference,
+        onThemePreferenceChange = viewModel::setThemePreference,
         hasNotificationPermission = hasPermission,
         onRequestNotificationPermission = {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -259,6 +263,8 @@ fun SettingsScreenContent(
     onSaveAnalysisApiKey: (AnalysisProvider, String) -> Unit = { _, _ -> },
     onClearAnalysisApiKey: (AnalysisProvider) -> Unit = {},
     onAnalysisModelChange: (AnalysisModel) -> Unit = {},
+    themePreference: ThemePreference = ThemePreference.DEFAULT,
+    onThemePreferenceChange: (ThemePreference) -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
     onImportFile: () -> Unit = {},
     onImportClipboard: () -> Unit = {},
@@ -347,6 +353,8 @@ fun SettingsScreenContent(
                 )
             }
         }
+
+        ThemeCard(selected = themePreference, onSelect = onThemePreferenceChange)
 
         OuraCard(
             state = ouraState,

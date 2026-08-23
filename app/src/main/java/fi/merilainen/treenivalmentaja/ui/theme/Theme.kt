@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import fi.merilainen.treenivalmentaja.domain.ThemePreference
 
 private val DarkColorScheme =
   darkColorScheme(
@@ -39,9 +40,29 @@ private val LightColorScheme =
     onSurface = TextPrimaryLight,
   )
 
+/**
+ * What [ThemePreference.SYSTEM] resolves to right now — and what the other two ignore it for.
+ *
+ * Composable rather than a plain `when`, because [isSystemInDarkTheme] reads a configuration that
+ * changes under a running app: a phone switching to dark at sunset recomposes through this, so the
+ * app follows it without being restarted.
+ */
+@Composable
+fun ThemePreference.resolveDarkTheme(): Boolean =
+  when (this) {
+    ThemePreference.LIGHT -> false
+    ThemePreference.DARK -> true
+    ThemePreference.SYSTEM -> isSystemInDarkTheme()
+  }
+
+/**
+ * @param theme what the user chose in Settings. It only decides [darkTheme]; pass [darkTheme]
+ *   directly to pin a scheme regardless of the preference, which is what the screenshot tests do.
+ */
 @Composable
 fun MyApplicationTheme(
-  darkTheme: Boolean = isSystemInDarkTheme(),
+  theme: ThemePreference = ThemePreference.DEFAULT,
+  darkTheme: Boolean = theme.resolveDarkTheme(),
   // Dynamic color is available on Android 12+
   dynamicColor: Boolean = true,
   content: @Composable () -> Unit,

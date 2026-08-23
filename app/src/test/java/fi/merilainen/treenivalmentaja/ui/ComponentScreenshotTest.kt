@@ -23,6 +23,7 @@ import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.WorkoutCardToday
 import fi.merilainen.treenivalmentaja.WorkoutCardWeek
 import fi.merilainen.treenivalmentaja.UpdateCard
+import fi.merilainen.treenivalmentaja.ThemeCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
@@ -31,6 +32,7 @@ import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.ExerciseSet
 import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.ThemePreference
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
@@ -92,9 +94,17 @@ class ComponentScreenshotTest {
         compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.005f)
     )
 
-    private fun capture(name: String, content: @Composable () -> Unit) {
+    private fun capture(name: String, content: @Composable () -> Unit) =
+        capture(name, darkTheme = false, content = content)
+
+    /**
+     * [darkTheme] is pinned rather than left to the preference, because Robolectric renders under
+     * whatever qualifier the class is configured with — a capture that read the system setting
+     * would say nothing about which scheme it actually drew.
+     */
+    private fun capture(name: String, darkTheme: Boolean, content: @Composable () -> Unit) {
         captureRoboImage("src/test/screenshots/$name.png", roborazziOptions = options) {
-            MyApplicationTheme {
+            MyApplicationTheme(darkTheme = darkTheme) {
                 Surface(color = MaterialTheme.colorScheme.background) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -487,6 +497,24 @@ class ComponentScreenshotTest {
             onConfirm = {},
             onDismiss = {},
         )
+    }
+
+    // ------------------------------------------------------------------ Appearance
+
+    /** The three options, with the one the app starts on selected. */
+    @Test
+    fun themeCard_system() = capture("card_theme_system") {
+        ThemeCard(selected = ThemePreference.SYSTEM)
+    }
+
+    /**
+     * The same card drawn by the scheme it selects. It is the only baseline in dark, and it is
+     * here because the preference is what makes that scheme reachable without a phone set to it —
+     * a contrast that fails there now fails visibly.
+     */
+    @Test
+    fun themeCard_darkSelected() = capture("card_theme_dark", darkTheme = true) {
+        ThemeCard(selected = ThemePreference.DARK)
     }
 
     // ------------------------------------------------------------------ Status badges
