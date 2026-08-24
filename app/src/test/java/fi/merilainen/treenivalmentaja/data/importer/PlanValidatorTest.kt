@@ -47,6 +47,7 @@ class PlanValidatorTest {
     assertEquals(45, strength.durationMin)
     assertEquals(Intensity.EASY, strength.intensity)
     assertEquals(3, strength.rounds)
+    assertNull(strength.roundRestSec)
     assertEquals(SessionStatus.PLANNED, strength.status)
     assertEquals(2, strength.exercises?.size)
     assertEquals("Kyykky", strength.exercises?.first()?.name)
@@ -87,6 +88,37 @@ class PlanValidatorTest {
         """
       )
     assertTrue(outcome is ValidationOutcome.Valid)
+  }
+
+  @Test
+  fun `active workout equipment and round rest survive validation`() {
+    val json =
+      VALID_PLAN
+        .replace("\"rounds\": 3,", "\"rounds\": 3, \"roundRestSec\": 60,")
+        .replace(
+          "\"name\": \"Kyykky\", \"sets\": 3",
+          "\"name\": \"Kyykky\", \"equipment\": [\"Kahvakuula\", \"Matto\"], \"sets\": 3",
+        )
+
+    val plan = (validate(json) as ValidationOutcome.Valid).plan
+    val strength = plan.sessions.first()
+
+    assertEquals(60, strength.roundRestSec)
+    assertEquals(listOf("Kahvakuula", "Matto"), strength.exercises!!.first().equipment)
+  }
+
+  @Test
+  fun `blank equipment name and negative round rest are rejected`() {
+    val json =
+      VALID_PLAN
+        .replace("\"rounds\": 3,", "\"rounds\": 3, \"roundRestSec\": -1,")
+        .replace(
+          "\"name\": \"Kyykky\", \"sets\": 3",
+          "\"name\": \"Kyykky\", \"equipment\": [\"\"], \"sets\": 3",
+        )
+    val paths = pathsOf(json)
+    assertTrue("weeks[0].sessions[0].roundRestSec" in paths)
+    assertTrue("weeks[0].sessions[0].exercises[0].equipment[0]" in paths)
   }
 
   // ------------------------------------------------------------------ broken

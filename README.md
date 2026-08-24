@@ -5,15 +5,16 @@ Treenivalmentaja is an Android application for managing a progressive training p
 actionable notifications. Users can complete, skip, lighten, reschedule or pause sessions. When a
 session is missed, the deterministic engine previews the resulting calendar change and applies it
 only after approval. Oura and intervals.icu supply recovery and workout data; optional, on-demand
-AI analysis comments on one workout but never changes the plan.
+AI analysis comments on one workout; the separate plan advisor can preview a bounded change list,
+but only an explicit approval writes it to the plan.
 
 ## Current Implementation Status
 **Status:** MVP Prototype
 
 **Implemented:**
-- Jetpack Compose UI (Today, Week and Settings) with bottom-tab navigation; a Week row expands to
+- Jetpack Compose UI (Today, Calendar and Settings) with bottom-tab navigation; a Calendar row expands to
   show what that session is
-- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 12
+- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 13
   with tested migrations
 - Session state machine with an append-only event history
 - Training plan JSON import (file + clipboard) with validation and duplicate detection
@@ -38,18 +39,17 @@ AI analysis comments on one workout but never changes the plan.
   ([docs](docs/TRAINING_ENGINE.md#easy-run-drift--a-fact-with-no-button-under-it))
 - Optional read-only AI analysis from Anthropic, OpenAI or Google, requested per workout with the
   user's own API key; the exact prompt is visible and no analysis is stored
+- AI plan advisor with visible prompt and preview, optional clarification, persistent constraints,
+  strict MOVE/LIGHTEN operations and an atomic write only after explicit approval
+- Full-screen Active Workout Mode with preparation, movement/rest/round phases, monotonic timers,
+  skip tracking and an RPE/feel completion summary
 - A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
 - Rolling test APK built by GitHub Actions, with an in-app check for whether the build is current
 - App icon and splash screen
 
 **Planned / Missing:**
-- AI-proposed plan changes with explicit approval. Read-only workout analysis is already built;
-  autonomous plan modification is not — see [ROADMAP.md](docs/ROADMAP.md#next-milestone).
 - Acting on readiness beyond the morning question below — chronic load, multi-week adjustment,
   and anything needing judgement rather than a rule.
-- Active Workout Mode: a guided session showing one movement at a time, with a preparation step
-  before each, rest timers and round tracking. Specified but not built —
-  [ACTIVE_WORKOUT.md](docs/ACTIVE_WORKOUT.md).
 
 ## Main Features
 Implemented today:

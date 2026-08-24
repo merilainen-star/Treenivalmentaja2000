@@ -35,7 +35,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       IntervalsActivityEntity::class,
       IntervalsWellnessEntity::class,
     ],
-  version = 12,
+  version = 13,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -73,6 +73,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 9, to = 10),
       AutoMigration(from = 10, to = 11),
       AutoMigration(from = 11, to = 12),
+      AutoMigration(from = 12, to = 13),
     ],
 )
 @TypeConverters(Converters::class)

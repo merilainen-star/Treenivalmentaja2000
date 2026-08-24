@@ -235,6 +235,7 @@ object PlanValidator {
     if (!positiveOrNull(session.durationMin, "$path.durationMin", errors)) usable = false
     if (!positiveOrNull(session.distanceKm, "$path.distanceKm", errors)) usable = false
     if (!positiveOrNull(session.rounds, "$path.rounds", errors)) usable = false
+    if (!nonNegativeOrNull(session.roundRestSec, "$path.roundRestSec", errors)) usable = false
 
     val exercises = validateExercises(session.exercises, "$path.exercises", errors)
     if (exercises == null) usable = false
@@ -280,6 +281,7 @@ object PlanValidator {
       roundsMax = session.roundsMax,
       targetPace = session.targetPace,
       warmupSec = session.warmupSec,
+      roundRestSec = session.roundRestSec,
       exercises = exercises?.takeIf { it.isNotEmpty() },
       lighterAlternative = lighter,
       description = session.description,
@@ -313,6 +315,19 @@ object PlanValidator {
       if (!positiveOrNull(dto.durationSec, "$itemPath.durationSec", errors)) ok = false
       if (!nonNegativeOrNull(dto.weightKg, "$itemPath.weightKg", errors)) ok = false
       if (!nonNegativeOrNull(dto.restSec, "$itemPath.restSec", errors)) ok = false
+
+      val equipment = dto.equipment?.mapIndexedNotNull { equipmentIndex, value ->
+        value?.trim()?.takeIf { it.isNotEmpty() }.also { cleaned ->
+          if (cleaned == null) {
+            errors +=
+              ImportError(
+                "$itemPath.equipment[$equipmentIndex]",
+                "välineen nimen on oltava ei-tyhjä merkkijono",
+              )
+            ok = false
+          }
+        }
+      }
 
       val setPlan = validateSetPlan(dto.setPlan, "$itemPath.setPlan", errors)
       if (setPlan == null) ok = false
@@ -352,6 +367,7 @@ object PlanValidator {
             durationSec = dto.durationSec,
             restSec = dto.restSec,
             notes = dto.notes,
+            equipment = equipment?.distinct()?.takeIf { it.isNotEmpty() },
             setPlan = setPlan?.takeIf { it.isNotEmpty() },
             guide = guide,
           )
@@ -458,6 +474,7 @@ object PlanValidator {
     if (!positiveOrNull(dto.durationMin, "$path.durationMin", errors)) ok = false
     if (!positiveOrNull(dto.distanceKm, "$path.distanceKm", errors)) ok = false
     if (!positiveOrNull(dto.rounds, "$path.rounds", errors)) ok = false
+    if (!nonNegativeOrNull(dto.roundRestSec, "$path.roundRestSec", errors)) ok = false
 
     val exercises = validateExercises(dto.exercises, "$path.exercises", errors)
     if (exercises == null) ok = false
@@ -467,6 +484,7 @@ object PlanValidator {
         dto.distanceKm == null &&
         dto.intensity == null &&
         dto.rounds == null &&
+        dto.roundRestSec == null &&
         dto.description == null &&
         exercises.isNullOrEmpty()
     if (empty) {
@@ -484,6 +502,7 @@ object PlanValidator {
       roundsMax = dto.roundsMax,
       targetPace = dto.targetPace,
       warmupSec = dto.warmupSec,
+      roundRestSec = dto.roundRestSec,
       description = dto.description,
       exercises = exercises?.takeIf { it.isNotEmpty() },
     )

@@ -46,6 +46,7 @@ import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.EasyRunDrift
@@ -72,7 +73,10 @@ import fi.merilainen.treenivalmentaja.ui.theme.ColorYellow
  * stopped at the individual cards and nothing ever verified how they sit together.
  */
 @Composable
-fun TodayScreen(viewModel: WorkoutViewModel) {
+fun TodayScreen(
+    viewModel: WorkoutViewModel,
+    onOpenActiveWorkout: (String) -> Unit = {},
+) {
     val workouts by viewModel.workouts.collectAsState()
     val guideState by viewModel.guideState.collectAsState()
     val ouraState by viewModel.ouraState.collectAsState()
@@ -86,6 +90,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
     val advice by viewModel.readinessAdvice.collectAsState()
     val drift by viewModel.easyRunDrift.collectAsState()
     val analyses by viewModel.aiAnalyses.collectAsState()
+    val planProposals by viewModel.aiPlanProposals.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
     val missedProposal by viewModel.missedSessionsProposal.collectAsState()
@@ -111,6 +116,7 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onRecoveredClicked = viewModel::markRecovered,
         onStatusChange = viewModel::updateWorkoutStatus,
         onGuidedProgressChange = viewModel::recordGuidedProgress,
+        onOpenActiveWorkout = onOpenActiveWorkout,
         onMoveToTomorrow = viewModel::moveWorkoutToTomorrow,
         onExerciseClick = viewModel::openExerciseGuide,
         onGuideRetry = viewModel::retryExerciseGuide,
@@ -134,9 +140,13 @@ fun TodayScreen(viewModel: WorkoutViewModel) {
         onRejectMissedSessions = viewModel::rejectMissedSessionsProposal,
         onCompleteMissedSessions = viewModel::completeMissedSessionsProposal,
         analyses = analyses,
+        planProposals = planProposals,
         analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
         onDismissAnalysis = viewModel::dismissAiAnalysis,
+        onRequestPlanProposal = viewModel::requestAiPlanProposal,
+        onApplyPlanProposal = viewModel::applyAiPlanProposal,
+        onDismissPlanProposal = viewModel::dismissAiPlanProposal,
     )
 }
 
@@ -150,6 +160,7 @@ fun TodayScreenContent(
     onRecoveredClicked: () -> Unit = {},
     onStatusChange: (String, SessionStatus) -> Unit = { _, _ -> },
     onGuidedProgressChange: (String, GuidedProgress) -> Unit = { _, _ -> },
+    onOpenActiveWorkout: (String) -> Unit = {},
     onMoveToTomorrow: (String) -> Unit = {},
     onExerciseClick: (Exercise) -> Unit = {},
     onGuideRetry: () -> Unit = {},
@@ -173,9 +184,13 @@ fun TodayScreenContent(
     onRejectMissedSessions: () -> Unit = {},
     onCompleteMissedSessions: () -> Unit = {},
     analyses: Map<String, AiAnalysisState> = emptyMap(),
+    planProposals: Map<String, AiPlanProposalState> = emptyMap(),
     analysisConfigured: Boolean = false,
     onRequestAnalysis: (String) -> Unit = {},
     onDismissAnalysis: (String) -> Unit = {},
+    onRequestPlanProposal: (String, String?) -> Unit = { _, _ -> },
+    onApplyPlanProposal: (String) -> Unit = {},
+    onDismissPlanProposal: (String) -> Unit = {},
 ) {
     val todayWorkouts = workouts.filter { it.dayOffset == 0 }
 
@@ -236,14 +251,19 @@ fun TodayScreenContent(
                     onGuidedProgressChange = { progress ->
                         onGuidedProgressChange(workout.id, progress)
                     },
+                    onOpenActiveWorkout = { onOpenActiveWorkout(workout.id) },
                     onMoveToTomorrow = { onMoveToTomorrow(workout.id) },
                     onExerciseClick = onExerciseClick,
                     completed = completedMetrics[workout.id],
                     run = runMetrics[workout.id],
                     analysis = analyses[workout.id],
+                    planProposal = planProposals[workout.id],
                     analysisConfigured = analysisConfigured,
                     onRequestAnalysis = { onRequestAnalysis(workout.id) },
                     onDismissAnalysis = { onDismissAnalysis(workout.id) },
+                    onRequestPlanProposal = { answer -> onRequestPlanProposal(workout.id, answer) },
+                    onApplyPlanProposal = { onApplyPlanProposal(workout.id) },
+                    onDismissPlanProposal = { onDismissPlanProposal(workout.id) },
                 )
             }
         } else {
@@ -432,31 +452,21 @@ fun RecoveryCard(
  */
 @Composable
 private fun RecoveryReading(recovery: DailyRecovery?, syncing: Boolean, syncFailure: String?) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "Palautuminen",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = "Päivän yhteenveto",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
         )
         when {
-            recovery?.readiness != null ->
+            recovery != null && !recovery.isEmpty ->
                 Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
-                    Text(
-                        text = "${recovery.readiness}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    recovery.readinessLabel?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(bottom = 4.dp),
-                        )
-                    }
+                    MetricRing("Palautuminen", recovery.readiness, Modifier.weight(1f))
+                    MetricRing("Uni", recovery.sleep, Modifier.weight(1f))
+                    MetricRing("Aktiivisuus", recovery.activity, Modifier.weight(1f))
                 }
             recovery != null ->
                 Text(
@@ -479,13 +489,9 @@ private fun RecoveryReading(recovery: DailyRecovery?, syncing: Boolean, syncFail
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
         }
-        val extras = buildList {
-            recovery?.sleep?.let { add("Uni $it") }
-            recovery?.activity?.let { add("Aktiivisuus $it") }
-        }
-        if (extras.isNotEmpty()) {
+        recovery?.readinessLabel?.let { label ->
             Text(
-                text = extras.joinToString(" · "),
+                text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -625,13 +631,18 @@ fun WorkoutCardToday(
     onStatusChange: (SessionStatus) -> Unit,
     onMoveToTomorrow: () -> Unit,
     onGuidedProgressChange: (GuidedProgress) -> Unit = {},
+    onOpenActiveWorkout: () -> Unit = {},
     onExerciseClick: ((Exercise) -> Unit)? = null,
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
     analysis: AiAnalysisState? = null,
+    planProposal: AiPlanProposalState? = null,
     analysisConfigured: Boolean = false,
     onRequestAnalysis: () -> Unit = {},
     onDismissAnalysis: () -> Unit = {},
+    onRequestPlanProposal: (String?) -> Unit = {},
+    onApplyPlanProposal: () -> Unit = {},
+    onDismissPlanProposal: () -> Unit = {},
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -802,6 +813,10 @@ fun WorkoutCardToday(
                 configured = analysisConfigured,
                 onRequest = onRequestAnalysis,
                 onDismiss = onDismissAnalysis,
+                proposalState = planProposal,
+                onRequestProposal = onRequestPlanProposal,
+                onApplyProposal = onApplyPlanProposal,
+                onDismissProposal = onDismissPlanProposal,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
 
@@ -811,17 +826,17 @@ fun WorkoutCardToday(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (workout.type == WorkoutType.STRENGTH && workout.status != SessionStatus.STARTED) {
                         Button(
-                            onClick = { onStatusChange(SessionStatus.STARTED) },
+                            onClick = onOpenActiveWorkout,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Aloita ohjattu treeni")
                         }
                     } else if (workout.type == WorkoutType.STRENGTH && workout.status == SessionStatus.STARTED) {
                         Button(
-                            onClick = { onStatusChange(SessionStatus.COMPLETED) },
+                            onClick = onOpenActiveWorkout,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Valmis")
+                            Text("Jatka ohjattua treeniä")
                         }
                     } else {
                         Button(

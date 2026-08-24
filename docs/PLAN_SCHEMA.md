@@ -86,6 +86,7 @@ notices until the import fails. It is a legacy path, not the intended one.
   "distanceKm": null,
   "intensity": "EASY",
   "rounds": 3,
+  "roundRestSec": 60,
   "description": "Aamun keskivartalo ja liikkuvuus.",
   "exercises": [
     { "name": "Kyykky",      "sets": 3, "reps": 10, "weightKg": 60.0, "restSec": 90, "notes": null },
@@ -117,6 +118,7 @@ notices until the import fails. It is a legacy path, not the intended one.
 | `rounds` | integer | no | > 0 if present. Number of circuit rounds. |
 | `roundsMin` | integer | no | > 0 if present. |
 | `roundsMax` | integer | no | > 0 if present. |
+| `roundRestSec` | integer | no | ≥ 0 if present. Rest between completed circuit rounds. |
 | `targetPace` | string | no | e.g. "5:25-5:35" |
 | `warmupSec` | integer | no | > 0 if present. |
 | `description` | string | no | Free text shown on the session card. |
@@ -139,6 +141,7 @@ a session with none of them describes no actual work and is rejected.
 | `weightKg` | number | no | ≥ 0 if present. |
 | `durationSec` | integer | no | > 0 if present. For held movements (plank, hang) instead of `reps`. |
 | `restSec` | integer | no | ≥ 0 if present. |
+| `equipment` | array of strings | no | Non-empty equipment names shown before the movement. |
 | `notes` | string | no | Free text. |
 | `setPlan` | array of set objects | no | The sets spelled out, when they are not all alike. See below. |
 | `guide` | object | no | Which movement this is in an outside catalogue. See below. |
@@ -173,7 +176,7 @@ Each set needs at least one of `reps` or `durationSec`, the same rule the exerci
 **An exercise carrying `setPlan` must not also carry `sets`, `reps` or `weightKg`.** Two
 descriptions of the same sets could disagree, and nothing in the document would say which was
 meant, so the importer rejects it rather than applying a precedence rule nobody would remember.
-`perSide`, `restSec` and `notes` still apply to the exercise as a whole.
+`perSide`, `restSec`, `equipment` and `notes` still apply to the exercise as a whole.
 
 Nothing changed in the database: exercises live in a single JSON column, so this needs no
 migration and no schema version bump.
@@ -250,7 +253,7 @@ Nothing changed in the database: exercises live in a single JSON column, so this
 migration and no schema version bump.
 
 ### `lighterAlternative`
-Same optional fields as a session — `durationMin`, `distanceKm`, `intensity`, `rounds`,
+Same optional fields as a session — `durationMin`, `distanceKm`, `intensity`, `rounds`, `roundRestSec`,
 `description`, `exercises` — and no `id`, `type`, `date`, or `time`: it inherits those from its
 parent session. Every field is optional, but the object must not be empty.
 

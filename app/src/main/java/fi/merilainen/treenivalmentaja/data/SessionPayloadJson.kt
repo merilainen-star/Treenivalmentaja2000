@@ -4,6 +4,7 @@ import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
 
 /**
  * What goes in `session_events.payloadJson`, and how it is read back.
@@ -24,9 +25,15 @@ internal object SessionPayloadJson {
    * The envelope. Every field is nullable so an unrelated payload decodes to a `Payload` with
    * nothing in it, which is the honest reading of "this row is about something else".
    */
-  private data class Payload(val guided: GuidedProgress? = null)
+  private data class Payload(
+    val guided: GuidedProgress? = null,
+    val activeWorkout: ActiveWorkoutOutcome? = null,
+  )
 
   fun encodeGuidedProgress(progress: GuidedProgress): String = adapter.toJson(Payload(progress))
+
+  fun encodeActiveWorkout(outcome: ActiveWorkoutOutcome): String =
+    adapter.toJson(Payload(activeWorkout = outcome))
 
   /**
    * `null` for a row that carries no guided progress — a reschedule, an older completion written
@@ -35,5 +42,10 @@ internal object SessionPayloadJson {
    * done: that would tell the coach the workout was abandoned.
    */
   fun decodeGuidedProgress(json: String?): GuidedProgress? =
-    json?.takeIf { it.isNotBlank() }?.let { runCatching { adapter.fromJson(it) }.getOrNull() }?.guided
+    decode(json)?.let { it.guided ?: it.activeWorkout?.guided }
+
+  fun decodeActiveWorkout(json: String?): ActiveWorkoutOutcome? = decode(json)?.activeWorkout
+
+  private fun decode(json: String?): Payload? =
+    json?.takeIf { it.isNotBlank() }?.let { runCatching { adapter.fromJson(it) }.getOrNull() }
 }

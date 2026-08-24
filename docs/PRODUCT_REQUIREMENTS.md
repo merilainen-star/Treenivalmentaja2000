@@ -17,6 +17,10 @@ Individuals following a progressive training programme who want an adaptive, con
 2. **Actionable Notification:** User receives a notification at the scheduled time, clicks it to view workout details, and later marks it as "Completed".
 3. **Rescheduling:** User is too busy today and taps "Move to Tomorrow", pushing the remaining schedule back.
 4. **Illness:** User marks themselves as sick, pausing the programme and initiating a return-to-play progression upon recovery.
+5. **Guided workout:** User prepares the listed equipment, follows one movement and rest phase at
+   a time, and saves RPE and feel at the end.
+6. **AI plan proposal:** User requests a bounded change, answers one clarification if needed,
+   previews the exact MOVE/LIGHTEN operations, and explicitly approves or rejects them.
 
 ## Functional Requirements
 - Display current day's and week's training plan.
@@ -29,6 +33,8 @@ Individuals following a progressive training programme who want an adaptive, con
   the activity must fit; a match attaches Oura's numbers and does not complete the session).
 - Import training plans (JSON Treenivalmentaja Schema v1).
 - Generate actionable inexact Android notifications via AlarmManager.
+- Guide a structured strength session full-screen with authored rests and completion feedback.
+- Preview AI-proposed MOVE/LIGHTEN changes and apply the validated list atomically only after approval.
 
 ## Non-Functional Requirements
 - **Offline First:** All core scheduling, rescheduling, and notifications must work offline.
@@ -47,11 +53,12 @@ Individuals following a progressive training programme who want an adaptive, con
 - UI for Today and Week views (implemented, backed by Room — the mock data is gone).
 - Local deterministic rule engine for rescheduling (implemented in `TrainingEngine`).
 - Manual completion/skipping of workouts (implemented, persisted in Room with an event log).
-- Local Room storage (implemented, schema version 12).
+- Local Room storage (implemented, schema version 13).
 - Android AlarmManager notifications (implemented).
 
 ## Excluded Scope (Out of MVP)
-- AI-proposed plan changes (planned; read-only per-workout AI analysis is implemented).
+- Autonomous or unbounded AI plan changes. The implemented advisor is approval-gated and limited
+  to validated MOVE/LIGHTEN operations.
 - Complex analytics dashboards.
 - Direct integration with Garmin/Polar (reliant on Oura and intervals.icu pass-through).
 

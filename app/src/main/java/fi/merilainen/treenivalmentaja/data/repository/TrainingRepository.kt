@@ -16,6 +16,9 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
 import fi.merilainen.treenivalmentaja.data.toDomain
 import fi.merilainen.treenivalmentaja.data.toEntity
 import fi.merilainen.treenivalmentaja.domain.EventSource
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
+import fi.merilainen.treenivalmentaja.domain.AdvisorOperation
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposal
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SessionEvent
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -38,6 +41,11 @@ sealed interface TransitionResult {
   data object SessionNotFound : TransitionResult
 
   data class NotAllowed(val from: SessionStatus, val to: SessionStatus) : TransitionResult
+}
+
+sealed interface AdvisorApplyResult {
+  data class Applied(val operationCount: Int) : AdvisorApplyResult
+  data class Rejected(val message: String) : AdvisorApplyResult
 }
 
 /**
@@ -155,6 +163,27 @@ class TrainingRepository(
       payloadJson = progress?.let(SessionPayloadJson::encodeGuidedProgress),
     )
 
+  suspend fun completeActiveWorkout(
+    sessionId: String,
+    outcome: ActiveWorkoutOutcome,
+  ): TransitionResult =
+    transition(
+      sessionId = sessionId,
+      target = SessionStatus.COMPLETED,
+      source = EventSource.USER,
+      note = "Ohjattu treeni tallennettu",
+      payloadJson = SessionPayloadJson.encodeActiveWorkout(outcome),
+    )
+
+  suspend fun activeWorkoutOutcomeFor(sessionId: String): ActiveWorkoutOutcome? =
+    eventDao
+      .getForSession(sessionId)
+      .asReversed()
+      .firstNotNullOfOrNull { event ->
+        if (event.toStatus != SessionStatus.COMPLETED) null
+        else SessionPayloadJson.decodeActiveWorkout(event.payloadJson)
+      }
+
   /**
    * What the guided workout recorded when this session was completed, or `null` if it recorded
    * nothing.
@@ -196,6 +225,7 @@ class TrainingRepository(
             distanceKm = lighter.distanceKm ?: entity.distanceKm,
             intensity = lighter.intensity?.name ?: entity.intensity,
             rounds = lighter.rounds ?: entity.rounds,
+            roundRestSec = lighter.roundRestSec ?: entity.roundRestSec,
             description = lighter.description ?: entity.description,
             exercisesJson =
               PlanJson.encodeExercises(lighter.exercises) ?: entity.exercisesJson,
@@ -289,6 +319,67 @@ class TrainingRepository(
       )
       TransitionResult.Applied
     }
+
+  /** Validates the whole AI proposal first, then applies every approved operation atomically. */
+  suspend fun applyAdvisorProposal(proposal: AiPlanProposal): AdvisorApplyResult =
+    runCatching {
+      db.withTransaction {
+        if (proposal.operations.isEmpty()) {
+          return@withTransaction AdvisorApplyResult.Rejected("AI-ehdotuksessa ei ollut muutoksia")
+        }
+        if (proposal.operations.map { it.sessionId }.distinct().size != proposal.operations.size) {
+          return@withTransaction AdvisorApplyResult.Rejected(
+            "Samaa harjoitusta ei voi muuttaa kahdesti samassa ehdotuksessa"
+          )
+        }
+        val activePlanId = planDao.getActivePlanId()
+          ?: return@withTransaction AdvisorApplyResult.Rejected("Aktiivista suunnitelmaa ei ole")
+        val sessions = sessionDao.getByPlan(activePlanId).associateBy { it.id }
+        val today = LocalDate.now(clock.withZone(activePlanTimeZone()))
+
+        for (operation in proposal.operations) {
+          val session = sessions[operation.sessionId]
+            ?: return@withTransaction AdvisorApplyResult.Rejected(
+              "Harjoitus ${operation.sessionId} ei kuulu aktiiviseen suunnitelmaan"
+            )
+          val target =
+            when (operation) {
+              is AdvisorOperation.Move -> {
+                if (operation.newDate.isBefore(today)) {
+                  return@withTransaction AdvisorApplyResult.Rejected(
+                    "Harjoitusta ${operation.sessionId} ei voi siirtää menneisyyteen"
+                  )
+                }
+                SessionStatus.RESCHEDULED
+              }
+              is AdvisorOperation.Lighten -> SessionStatus.REPLACED_WITH_LIGHTER_VERSION
+            }
+          if (!session.status.canTransitionTo(target)) {
+            return@withTransaction AdvisorApplyResult.Rejected(
+              "Harjoituksen ${operation.sessionId} tila ${session.status} estää muutoksen"
+            )
+          }
+        }
+
+        proposal.operations.forEach { operation ->
+          val result =
+            when (operation) {
+              is AdvisorOperation.Move ->
+                reschedule(
+                  sessionId = operation.sessionId,
+                  newDate = operation.newDate,
+                  newTime = operation.newTime,
+                  source = EventSource.AI_ADVISOR,
+                  note = "Käyttäjän hyväksymä AI-ehdotus: ${proposal.summary}",
+                )
+              is AdvisorOperation.Lighten ->
+                applyLighterVersion(operation.sessionId, source = EventSource.AI_ADVISOR)
+            }
+          check(result == TransitionResult.Applied) { "Hyväksytyn AI-operaation toteutus epäonnistui" }
+        }
+        AdvisorApplyResult.Applied(proposal.operations.size)
+      }
+    }.getOrElse { AdvisorApplyResult.Rejected(it.message ?: "AI-ehdotuksen toteutus epäonnistui") }
 
   // ---------------------------------------------------------------- import
 

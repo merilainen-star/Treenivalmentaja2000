@@ -10,6 +10,14 @@ outcome as a payload on the `COMPLETED` event, and `GuidedProgress`, `SessionPay
 `TrainingRepository.completeGuided` now do exactly that for the count of ticked movements. The
 sections concerned say so rather than still proposing it.
 
+## Implementation status
+
+Built 2026-08-24. The full-screen route follows the flow below, uses an elapsed-realtime deadline
+for rest clocks, keeps the display awake, sounds and vibrates at zero, and stores the finish
+summary under `activeWorkout` on the immutable completion event. Plans without a structured
+`exercises` array stay on the original Today card. Optional `equipment` and `roundRestSec` are now
+part of Plan Schema v1; Room is schema v13 for the latter.
+
 ## What it is
 
 A guided session that shows **one thing at a time** and carries the workout from the first movement
@@ -114,7 +122,7 @@ More than the specification assumes. This is mostly a rearrangement of built par
 | Recording an outcome at all (§7, §8) | `TrainingRepository.completeGuided` writes a `GuidedProgress` — how many movements were ticked, against how long a sequence — as JSON on the `COMPLETED` event, and `guidedProgressFor` reads it back from the newest completion carrying one. The mechanism the feel answers and the RPE need is therefore built; only the fields are missing. |
 | Rest lengths (§4) | **The data is already stored.** `restSec` is validated (`PlanValidator`) and persisted with every exercise — and nothing reads it. The rest timer is a reader for a field that has been waiting for one, the same shape as `icu_atl`/`icu_ctl` before the analysis feature. |
 
-## What has to be built
+## What was built
 
 1. **A full-screen mode.** Today the guided session is a card in a scrolling list with every movement
    visible. "One thing at a time" needs its own route and the bottom bar out of the way.
@@ -231,14 +239,14 @@ whoever builds it should decide deliberately, because the failure mode is exactl
 design exists to avoid: a screen that shows the whole session again and leaves the person to find
 their own place in it.
 
-## Suggested slices
+## Implementation slices (completed)
 
-1. **Full-screen route, step list, preparation step**, reusing the existing timer. No schema change,
+1. ~~**Full-screen route, step list, preparation step**~~, reusing the existing timer. No schema change,
    no migration.
-2. **Rest timers** — the `restSec` reader — on a wall-clock deadline, plus keeping the screen awake
+2. ~~**Rest timers**~~ — the `restSec` reader — on an elapsed-realtime deadline, plus keeping the screen awake
    and vibration.
-3. **The summary, the feel answers and RPE**, into the `COMPLETED` event's payload.
-4. **The schema**: `equipment` and the round break, with `PLAN_SCHEMA.md` and validator tests.
+3. ~~**The summary, the feel answers and RPE**~~, into the `COMPLETED` event's payload.
+4. ~~**The schema**~~: `equipment` and `roundRestSec`, with `PLAN_SCHEMA.md` and validator tests.
 
 ## Why the shape of this fits
 

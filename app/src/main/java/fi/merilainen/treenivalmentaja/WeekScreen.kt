@@ -53,6 +53,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
@@ -77,6 +78,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val intervalsState by viewModel.intervalsState.collectAsState()
     val runMetrics by viewModel.runMetrics.collectAsState()
     val analyses by viewModel.aiAnalyses.collectAsState()
+    val planProposals by viewModel.aiPlanProposals.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
     val today by viewModel.currentDate.collectAsState()
@@ -103,9 +105,13 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         onGuideSuggestionSelected = viewModel::selectGuideSuggestion,
         onGuideDismiss = viewModel::closeExerciseGuide,
         analyses = analyses,
+        planProposals = planProposals,
         analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
         onDismissAnalysis = viewModel::dismissAiAnalysis,
+        onRequestPlanProposal = viewModel::requestAiPlanProposal,
+        onApplyPlanProposal = viewModel::applyAiPlanProposal,
+        onDismissPlanProposal = viewModel::dismissAiPlanProposal,
     )
 }
 
@@ -124,9 +130,13 @@ fun WeekScreenContent(
     recoveryByDay: Map<LocalDate, DailyRecovery> = emptyMap(),
     runMetrics: Map<String, CompletedRunMetrics> = emptyMap(),
     analyses: Map<String, AiAnalysisState> = emptyMap(),
+    planProposals: Map<String, AiPlanProposalState> = emptyMap(),
     analysisConfigured: Boolean = false,
     onRequestAnalysis: (String) -> Unit = {},
     onDismissAnalysis: (String) -> Unit = {},
+    onRequestPlanProposal: (String, String?) -> Unit = { _, _ -> },
+    onApplyPlanProposal: (String) -> Unit = {},
+    onDismissPlanProposal: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -134,11 +144,22 @@ fun WeekScreenContent(
             .padding(16.dp)
     ) {
         Text(
-            text = "Ohjelma",
+            text = "Kalenteri",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 16.dp)
         )
+
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        ) {
+            MonthCalendar(
+                today = today,
+                workouts = workouts,
+                modifier = Modifier.padding(12.dp),
+            )
+        }
 
         // Which days get a row.
         //
@@ -214,9 +235,13 @@ fun WeekScreenContent(
                                 completed = completedMetrics[workout.id],
                                 run = runMetrics[workout.id],
                                 analysis = analyses[workout.id],
+                                planProposal = planProposals[workout.id],
                                 analysisConfigured = analysisConfigured,
                                 onRequestAnalysis = { onRequestAnalysis(workout.id) },
                                 onDismissAnalysis = { onDismissAnalysis(workout.id) },
+                                onRequestPlanProposal = { answer -> onRequestPlanProposal(workout.id, answer) },
+                                onApplyPlanProposal = { onApplyPlanProposal(workout.id) },
+                                onDismissPlanProposal = { onDismissPlanProposal(workout.id) },
                             )
                         }
                     }
@@ -308,9 +333,13 @@ fun WorkoutCardWeek(
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
     analysis: AiAnalysisState? = null,
+    planProposal: AiPlanProposalState? = null,
     analysisConfigured: Boolean = false,
     onRequestAnalysis: () -> Unit = {},
     onDismissAnalysis: () -> Unit = {},
+    onRequestPlanProposal: (String?) -> Unit = {},
+    onApplyPlanProposal: () -> Unit = {},
+    onDismissPlanProposal: () -> Unit = {},
 ) {
     var expanded by rememberSaveable(workout.id) { mutableStateOf(false) }
     WorkoutCardWeek(
@@ -321,9 +350,13 @@ fun WorkoutCardWeek(
         completed = completed,
         run = run,
         analysis = analysis,
+        planProposal = planProposal,
         analysisConfigured = analysisConfigured,
         onRequestAnalysis = onRequestAnalysis,
         onDismissAnalysis = onDismissAnalysis,
+        onRequestPlanProposal = onRequestPlanProposal,
+        onApplyPlanProposal = onApplyPlanProposal,
+        onDismissPlanProposal = onDismissPlanProposal,
     )
 }
 
@@ -336,9 +369,13 @@ fun WorkoutCardWeek(
     completed: CompletedSessionMetrics? = null,
     run: CompletedRunMetrics? = null,
     analysis: AiAnalysisState? = null,
+    planProposal: AiPlanProposalState? = null,
     analysisConfigured: Boolean = false,
     onRequestAnalysis: () -> Unit = {},
     onDismissAnalysis: () -> Unit = {},
+    onRequestPlanProposal: (String?) -> Unit = {},
+    onApplyPlanProposal: () -> Unit = {},
+    onDismissPlanProposal: () -> Unit = {},
 ) {
     val indicatorColor = when (workout.type) {
         WorkoutType.RUNNING -> ColorBlue
@@ -474,6 +511,10 @@ fun WorkoutCardWeek(
                     configured = analysisConfigured,
                     onRequest = onRequestAnalysis,
                     onDismiss = onDismissAnalysis,
+                    proposalState = planProposal,
+                    onRequestProposal = onRequestPlanProposal,
+                    onApplyProposal = onApplyPlanProposal,
+                    onDismissProposal = onDismissPlanProposal,
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }

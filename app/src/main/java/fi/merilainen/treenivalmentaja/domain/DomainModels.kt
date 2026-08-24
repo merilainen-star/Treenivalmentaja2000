@@ -43,6 +43,8 @@ data class Exercise(
   val durationSec: Int? = null,
   val restSec: Int? = null,
   val notes: String? = null,
+  /** Equipment that must be ready before this movement. Optional and authored by the plan. */
+  val equipment: List<String>? = null,
   /**
    * The sets spelled out, for an exercise whose sets are not all alike — a ramp such as
    * 25/35/45/55 kg, or a drop in reps as the weight climbs.
@@ -88,6 +90,7 @@ data class LighterAlternative(
   val roundsMax: Int? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
+  val roundRestSec: Int? = null,
   val description: String? = null,
   val exercises: List<Exercise>? = null,
 )
@@ -116,6 +119,8 @@ data class TrainingSession(
   val roundsMax: Int? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
+  /** Pause after a completed circuit round. Separate from each movement's [Exercise.restSec]. */
+  val roundRestSec: Int? = null,
   val exercises: List<Exercise>? = null,
   val lighterAlternative: LighterAlternative? = null,
   val description: String? = null,

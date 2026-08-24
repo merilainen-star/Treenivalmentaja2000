@@ -1,6 +1,9 @@
 # Privacy Policy — Treenivalmentaja
 
-**Last updated: 20 August 2026** *(revised: automatic Android backup and device transfer are now
+**Last updated: 24 August 2026** *(revised: AI plan proposals can send the open schedule and the
+standing constraints entered in Settings to the selected AI provider, only after an explicit tap.
+Unaccepted proposals are not stored; accepted typed operations are recorded in the local event
+log. Automatic Android backup and device transfer are
 disabled for the entire app, including the Room training/health database, settings and all
 credentials. In the optional **AI analysis** feature, data is sent only when you tap
 "AI-analyysi" on a workout: that workout's data and your recent recovery readings go to the
@@ -46,8 +49,11 @@ of them, and a key stored for a provider you are not using is never sent anywher
   Each service has its own file and its own key, so removing one cannot affect another. All are
   excluded from Android cloud backup and device transfer. The intervals.icu and AI provider keys are
   never redisplayed in the app once saved, and are never written to a log.
-- **AI analyses are not stored at all.** An analysis lives on screen until you close it or leave the
-  screen, and is never written to the database. There is no history of them.
+- **AI analyses and unaccepted plan proposals are not stored at all.** They live on screen until
+  you close it or leave the screen. Accepted proposal effects are ordinary local plan changes with
+  `AI_ADVISOR` audit events; the provider's prose is not stored.
+- **AI advisor constraints**, such as "long runs only on weekends", are stored locally in the
+  settings DataStore and sent only when you request a plan proposal.
 - **App settings**, such as reminder times.
 
 All of it is stored inside the app's private storage, protected by the Android application sandbox.
@@ -65,7 +71,7 @@ providers are contacted **only** when you tap the button, and only the one you s
 | --- | --- | --- |
 | `api.ouraring.com`, `cloud.ouraring.com` | Your Oura credentials and tokens; requests for date ranges | To sign in to Oura and read your own Oura data |
 | `intervals.icu` | Your intervals.icu API key; requests for date ranges | To read your own activities, which arrive there from your Suunto watch |
-| `api.anthropic.com` | **Only when you tap "AI-analyysi" with Claude selected:** your Anthropic key, one workout's details, and about a week of recovery readings | To get a coach's comment on that workout |
+| `api.anthropic.com` | **Only after an explicit AI action with Claude selected:** your Anthropic key and either one workout plus recent recovery, or the open schedule plus advisor constraints | To get a workout comment or a structured plan proposal |
 | `api.openai.com` | The same, when ChatGPT is selected | The same |
 | `generativelanguage.googleapis.com` | The same, when Gemini is selected | The same |
 | `oss.exercisedb.dev` (ExerciseDB) | The name or catalogue id of an exercise in your plan | To show an animation and instructions when you tap a movement |
@@ -91,6 +97,14 @@ precise. One tap sends **one** request containing:
 It does **not** send your name, your email, your Oura or intervals.icu credentials, your training
 plan as a whole, or any workout other than the one you tapped. Readings the app does not have are
 simply left out — nothing is filled in with a placeholder.
+
+### What an AI plan proposal sends
+
+An explicit proposal request sends the target workout, the currently open plan sessions (ids,
+dates, times, sport, intensity and duration), today's date and the standing constraints written in
+Settings. A clarification answer is sent only after you type it and tap **Jatka**. The response is
+accepted only as a clarification question or typed `MOVE`/`LIGHTEN` JSON; it remains read-only until
+you tap **Hyväksy muutokset**.
 
 **You can see the request.** Every analysis has a "Näytä pyyntö" control that shows the exact text
 that was sent, character for character. Nothing is sent that you cannot read afterwards.

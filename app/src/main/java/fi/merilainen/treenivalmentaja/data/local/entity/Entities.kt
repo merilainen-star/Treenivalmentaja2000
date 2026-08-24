@@ -63,6 +63,7 @@ data class WorkoutSessionEntity(
   val roundsMax: Int? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
+  val roundRestSec: Int? = null,
   /** JSON array of exercises; see `docs/DATA_MODEL.md` for why this is not normalised. */
   val exercisesJson: String? = null,
   val lighterAlternativeJson: String? = null,

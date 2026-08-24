@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 
 /**
  * The "AI-analyysi" button, and whatever it has produced.
@@ -67,6 +68,10 @@ fun AiAnalysisSection(
   configured: Boolean,
   onRequest: () -> Unit = {},
   onDismiss: () -> Unit = {},
+  proposalState: AiPlanProposalState? = null,
+  onRequestProposal: (String?) -> Unit = {},
+  onApplyProposal: () -> Unit = {},
+  onDismissProposal: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   if (kind == null || !configured) return
@@ -99,6 +104,15 @@ fun AiAnalysisSection(
             }
           )
         }
+    }
+
+    if (kind == AiAnalysisKind.UPCOMING) {
+      AiPlanAdvisorSection(
+        state = proposalState,
+        onRequest = onRequestProposal,
+        onApply = onApplyProposal,
+        onDismiss = onDismissProposal,
+      )
     }
   }
 }

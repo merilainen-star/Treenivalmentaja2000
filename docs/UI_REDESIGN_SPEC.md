@@ -132,11 +132,28 @@ Päivitetään teematiedostot:
 
 ---
 
-## Ratkaisematta ennen toteutusta
+## Toteutuspäätökset 2026-08-24
 
-Nämä eivät ole osa Geminin ohjetta. Ne ovat kohtia, joissa ohje ja mockupit ovat eri mieltä tai
-joissa mockup näyttää jotain, mitä sovelluksessa ei ole — ja jokainen niistä pysäyttäisi
-toteutuksen kesken, jos siihen törmää vasta koodia kirjoittaessa.
+Seuraavat aiemmin avoimet kohdat on lukittu ennen toteutuksen aloittamista:
+
+1. **Navigaatiossa on kolme toimivaa kohdetta:** Tänään, Kalenteri ja Asetukset. Edistymistä ei
+   lisätä ennen kuin sillä on oikea näkymä, eikä yhden käyttäjän sovellus tarvitse erillistä
+   Profiili-välilehteä.
+2. **Yhteenvetorenkaat näyttävät vain jo tallennettua dataa:** Oura-palautumisen, unen ja
+   aktiivisuuden pisteet. Askeleita ja päivän kaloreita ei teeskennellä saatavilla oleviksi eikä
+   niiden vuoksi lisätä tietokantamuutosta visuaaliseen uudistukseen.
+3. **Kalenteriruudukko lasketaan `java.time`:lla.** Mockupin toistuvat ja puuttuvat päivät ovat
+   piirrosvirhe, eivät toteutusohje.
+4. **`dynamicColor = false`.** Electric Blue -paletti on sovelluksen oma tunnistettava ilme myös
+   Android 12+:lla. Muutos kirjataan changelogiin, koska se poistaa Material You -mukautuvuuden.
+5. **Statusvärit säilyvät semanttisina väreinä.** Onnistuminen, varoitus, virhe ja neutraali tila
+   eivät vaihda merkitystä brändipaletin mukana.
+
+## Ratkaistut ristiriidat (historia)
+
+Nämä eivät ole osa Geminin ohjetta. Ne ovat kohdat, joissa ohje ja mockupit olivat eri mieltä tai
+joissa mockup näytti jotain, mitä sovelluksessa ei ollut. Yllä oleva päätöslista kertoo, kumpi
+vaihtoehto toteutuksessa voitti.
 
 1. **Kolme välilehteä vai neljä?** Ohjeen kohta 1 sanoo *"navigointirakenne pidetään kolmessa
    toimivassa välilehdessä… ei lisätä tyhjiä placeholder-välilehtiä"*, mutta **molemmissa
