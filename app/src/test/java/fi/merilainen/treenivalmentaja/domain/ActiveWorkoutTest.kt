@@ -31,14 +31,43 @@ class ActiveWorkoutTest {
   }
 
   @Test
-  fun `skip is recorded only on a perform step`() {
-    val steps = buildActiveWorkoutSteps(session(exercises = listOf(Exercise("Punnerrus", reps = 10))))
-    val prepare = ActiveWorkoutProgress()
-    assertEquals(prepare, prepare.skip(steps))
+  fun `a skipped movement counts as neither done nor unreached`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(
+          rounds = 2,
+          exercises = listOf(Exercise("Punnerrus", reps = 10), Exercise("Soutu", reps = 8)),
+        )
+      )
+    val performs = steps.filterIsInstance<ActiveWorkoutStep.Perform>()
+    val skippedKeys = listOf(performs[1].key())
 
-    val skipped = prepare.advance(steps).skip(steps)
-    assertEquals(2, skipped.stepIndex)
-    assertEquals(listOf(SkippedMovement(1, 1, "Punnerrus")), skipped.skipped)
+    // Standing on the last step: three of the four movements were trained, one was skipped.
+    assertEquals(3, steps.completedMovements(steps.lastIndex, skippedKeys))
+    // Without the skip list the meter would have counted the movement it walked past.
+    assertEquals(4, steps.completedMovements(steps.lastIndex))
+    assertEquals(listOf(SkippedMovement(1, 2, "Soutu")), steps.skippedMovements(skippedKeys))
+  }
+
+  @Test
+  fun `the same movement in a later round is a different skip`() {
+    val steps =
+      buildActiveWorkoutSteps(session(rounds = 2, exercises = listOf(Exercise("Kyykky", reps = 5))))
+    val performs = steps.filterIsInstance<ActiveWorkoutStep.Perform>()
+
+    assertEquals(listOf("1:1", "2:1"), performs.map { it.key() })
+    assertEquals(
+      listOf(SkippedMovement(2, 1, "Kyykky")),
+      steps.skippedMovements(listOf(performs[1].key())),
+    )
+  }
+
+  @Test
+  fun `nothing is skipped and nothing is done before the first movement`() {
+    val steps = buildActiveWorkoutSteps(session(exercises = listOf(Exercise("Punnerrus", reps = 10))))
+
+    assertEquals(0, steps.completedMovements(0, emptyList()))
+    assertTrue(steps.skippedMovements(emptyList()).isEmpty())
   }
 
   @Test

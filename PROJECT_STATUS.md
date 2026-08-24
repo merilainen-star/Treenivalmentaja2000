@@ -7,20 +7,31 @@ other documentation.
 
 - Date: 2026-08-24
 - Base commit: working tree for this change on top of `1fcaa36`
-- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36.1 and
-  build-tools 36.1.0
+- Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
+  and build-tools 36.1.0, on Windows 11
+- Emulator: `treeni-test`, android-36 google_apis x86_64, headless
+
+All five ran in one invocation with `--rerun-tasks` and a cleared `app/build/test-results`, so every
+number below was executed rather than replayed: Gradle reported `91 actionable tasks: 91 executed`
+and no task line carried `FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:cleanTestDebugUnitTest :app:testDebugUnitTest --rerun` | 604 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 58 comparisons, 0 changed, 58 unchanged |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 606 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 58 comparisons, 0 changed, 58 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew clean :app:assembleDebug`, and a fresh `git worktree` for the comparison | 21,072,879 bytes |
-| Instrumented | `adb devices -l` | Not run: no device or emulator attached |
+| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,072,879 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 44 tests, 0 failures, 0 errors, 0 skipped |
 
 The 43 warnings are the same non-functional families as before — dependency-update notices, two `UseKtx`
 suggestions on the API-key stores, one `RedundantLabel` and one `ObsoleteSdkInt` that must stay.
 None is in the code added here.
+
+**The instrumented run is the one that had been outstanding.** Schema 13 is the first migration this
+branch adds, and `MigrationTest.migrate12To13` can only prove anything on a device — it ran here and
+passed, alongside the other 43 instrumented cases. The APK is byte-identical to the measurement taken
+before the skip-accounting change, which is what a pure refactor of already-compiled call sites
+should produce.
 
 **Read `--rerun` and a cleared `app/build/test-results` as part of the method, not as decoration.**
 `org.gradle.caching=true` means a plain re-run can report `testDebugUnitTest FROM-CACHE` and execute

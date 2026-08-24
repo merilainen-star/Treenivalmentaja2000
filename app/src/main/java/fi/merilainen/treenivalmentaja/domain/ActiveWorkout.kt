@@ -34,30 +34,6 @@ data class ActiveWorkoutOutcome(
   val durationSec: Long? = null,
 )
 
-data class ActiveWorkoutProgress(
-  val stepIndex: Int = 0,
-  val skipped: List<SkippedMovement> = emptyList(),
-) {
-  fun current(steps: List<ActiveWorkoutStep>): ActiveWorkoutStep =
-    steps[stepIndex.coerceIn(0, steps.lastIndex)]
-
-  fun advance(steps: List<ActiveWorkoutStep>): ActiveWorkoutProgress =
-    copy(stepIndex = (stepIndex + 1).coerceAtMost(steps.lastIndex))
-
-  fun back(): ActiveWorkoutProgress = copy(stepIndex = (stepIndex - 1).coerceAtLeast(0))
-
-  fun skip(steps: List<ActiveWorkoutStep>): ActiveWorkoutProgress {
-    val perform = current(steps) as? ActiveWorkoutStep.Perform ?: return this
-    val skippedMovement =
-      SkippedMovement(
-        round = perform.round,
-        position = perform.position,
-        name = perform.exercise.name,
-      )
-    return advance(steps).copy(skipped = (skipped + skippedMovement).distinct())
-  }
-}
-
 /**
  * Builds the deterministic sequence the full-screen mode renders.
  *
@@ -126,5 +102,27 @@ fun buildActiveWorkoutSteps(
   }
 }
 
-fun List<ActiveWorkoutStep>.completedMovements(beforeStepIndex: Int): Int =
-  take(beforeStepIndex.coerceIn(0, size)).count { it is ActiveWorkoutStep.Perform }
+/**
+ * Which movement this is, independent of where it sits in the step list: a movement is the same
+ * one whether it was reached forwards or by walking back, so the key is the round and the position
+ * rather than the index.
+ */
+fun ActiveWorkoutStep.Perform.key(): String = "$round:$position"
+
+/**
+ * The movements the person has actually done — a skipped one has passed its step but was not
+ * trained, so it counts for neither the progress meter nor the stored [GuidedProgress].
+ */
+fun List<ActiveWorkoutStep>.completedMovements(
+  beforeStepIndex: Int,
+  skippedKeys: List<String> = emptyList(),
+): Int =
+  take(beforeStepIndex.coerceIn(0, size)).filterIsInstance<ActiveWorkoutStep.Perform>().count {
+    it.key() !in skippedKeys
+  }
+
+/** Resolves the keys the screen collected back into the movements they name, in sequence order. */
+fun List<ActiveWorkoutStep>.skippedMovements(skippedKeys: List<String>): List<SkippedMovement> =
+  filterIsInstance<ActiveWorkoutStep.Perform>()
+    .filter { it.key() in skippedKeys }
+    .map { SkippedMovement(round = it.round, position = it.position, name = it.exercise.name) }

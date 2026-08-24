@@ -54,6 +54,8 @@ import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SkippedMovement
 import fi.merilainen.treenivalmentaja.domain.buildActiveWorkoutSteps
 import fi.merilainen.treenivalmentaja.domain.completedMovements
+import fi.merilainen.treenivalmentaja.domain.key
+import fi.merilainen.treenivalmentaja.domain.skippedMovements
 import kotlin.math.ceil
 import kotlinx.coroutines.delay
 
@@ -158,7 +160,7 @@ fun ActiveWorkoutContent(
 
     val safeIndex = stepIndex.coerceIn(0, steps.lastIndex)
     val step = steps[safeIndex]
-    val completed = steps.completedMovements(safeIndex)
+    val completed = steps.completedMovements(safeIndex, skippedIds)
     val total = workout.rounds * workout.exercises.size
     Column(
       modifier =
@@ -191,7 +193,7 @@ fun ActiveWorkoutContent(
             onExerciseClick = onExerciseClick,
             onDone = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
             onSkip = {
-              skippedIds = (skippedIds + "${step.round}:${step.position}").distinct()
+              skippedIds = (skippedIds + step.key()).distinct()
               stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex)
             },
           )
@@ -210,12 +212,7 @@ fun ActiveWorkoutContent(
             onFinished = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
           )
         ActiveWorkoutStep.Finish -> {
-          val skipped =
-            steps.filterIsInstance<ActiveWorkoutStep.Perform>().mapNotNull { perform ->
-              if ("${perform.round}:${perform.position}" in skippedIds) {
-                SkippedMovement(perform.round, perform.position, perform.exercise.name)
-              } else null
-            }
+          val skipped = steps.skippedMovements(skippedIds)
           FinishWorkoutCard(
             total = total,
             skipped = skipped,

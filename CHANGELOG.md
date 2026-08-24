@@ -20,6 +20,20 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   read-only-esikatselu ja erillinen hyväksyntä. Hyväksytty lista toteutetaan atomisesti ja merkitään
   tapahtumalokiin lähteellä `AI_ADVISOR`; virheellinen lista ei muuta mitään.
 
+### Fixed
+- Ohitettu liike ei enää näy tehtynä kesken treenin. Edistymispalkki laski `Perform`-askelia
+  katsomatta ohituslistaa, joten "Ohita" siirsi mittaria eteenpäin samalla tavalla kuin "Valmis" —
+  vaikka tallennettu `GuidedProgress` on koko ajan vähentänyt ohitetut oikein. Näytöllä näkyvä luku
+  ja tapahtumalokiin kirjoitettu luku ovat nyt sama luku.
+
+### Changed
+- Ohjatun treenin askellogiikka on siirretty domainiin funktioina, joita näyttö kutsuu:
+  `Perform.key()`, `completedMovements(index, skippedKeys)` ja `skippedMovements(skippedKeys)`.
+  `ActiveWorkoutProgress` poistettiin — se oli kirjoitettu tähän tarkoitukseen mutta jäi
+  kytkemättä, joten `ActiveWorkoutScreen` rakensi samat `"$round:$position"`-avaimet käsin
+  kahdessa paikassa ja luokan testit todistivat koodista, jota sovellus ei ajanut. Ei
+  käyttäytymismuutosta yllä mainitun korjauksen lisäksi; kuvakaappausperustasot eivät muuttuneet.
+
 ## [Unreleased] - 2026-08-23
 
 ### Added
