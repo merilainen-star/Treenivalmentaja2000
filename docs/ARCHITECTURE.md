@@ -29,9 +29,12 @@ All source lives under the package `fi.merilainen.treenivalmentaja`.
 - **Presentation Layer:** `WorkoutViewModel`
 - **Domain Layer:** models and status transition rules (`domain/`), plus use cases —
   `RescheduleAlarmsUseCase`, `ResolveReminderUseCase`, `LoadExerciseGuideUseCase`,
-  `CheckForUpdateUseCase` and `MatchOuraWorkoutsUseCase`
+  `CheckForUpdateUseCase`, `InstallUpdateUseCase` and `MatchOuraWorkoutsUseCase`
 - **Data Layer:** Room database, DAOs and repositories (`data/`); the Oura API client in
-  `data/oura`, built on OkHttp ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client))
+  `data/oura`, built on OkHttp ([ADR-007](DECISIONS.md#adr-007-okhttp-not-retrofit-for-the-oura-client));
+  the sideload updater in `data/update`, which streams the published APK into an Android
+  `PackageInstaller` session and verifies it against the release's SHA-256
+  ([ADR-013](DECISIONS.md#adr-013-the-app-installs-its-own-update-through-packageinstaller))
 
 ```mermaid
 graph TD

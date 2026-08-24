@@ -9,6 +9,10 @@ import org.junit.Test
 
 class CheckForUpdateUseCaseTest {
 
+    private companion object {
+        const val DIGEST = "9f2ec1b0f4a58a1e2a6d4b8c0e5f7a9b1c3d5e7f9a1b3c5d7e9f1a3b5c7d9e1f"
+    }
+
     private fun published(versionName: String, sizeBytes: Long = 19_420_493) =
         UpdateInfo(
             versionName = versionName,
@@ -16,6 +20,7 @@ class CheckForUpdateUseCaseTest {
             builtAtUtc = "2026-08-08T09:00:00Z",
             apkUrl = "https://example.invalid/Treenivalmentaja-test.apk",
             apkSizeBytes = sizeBytes,
+            apkSha256 = DIGEST,
         )
 
     private fun service(info: UpdateInfo) = object : UpdateService {
@@ -61,6 +66,25 @@ class CheckForUpdateUseCaseTest {
         val available = status as UpdateStatus.Available
         assertEquals("1.0-a1b2c3d", available.versionName)
         assertEquals("https://example.invalid/Treenivalmentaja-test.apk", available.apkUrl)
+    }
+
+    /**
+     * The exact byte count and the digest travel with the offer, not just the rounded megabytes.
+     *
+     * They are what the download is verified against, and re-reading them at the moment the user
+     * presses the button would check the file against whatever is published *then* rather than
+     * against the release this card is describing.
+     */
+    @Test
+    fun `an available update carries the exact size and the digest`() = runTest {
+        val status = CheckForUpdateUseCase(
+            service = service(published("1.0-a1b2c3d", sizeBytes = 19_420_493)),
+            installedVersionName = "1.0-c07cfac",
+        ).execute()
+
+        val available = status as UpdateStatus.Available
+        assertEquals(19_420_493L, available.sizeBytes)
+        assertEquals(DIGEST, available.sha256)
     }
 
     @Test

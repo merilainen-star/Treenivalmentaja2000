@@ -295,19 +295,45 @@ class ComponentScreenshotTest {
 
     // ------------------------------------------------------------------ Update card
 
-    /** The three states the version card can be read in; "checking" is transient. */
+    private val availableUpdate = UpdateStatus.Available(
+        versionName = "1.0-a1b2c3d",
+        apkUrl = "https://example.invalid/app.apk",
+        sizeMb = 19,
+        sizeBytes = 19_420_493,
+        sha256 = "9f2ec1b0f4a58a1e2a6d4b8c0e5f7a9b1c3d5e7f9a1b3c5d7e9f1a3b5c7d9e1f",
+    )
+
+    /** What the card says when nothing is being installed; "checking" is transient. */
     @Test
     fun updateCard_states() = capture("update_card_states") {
         UpdateCard(status = UpdateStatus.UpToDate("1.0-c07cfac"), onCheck = {})
+        UpdateCard(status = availableUpdate, onCheck = {})
+        UpdateCard(status = UpdateStatus.Failed("GitHub vastasi HTTP 503"), onCheck = {})
+    }
+
+    /**
+     * The install itself, in its own capture because six cards do not fit on the device and a
+     * baseline that is clipped proves nothing about the part below the fold.
+     *
+     * These three are the whole visible difference between installing in-app and handing the APK
+     * to a browser: a percentage that moves, a sentence saying the file is already verified while
+     * Android's dialog is on its way, and a refusal that offers the same release again rather than
+     * sending the user back to check.
+     */
+    @Test
+    fun updateCard_installStates() = capture("update_card_install_states") {
         UpdateCard(
-            status = UpdateStatus.Available(
-                versionName = "1.0-a1b2c3d",
-                apkUrl = "https://example.invalid/app.apk",
-                sizeMb = 19,
-            ),
+            status = UpdateStatus.Downloading("1.0-a1b2c3d", progressPercent = 42),
             onCheck = {},
         )
-        UpdateCard(status = UpdateStatus.Failed("GitHub vastasi HTTP 503"), onCheck = {})
+        UpdateCard(
+            status = UpdateStatus.AwaitingInstallConfirmation("1.0-a1b2c3d"),
+            onCheck = {},
+        )
+        UpdateCard(
+            status = UpdateStatus.Failed("Asennus peruttiin.", retryable = availableUpdate),
+            onCheck = {},
+        )
     }
 
     // ------------------------------------------------------------------ Import dialog

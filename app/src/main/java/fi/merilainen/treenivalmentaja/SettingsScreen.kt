@@ -99,6 +99,25 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         }
     }
 
+    /**
+     * The trip to "Asenna tuntemattomia sovelluksia" and back.
+     *
+     * The result code says nothing — that settings screen returns `RESULT_CANCELED` whatever the
+     * user did with the toggle — so the permission itself is read again on return, and the
+     * download the button was pressed for begins without a second tap. This lives here rather than
+     * in [UpdateCard] because a launcher needs an activity, which is exactly what the card does
+     * not have when a screenshot test renders it.
+     */
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (context.packageManager.canRequestPackageInstalls()) {
+            viewModel.downloadAndInstallUpdate()
+        } else {
+            viewModel.installPermissionRefused()
+        }
+    }
+
     /** Plan text waiting for the user to say where in the calendar it should land. */
     var pendingImportJson by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -209,6 +228,19 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         },
         onResetSampleData = viewModel::resetSampleData,
         onCheckUpdate = viewModel::checkForUpdate,
+        onDownloadUpdate = {
+            // No SDK guard: per-app install permission arrived in API 26, which is minSdk.
+            if (context.packageManager.canRequestPackageInstalls()) {
+                viewModel.downloadAndInstallUpdate()
+            } else {
+                installPermissionLauncher.launch(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        "package:${context.packageName}".toUri(),
+                    )
+                )
+            }
+        },
     )
 
     if (rawDataOpen) {
@@ -275,6 +307,7 @@ fun SettingsScreenContent(
     onImportClipboard: () -> Unit = {},
     onResetSampleData: () -> Unit = {},
     onCheckUpdate: () -> Unit = {},
+    onDownloadUpdate: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -447,7 +480,11 @@ fun SettingsScreenContent(
                 // Checked once per visit to Settings rather than on a timer: the whole point is
                 // to answer the question you have while looking at this screen.
                 LaunchedEffect(Unit) { onCheckUpdate() }
-                UpdateCard(status = updateStatus, onCheck = onCheckUpdate)
+                UpdateCard(
+                    status = updateStatus,
+                    onCheck = onCheckUpdate,
+                    onDownload = onDownloadUpdate,
+                )
             }
         }
     }
