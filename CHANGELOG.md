@@ -8,6 +8,28 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-08-24
 
 ### Added
+- **Kalenterin päivää täppäämällä alla oleva lista hyppää siihen päivään.** Ruudut ovat
+  klikattavia, valittu päivä saa renkaan, ja lista animoituu riville. Kalenteri tarjoaa kuukauden
+  jokaisen päivän mutta listassa on vain päivät jotka ovat ansainneet rivin, joten päivä jolla ei
+  ole riviä vie lähimpään sellaiseen — tapahtumaton täppäys lukisi rikkinäisenä kontrollina.
+- Tulevan treenin kortissa kolme statussaraketta: Kesto, Liikkeet ja Kierrokset. Vain
+  voimaharjoituksille: `parseStrengthDescription` päättelee liikkeet pilkkuja laskemalla, joten
+  juoksun kuvaus tuotti "Liikkeet 2".
+- Viikkolistan päiväotsikko erottaa menneen, tämän päivän ja tulevan: tehty mennyt päivä saa
+  kuittausmerkin, tänään saa täytetyn korostuksen, tulevat ovat neutraaleja. Aiemmin jokainen
+  päivänimi oli samaa korostusväriä, eli korostus ei erottanut mitään.
+
+### Fixed
+- **`secondaryContainer`, `onSecondaryContainer`, `errorContainer` ja `onErrorContainer` puuttuivat
+  molemmista väriskeemoista.** Material 3 johtaa puuttuvan roolin omasta perusparetistaan, joten
+  ensimmäinen `FilledTonalButton` piirtyi liilana sovelluksessa jonka paletissa ei ole liilaa.
+  Roolit on nyt määritelty samoista väriperheistä kuin `GreenAccent` ja `RedAccent`.
+- Virhekortin painikkeet piirtyivät sinisinä punaisella pohjalla, koska `TextButton` käyttää
+  oletuksena `primary`-väriä.
+
+
+
+### Added
 - Material 3 Electric Blue -uudistus: yhtenäinen vaalea/tumma paletti, kolme toimivaa
   navigaatiokohdetta, Oura-pisteiden yhteenvetorenkaat ja `java.time`-kalenterista laskettu
   kuukausiruudukko. Material You -dynaamiset värit poistettiin tietoisena käyttäytymismuutoksena;

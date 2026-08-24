@@ -10,6 +10,18 @@ val GreenAccent = Color(0xFF43A047)
 val RedAccent = Color(0xFFE53935)
 val YellowAccent = Color(0xFFFDD835)
 
+// Tonal containers for the two accents. Material 3 derives these from its own baseline palette
+// when a scheme leaves them out, which is how a FilledTonalButton came out lilac in an app whose
+// palette has no lilac in it. Same families as the accents above, two steps lighter and darker.
+val SecondaryContainerLight = Color(0xFFC8E6C9)
+val OnSecondaryContainerLight = Color(0xFF1B5E20)
+val SecondaryContainerDark = Color(0xFF1B5E20)
+val OnSecondaryContainerDark = Color(0xFFC8E6C9)
+val ErrorContainerLight = Color(0xFFFFCDD2)
+val OnErrorContainerLight = Color(0xFFB71C1C)
+val ErrorContainerDark = Color(0xFF7F1D1D)
+val OnErrorContainerDark = Color(0xFFFFCDD2)
+
 val SurfaceLight = Color(0xFFF8F9FA)
 val SurfaceContainerLowLight = Color(0xFFF1F3F4)
 val SurfaceContainerLight = Color(0xFFE8EAED)

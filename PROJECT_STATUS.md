@@ -6,48 +6,43 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-08-24
-- Base commit: working tree for the sideload-update work on top of `d9508d4`
+- Base commit: working tree for the UI redesign remainder on top of `14bef1c`
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
 
-The first four ran in one invocation with `--rerun-tasks` and a cleared `app/build/test-results`;
-the instrumented run followed with `--rerun-tasks` on the same emulator. No task line carried
-`FROM-CACHE` or `UP-TO-DATE`.
+All five ran in one invocation with `--rerun-tasks` and a cleared `app/build/test-results`, after
+a full `recordRoborazziDebug`. No task line carried `FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 638 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 61 comparisons, 0 changed, 61 unchanged |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 646 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 65 comparisons, 0 changed, 65 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
 | Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,105,695 bytes |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 53 tests, 0 failures, 0 errors, 0 skipped |
 
-The unit suite grew by 24 (614 → 638) and the instrumented suite by 9 (44 → 53), all of them for
-the in-app update: the digest and size check as a pure stream copy, every `PackageInstaller` status
-having a sentence of its own, the four `latest.json` payloads that must be refused rather than
-installed, the progress-to-status mapping, and — on a device — that the install callback starts the
-intent it carries only for `STATUS_PENDING_USER_ACTION`, and that the "app updated" notice appears
-for `ACTION_MY_PACKAGE_REPLACED` and for neither of the other two actions `BootReceiver` handles.
+The suite counts include the update-notice work that landed in `14bef1c` as well as this change's
+own additions — four unit tests for `rowIndexForDate` and three screenshot cases.
 
-`UpdateInstalledNotificationTest` failed once before it passed, and the failure was the test's
-rather than the code's: posting a notification and reading `activeNotifications` are separate calls
-into the system, and the read beat the post. Presence is now polled and absence asserted after a
-settle. Worth recording because the sibling test that posted twice passed throughout — a race that
-only fails in the single-post case reads exactly like a feature that does not work.
+**Two of the three defects in this change were caught by looking at the recorded images, not by a
+check passing.** A running card said "Liikkeet 2" because `parseStrengthDescription` counts commas,
+and a `FilledTonalButton` came out lilac because neither colour scheme ever defined
+`secondaryContainer` — Material 3 fills a missing role from its own baseline palette.
+`verifyRoborazziDebug` can catch neither: it compares against a baseline recorded from the same
+code. **It prevents a baseline changing by accident; it does not prevent recording the wrong thing
+on purpose.** The third defect — blue actions on a red error container — was the same. Recording is
+not verification, and the step that does the verifying is a person opening the PNGs.
 
-One screenshot baseline was added (`update_card_install_states`) and one rewritten
-(`update_card_states`); both diffs were looked at before recording. The install states are a
-separate capture because six cards do not fit on the device, and the first attempt clipped the last
-one — a baseline that proves nothing about the part below the fold.
+The three colour roles the scheme was missing (`secondaryContainer`, `errorContainer` and their
+`on-` pairs) had been absent since the Material 3 redesign landed. Nothing had used them, so nothing
+had shown it. Any future component that reaches for a role this scheme does not define will draw
+itself from the baseline palette and look like it belongs to a different app.
 
-The APK grew **16,432 B (+0.078 %)** over the 21,089,263 B measured for the advisor fix. One 16 KiB
-alignment page plus change, and no new dependency: `PackageInstaller`, `MessageDigest` and
-`HttpsURLConnection` are all platform APIs.
-
-Lint is unchanged at 0 errors and 43 warnings — the same non-functional families as before.
-`REQUEST_INSTALL_PACKAGES` raised nothing new, which is worth writing down rather than assuming: it
-is a permission tooling is entitled to complain about.
+The APK is 21,105,695 B against the CI-built 21,105,711 B for `14bef1c`; local builds have measured
+16 B under CI on every comparison so far, so this change fits inside the existing alignment page and
+costs nothing measurable. The base was not rebuilt locally, so that is an inference from a
+consistent offset rather than a measured delta.
 
 ## Current implementation
 
@@ -124,7 +119,7 @@ unchanged, as it was written when each figure was taken.
 ### 2026-08-24 — the advisor fix, the skip accounting and the theme (measured on `1fcaa36`)
 
 - Date: 2026-08-24
-- Base commit: working tree for this change on top of `1fcaa36`
+- Base commit: working tree for this change on top of `d9508d4`
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
@@ -146,11 +141,6 @@ suggestions on the API-key stores, one `RedundantLabel` and one `ObsoleteSdkInt`
 None is in the code added here. CI reports **45** warnings for the same commit; the two extra are
 dependency-update notices, which depend on what versions the build environment can see from the
 network rather than on anything in the repository. Both environments report 0 errors.
-
-The APK grew 16,384 bytes over the 21,072,879 measured before the advisor fix — one 16 KiB
-alignment page, which is the smallest step this packaging can take. Two screenshot baselines were
-added (`card_ai_advisor_no_change`, `card_ai_advisor_failed`) and `recordRoborazziDebug` rewrote
-every other baseline byte-for-byte, so the diff carries exactly those two new images.
 
 **The instrumented run is the one that had been outstanding.** Schema 13 is the first migration this
 branch adds, and `MigrationTest.migrate12To13` can only prove anything on a device — it ran here and
