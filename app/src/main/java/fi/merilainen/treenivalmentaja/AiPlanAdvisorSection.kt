@@ -90,6 +90,25 @@ fun AiPlanAdvisorSection(
           TextButton(onClick = onDismiss) { Text("Hylkää ehdotus") }
         }
       }
+    is AiPlanProposalState.NoChange ->
+      Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
+        var promptVisible by rememberSaveable(state.prompt) { mutableStateOf(false) }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+          Text("AI ei ehdota muutoksia", fontWeight = FontWeight.Bold)
+          Text(state.reason)
+          TextButton(onClick = { promptVisible = !promptVisible }) {
+            Text(if (promptVisible) "Piilota AI:lle lähetetty pyyntö" else "Näytä AI:lle lähetetty pyyntö")
+          }
+          if (promptVisible) {
+            Text(
+              state.prompt,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+          TextButton(onClick = onDismiss) { Text("Sulje") }
+        }
+      }
     is AiPlanProposalState.Applying ->
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         CircularProgressIndicator()
@@ -106,6 +125,20 @@ fun AiPlanAdvisorSection(
       Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
           Text(state.message, color = MaterialTheme.colorScheme.onErrorContainer)
+          val raw = state.rawResponse
+          if (!raw.isNullOrBlank()) {
+            var rawVisible by rememberSaveable(raw) { mutableStateOf(false) }
+            TextButton(onClick = { rawVisible = !rawVisible }) {
+              Text(if (rawVisible) "Piilota AI:n vastaus" else "Näytä AI:n vastaus")
+            }
+            if (rawVisible) {
+              Text(
+                raw,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+              )
+            }
+          }
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (state.canRetry) TextButton(onClick = { onRequest(null) }) { Text("Yritä uudelleen") }
             TextButton(onClick = onDismiss) { Text("Sulje") }

@@ -55,6 +55,64 @@ class AiPlanAdvisorTest {
     assertTrue(prompt.contains("puuttuvia arvoja ei saa päätellä"))
   }
 
+  @Test
+  fun `an explicit no_change status is a successful answer`() {
+    val response =
+      parser
+        .parse("""{"status":"no_change","summary":"Kuormitus on sopiva, jatka suunnitelman mukaan."}""")
+        .getOrThrow()
+
+    assertEquals(
+      AdvisorResponse.NoChange("Kuormitus on sopiva, jatka suunnitelman mukaan."),
+      response,
+    )
+  }
+
+  @Test
+  fun `a proposal with no operations reads as no change, not as a broken answer`() {
+    val response =
+      parser
+        .parse("""{"status":"proposal","summary":"Suunnitelma on kunnossa.","operations":[]}""")
+        .getOrThrow()
+
+    assertEquals(AdvisorResponse.NoChange("Suunnitelma on kunnossa."), response)
+  }
+
+  @Test
+  fun `a proposal that omits the operations key entirely is also no change`() {
+    val response =
+      parser.parse("""{"status":"proposal","summary":"Ei muutettavaa."}""").getOrThrow()
+
+    assertEquals(AdvisorResponse.NoChange("Ei muutettavaa."), response)
+  }
+
+  @Test
+  fun `no change falls back to a sentence of its own when the model gives no summary`() {
+    val response = parser.parse("""{"status":"no_change"}""").getOrThrow()
+
+    assertEquals(AdvisorResponse.NoChange("AI ei ehdota muutoksia."), response)
+  }
+
+  @Test
+  fun `an unknown status is still refused`() {
+    assertTrue(parser.parse("""{"status":"siirrä kaikki"}""").isFailure)
+  }
+
+  @Test
+  fun `the prompt offers no change as an option the model is allowed to take`() {
+    val prompt =
+      AdvisorPromptBuilder()
+        .build(
+          target = session("run-1"),
+          sessions = listOf(session("run-1")),
+          today = LocalDate.of(2026, 8, 24),
+          constraints = "",
+        )
+
+    assertTrue(prompt.contains("no_change"))
+    assertTrue(prompt.contains("älä keksi muutosta"))
+  }
+
   private fun session(id: String) =
     TrainingSession(
       id = id,

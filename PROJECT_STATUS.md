@@ -17,15 +17,22 @@ and no task line carried `FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 606 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 58 comparisons, 0 changed, 58 unchanged |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 614 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 60 comparisons, 0 changed, 60 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,072,879 bytes |
+| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,089,263 bytes |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 44 tests, 0 failures, 0 errors, 0 skipped |
 
 The 43 warnings are the same non-functional families as before — dependency-update notices, two `UseKtx`
 suggestions on the API-key stores, one `RedundantLabel` and one `ObsoleteSdkInt` that must stay.
-None is in the code added here.
+None is in the code added here. CI reports **45** warnings for the same commit; the two extra are
+dependency-update notices, which depend on what versions the build environment can see from the
+network rather than on anything in the repository. Both environments report 0 errors.
+
+The APK grew 16,384 bytes over the 21,072,879 measured before the advisor fix — one 16 KiB
+alignment page, which is the smallest step this packaging can take. Two screenshot baselines were
+added (`card_ai_advisor_no_change`, `card_ai_advisor_failed`) and `recordRoborazziDebug` rewrote
+every other baseline byte-for-byte, so the diff carries exactly those two new images.
 
 **The instrumented run is the one that had been outstanding.** Schema 13 is the first migration this
 branch adds, and `MigrationTest.migrate12To13` can only prove anything on a device — it ran here and

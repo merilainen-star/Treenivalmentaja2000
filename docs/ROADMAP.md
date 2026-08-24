@@ -203,7 +203,8 @@ almost nothing to say about the sessions that matter most.
    changes go through the append-only session-event log like every other transition. Standing
    constraints — e.g. runs belong on weekends, because that is when there is time to run — are
    user preferences carried in the prompt, and the advisor asks its clarifying questions before
-   proposing.
+   proposing. It may also answer `no_change` — added 2026-08-24 after the first run against a real
+   plan, where the advisor agreed with the plan and the app showed that agreement as a red error.
 
 ## Designed, not built
 

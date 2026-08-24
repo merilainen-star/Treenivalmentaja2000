@@ -21,6 +21,17 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   tapahtumalokiin lähteellä `AI_ADVISOR`; virheellinen lista ei muuta mitään.
 
 ### Fixed
+- **AI:n muutosehdotus kaatui aina kun muutosta ei tarvittu.** Neuvojan protokollassa oli vain
+  kaksi vastausta — tarkentava kysymys tai ehdotus operaatioineen — joten kun malli päätyi siihen
+  ettei suunnitelmaa kannata muuttaa, se palautti `proposal`in tyhjällä operaatiolistalla ja
+  `AdvisorResponseParser` hylkäsi sen virheenä *"Muutosehdotuksessa ei ollut operaatioita"*. Yleisin
+  oikea lopputulos näkyi siis punaisena virheenä. Protokollaan lisättiin kolmas vastaus `no_change`,
+  kehote kertoo nyt sen olevan hyväksyttävä ("älä keksi muutosta vain vastataksesi jotain"), ja
+  tyhjä operaatiolista luetaan samaksi asiaksi, koska vanhempi kehote tuottaa sitä joka tapauksessa.
+  Näytöllä se on oma rauhallinen korttinsa, ei virhelaatikko.
+- Epäonnistunut jäsennys näyttää nyt AI:n raakavastauksen "Näytä AI:n vastaus" -painikkeen takaa.
+  Vastausta ei aiemmin säilytetty missään, joten yllä oleva vika piti päätellä virheilmoituksen
+  sanamuodosta — pyyntö oli katsottavissa, vastaus ei.
 - Ohitettu liike ei enää näy tehtynä kesken treenin. Edistymispalkki laski `Perform`-askelia
   katsomatta ohituslistaa, joten "Ohita" siirsi mittaria eteenpäin samalla tavalla kuin "Valmis" —
   vaikka tallennettu `GuidedProgress` on koko ajan vähentänyt ohitetut oikein. Näytöllä näkyvä luku
