@@ -22,6 +22,16 @@ data class UpdateInfo(
   val builtAtUtc: String,
   val apkUrl: String,
   val apkSizeBytes: Long,
+  /**
+   * The published APK's SHA-256, lower-case hex, computed by the same CI job that uploaded it.
+   *
+   * Required, not optional. The app installs this file itself now, so "no digest published" is not
+   * a degraded check but no check at all — and a field that may be absent is one every caller has
+   * to remember to treat as a refusal. A release published before this field existed therefore
+   * fails the parse and is reported as such, which is the honest reading: that build cannot be
+   * verified.
+   */
+  val apkSha256: String,
 )
 
 /** Fails with an exception rather than returning null, so the caller can say why. */
@@ -68,9 +78,26 @@ class HttpUpdateService(
 
     private val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
-    /** Separate from the request so it can be tested against the real published payload. */
-    fun parseUpdateInfo(json: String): UpdateInfo =
-      moshi.adapter(UpdateInfo::class.java).fromJson(json)
+    private val SHA256_HEX = Regex("[0-9a-fA-F]{64}")
+
+    /**
+     * Separate from the request so it can be tested against the real published payload.
+     *
+     * The three checks after the parse are the ones the installer would otherwise have to make
+     * with a session already open: a download it cannot verify, or one it would fetch over plain
+     * HTTP, is refused here — while the only thing lost is a metadata read.
+     */
+    fun parseUpdateInfo(json: String): UpdateInfo {
+      val info = moshi.adapter(UpdateInfo::class.java).fromJson(json)
         ?: error("julkaisun tiedot olivat tyhjät")
+      require(info.apkUrl.startsWith("https://")) {
+        "julkaisun APK-osoite ei ole HTTPS-osoite"
+      }
+      require(info.apkSizeBytes > 0) { "julkaisun APK-koko puuttuu" }
+      require(SHA256_HEX.matches(info.apkSha256)) {
+        "julkaisun tarkistussumma ei ole SHA-256"
+      }
+      return info
+    }
   }
 }

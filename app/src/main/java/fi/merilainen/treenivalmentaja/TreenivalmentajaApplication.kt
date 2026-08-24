@@ -13,7 +13,9 @@ import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
 import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.update.HttpUpdateService
+import fi.merilainen.treenivalmentaja.data.update.PackageInstallerApkInstaller
 import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
+import fi.merilainen.treenivalmentaja.domain.InstallUpdateUseCase
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import fi.merilainen.treenivalmentaja.data.settings.MissedProposalSettingsStore
@@ -98,6 +100,16 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
       installedVersionName = BuildConfig.VERSION_NAME,
     )
   }
+
+  /**
+   * One for the whole process, and not private, because `UpdateInstallReceiver` has to reach the
+   * same instance: the receiver is built by the system and can only find its way back to the
+   * download that is waiting through this object. The same reason `ReminderReceiver` reads
+   * `repository` from here.
+   */
+  val apkInstaller: PackageInstallerApkInstaller by lazy { PackageInstallerApkInstaller(this) }
+
+  val installUpdateUseCase: InstallUpdateUseCase by lazy { InstallUpdateUseCase(apkInstaller) }
 
   /**
    * One instance for the whole process: its cache is the only place guide data is allowed to

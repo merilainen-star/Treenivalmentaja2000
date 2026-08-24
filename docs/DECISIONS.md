@@ -619,3 +619,73 @@
 - **Related Files:** `domain/GuidedProgress.kt`, `data/SessionPayloadJson.kt`,
   `domain/AnalysisPromptBuilder.kt`, `data/repository/TrainingRepository.kt`, `WorkoutViewModel.kt`,
   `TodayScreen.kt`, `docs/DATA_MODEL.md`
+
+## ADR-013: The app installs its own update through `PackageInstaller`
+- **Status:** Accepted (2026-08-24), and built. Replaces the delivery mechanism of the update check
+  built alongside [ADR-006](#adr-006-no-separate-backend-in-the-mvp); the "no backend" decision and
+  the rolling test release are untouched.
+- **Context:** The version card found the published build and then handed its URL to
+  `ACTION_VIEW`. The browser downloaded the APK into the user's Downloads folder, the user found
+  it there, tapped it, and Android's package installer took over. Three things were wrong with
+  that, and only the first is cosmetic.
+  - **An installable APK was left among the user's documents**, one copy per update, on a phone
+    that never asked for a file. Nothing removed them.
+  - **Nothing checked what arrived.** The release published a size that no one compared against
+    the file, and no digest at all. The signing certificate was the whole of the protection — it
+    is a real protection, and it is what stops a substituted binary replacing this app, but it says
+    nothing until installation is already under way and nothing whatsoever about a truncated or
+    stale download.
+  - **The browser was in the update path.** A redirect, a download manager's retry, a mirror, a
+    cached older asset: each is a place where what the card described and what the user installed
+    could differ, invisibly.
+- **Decision:**
+  - **The APK is streamed straight into a `PackageInstaller` session** — `MODE_FULL_INSTALL`,
+    `setAppPackageName`, `setSize` — and never becomes a file the user or any other app can see.
+    No `DownloadManager`, no browser, no Downloads folder, and therefore **no storage permission**.
+    The session is Android's own staging area; abandoning it takes the bytes with it.
+  - **The release publishes `apkSha256`, and the download is verified against it while it is
+    written.** The digest is computed by the same CI step that uploads the APK, and by the app from
+    the bytes as they pass into the session — they cannot be read back out of one. A mismatch in
+    either the digest or the byte count abandons the session, so nothing unverified is ever
+    committed. The field is **required**: a release with no digest fails the parse rather than
+    installing unchecked, because "no digest" is not a weaker check but no check.
+  - **`USER_ACTION_REQUIRED` is set, deliberately.** Android's own "Päivitetäänkö tämä sovellus?"
+    dialog is the confirmation, exactly as before. This app has no business installing anything
+    without it being asked, and `REQUEST_INSTALL_PACKAGES` grants only the right to *ask*.
+  - **The status callback goes to a non-exported `BroadcastReceiver`, not through `MainActivity`.**
+    The callback carries an `Intent` in `EXTRA_INTENT` which the app then *starts*. Routed through
+    the app's one exported component, any application on the device could send one and this app
+    would launch whatever it named while believing it was the system's install prompt. A
+    non-exported receiver reached by an explicit `PendingIntent` can be delivered to by the system
+    alone. The `PendingIntent` is mutable on Android 12+ because the platform fills in the status
+    extras; that is safe precisely because it names the component it starts.
+- **Consequences:**
+  - **A release published before this shipped cannot be installed by a build that has it**, and
+    reports the parse failure rather than pretending. The first CI run after this lands publishes
+    the field, so the window is one build long.
+  - **The permission is visible in the manifest and to Play Protect.** `REQUEST_INSTALL_PACKAGES`
+    is treated with suspicion by design, and rightly. This app is not distributed through Play; if
+    it ever is, this is one of the things that has to be reconsidered rather than defended.
+  - **The first update after installing asks for "Asenna tuntemattomia sovelluksia" once.** The app
+    opens that settings screen itself and continues the download when the user comes back, because
+    the settings screen returns no useful result code — the permission is simply read again.
+  - **The download does not survive the process being killed.** The session does, but nothing
+    resumes it: pressing the button again starts a fresh one. A resumable download is a larger
+    feature for a file that takes seconds on any usable connection.
+- **Alternatives Considered:**
+  - *Keep the browser hand-off* — no permission, no code, and Play Protect never raises an eyebrow.
+    Rejected because it cannot verify what it installs and leaves the APK behind; those are the two
+    reasons this work exists.
+  - *`DownloadManager` into app-private storage, then `FileProvider` + `ACTION_INSTALL_PACKAGE`* —
+    the conventional sideload route, and it does keep the file out of Downloads. Rejected: it needs
+    the same `REQUEST_INSTALL_PACKAGES`, adds a `FileProvider` and a file to clean up afterwards,
+    and `ACTION_INSTALL_PACKAGE` is deprecated in favour of the API chosen here.
+  - *Silent installation* — impossible without being a device owner or a system app, and not wanted
+    if it were. The user seeing what is about to replace their app is a feature.
+  - *Publishing the digest in the release notes instead of `latest.json`* — human-readable, and
+    unusable: the app would have to parse prose, and nothing would compare it to anything.
+- **Related Files:** `data/update/ApkInstaller.kt`, `data/update/PackageInstallerApkInstaller.kt`,
+  `data/update/UpdateInstallReceiver.kt`, `data/update/UpdateService.kt`,
+  `domain/InstallUpdateUseCase.kt`, `domain/CheckForUpdateUseCase.kt`, `UpdateCard.kt`,
+  `SettingsScreen.kt`, `AndroidManifest.xml`, `.github/workflows/build-test-apk.yml`,
+  `docs/SECURITY.md`

@@ -38,6 +38,40 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   ja tapahtumalokiin kirjoitettu luku ovat nyt sama luku.
 
 ### Changed
+- **Sideload-päivitys asennetaan nyt sovelluksen sisällä, ei selaimen kautta.** Versiokortin
+  painike avasi ennen APK:n osoitteen `ACTION_VIEW`-intentillä: selain latasi tiedoston
+  Lataukset-kansioon, käyttäjä etsi sen sieltä ja avasi sen. Jokainen päivitys jätti puhelimeen
+  asennuskelpoisen APK:n, eikä kukaan tarkistanut mitä oli latautunut — julkaisu kertoi koon, jota
+  ei verrattu mihinkään, eikä tarkistussummaa ollut lainkaan.
+
+  Nyt APK ladataan HTTPS:n yli suoraan Androidin `PackageInstaller`-sessioon
+  (`MODE_FULL_INSTALL`, `setAppPackageName`, `setSize`, Android 12+ `USER_ACTION_REQUIRED`).
+  Tiedostoa ei kirjoiteta mihinkään, mistä käyttäjä tai muu sovellus näkisi sen, joten
+  tallennustilan käyttöoikeutta ei pyydetä. SHA-256 lasketaan `MessageDigest`illä samalla kun
+  tavut kirjoitetaan sessioon, ja jos koko tai tarkistussumma ei täsmää julkaisuun, sessio
+  hylätään `abandonSession()`-kutsulla eikä mitään asenneta. `latest.json` sai pakollisen
+  `apkSha256`-kentän; ilman sitä jäsennys epäonnistuu, koska "ei tarkistussummaa" ei ole heikompi
+  tarkistus vaan ei tarkistusta lainkaan.
+
+  Asennusta ei tehdä hiljaa: Android näyttää saman "Päivitetäänkö tämä sovellus?" -vahvistuksen
+  kuin ennenkin, ja allekirjoitusvarmenne ratkaisee edelleen mitä sovelluksen päälle voi asentaa.
+  Ensimmäisellä kerralla avataan `ACTION_MANAGE_UNKNOWN_APP_SOURCES`, ja lataus jatkuu itsestään
+  kun käyttäjä palaa — asetusnäyttö ei palauta käyttökelpoista tuloskoodia, joten lupa luetaan
+  uudelleen. Versiokortti sai tilat `Downloading(versionName, progressPercent)` ja
+  `AwaitingInstallConfirmation`, ja peruttu tai epäonnistunut asennus palauttaa
+  "Lataa ja asenna päivitys" -painikkeen samalle julkaisulle ilman uutta tarkistusta.
+  [ADR-013](docs/DECISIONS.md#adr-013-the-app-installs-its-own-update-through-packageinstaller).
+- **Asennuksen tuloskutsu menee ei-exportattuun `UpdateInstallReceiver`iin, ei `MainActivity`n
+  kautta.** Kutsu kantaa `Intent.EXTRA_INTENT`-arvoa, jonka sovellus *käynnistää*; exportatun
+  komponentin kautta reititettynä mikä tahansa laitteen sovellus voisi lähettää sellaisen ja tämä
+  sovellus avaisi sen luullen sitä Androidin asennusvahvistukseksi. `PendingIntent` on Android
+  12+:ssa mutable, jotta alusta saa lisätä status-extrat — turvallista nimenomaan siksi, että se
+  nimeää käynnistettävän komponentin. Ks. `docs/SECURITY.md`.
+- CI laskee APK:n SHA-256:n samassa vaiheessa jossa tiedosto kopioidaan julkaistavaksi, kirjoittaa
+  sen `latest.json`iin, ja julkaisun jälkeen lataa molemmat assetit takaisin ja tarkistaa että
+  julkaistun APK:n digest ja koko vastaavat julkaistua `latest.json`ia. Puolittain onnistunut
+  `--clobber`-lataus jättäisi muuten tarkistussumman kuvaamaan edellistä buildia, ja jokainen
+  asennus hylättäisiin puhelimessa ilman että syy näkyisi täältä.
 - Ohjatun treenin askellogiikka on siirretty domainiin funktioina, joita näyttö kutsuu:
   `Perform.key()`, `completedMovements(index, skippedKeys)` ja `skippedMovements(skippedKeys)`.
   `ActiveWorkoutProgress` poistettiin — se oli kirjoitettu tähän tarkoitukseen mutta jäi

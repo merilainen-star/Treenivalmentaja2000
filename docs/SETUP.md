@@ -132,6 +132,21 @@ you can tell which build is on the phone. `versionCode` deliberately stays `1`: 
 sideloaded reinstall when the package id and certificate match and the version code is equal or
 higher.
 
+### Updating from inside the app
+
+After the first install, the link above is not needed. *Asetukset* checks the published build on
+every visit and offers **Lataa ja asenna päivitys** when it differs from the installed one. The APK
+is downloaded inside the app, straight into an Android install session, and is checked against the
+size and SHA-256 the release published before anything is committed — see
+[ADR-013](DECISIONS.md#adr-013-the-app-installs-its-own-update-through-packageinstaller). It never
+appears in the Downloads folder and no browser is involved.
+
+The **first** time, Android opens "Asenna tuntemattomia sovelluksia" and asks for the permission
+once; allow it for Treenivalmentaja and the download continues by itself when you come back. Every
+time, Android shows its ordinary "Päivitetäänkö tämä sovellus?" confirmation before installing —
+the app cannot and does not install anything silently. Declining leaves the installed build exactly
+as it was, and the card offers the download again.
+
 ### When an update is refused
 
 Android compares signing certificates, not version numbers. If it refuses to update, the installed

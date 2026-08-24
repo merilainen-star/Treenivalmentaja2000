@@ -122,16 +122,23 @@ jobs:
           cp "$APK" dist/Treenivalmentaja-test.apk
           echo "apk_mb=$(du -m "$APK" | cut -f1)" >> "$GITHUB_OUTPUT"
 
-          # The app reads this to tell whether the installed build is the published one. It is a
-          # release asset rather than a call to GitHub's API, which is rate-limited to 60 requests
-          # an hour for unauthenticated callers.
+          # Computed from the file that is about to be uploaded, in the same step, so the digest
+          # and the APK cannot come from different builds. The app refuses to install a download
+          # whose SHA-256 is not this one — see app/src/main/.../data/update/ApkInstaller.kt.
+          APK_SHA256=$(sha256sum dist/Treenivalmentaja-test.apk | cut -d ' ' -f1)
+          echo "APK SHA-256: $APK_SHA256"
+
+          # The app reads this to tell whether the installed build is the published one, and to
+          # verify the APK it downloads. It is a release asset rather than a call to GitHub's API,
+          # which is rate-limited to 60 requests an hour for unauthenticated callers.
           cat > dist/latest.json <<JSON
           {
             "versionName": "1.0-${GITHUB_SHA::7}",
             "commit": "${GITHUB_SHA::7}",
             "builtAtUtc": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "apkUrl": "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/test-build/Treenivalmentaja-test.apk",
-            "apkSizeBytes": $(stat -c%s "$APK")
+            "apkSizeBytes": $(stat -c%s "$APK"),
+            "apkSha256": "$APK_SHA256"
           }
           JSON
           python3 -c "import json;json.load(open('dist/latest.json'))"             || { echo "::error::latest.json is not valid JSON"; exit 1; }
@@ -221,6 +228,27 @@ jobs:
             grep -qx "$want" assets.txt \
               || { echo "::error::the release does not carry $want"; exit 1; }
           done
+
+      # The phone installs whatever these two assets say, so the check is made against what the
+      # release actually serves rather than against dist/, which was already known to agree. A
+      # --clobber upload that half succeeded would leave a digest describing the previous APK, and
+      # every install would then be refused by the app with no way to tell why from here.
+      - name: Verify the published digest against the published APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p published
+          gh release download test-build --repo "$GITHUB_REPOSITORY" --dir published --clobber --pattern Treenivalmentaja-test.apk --pattern latest.json
+          PUBLISHED_SHA=$(sha256sum published/Treenivalmentaja-test.apk | cut -d ' ' -f1)
+          DECLARED_SHA=$(python3 -c "import json;print(json.load(open('published/latest.json'))['apkSha256'])")
+          DECLARED_SIZE=$(python3 -c "import json;print(json.load(open('published/latest.json'))['apkSizeBytes'])")
+          PUBLISHED_SIZE=$(stat -c%s published/Treenivalmentaja-test.apk)
+          echo "published APK : $PUBLISHED_SHA ($PUBLISHED_SIZE bytes)"
+          echo "latest.json   : $DECLARED_SHA ($DECLARED_SIZE bytes)"
+          if [ "$PUBLISHED_SHA" != "$DECLARED_SHA" ] || [ "$PUBLISHED_SIZE" != "$DECLARED_SIZE" ]; then
+            echo "::error::latest.json does not describe the published APK"
+            exit 1
+          fi
 
       - name: Write the job summary
         run: |

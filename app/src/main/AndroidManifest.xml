@@ -9,6 +9,13 @@
          2. fetching an exercise guide when a movement is tapped, and nothing is kept afterwards —
             data/guide/ExerciseDbProvider.kt and docs/EXERCISE_GUIDE.md. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The app installs its own updates through PackageInstaller rather than handing the APK to
+         a browser and the Downloads folder, so it has to be allowed to ask. It is only an
+         entitlement to *ask*: Android still requires the per-app "Asenna tuntemattomia
+         sovelluksia" toggle, and still shows its own confirmation dialog for every install.
+         No storage permission accompanies it, because the download never becomes a file the user
+         can see — data/update/PackageInstallerApkInstaller.kt. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -52,6 +59,13 @@
                 <data android:scheme="treenivalmentaja" android:host="oauth2callback" />
             </intent-filter>
         </activity>
+
+        <!-- PackageInstaller's status callback. Not exported, and deliberately not routed
+             through MainActivity: the callback carries an Intent this app then starts, so an
+             exported entry point would let another app hand it one of its own. Only the system
+             can reach a non-exported receiver named by an explicit PendingIntent.
+             See data/update/UpdateInstallReceiver.kt and docs/SECURITY.md. -->
+        <receiver android:name=".data.update.UpdateInstallReceiver" android:exported="false" />
 
         <receiver android:name=".data.alarm.ReminderReceiver" android:exported="false" />
         <receiver android:name=".data.alarm.ActionReceiver" android:exported="false" />

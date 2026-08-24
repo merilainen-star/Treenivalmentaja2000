@@ -44,7 +44,10 @@ but only an explicit approval writes it to the plan.
 - Full-screen Active Workout Mode with preparation, movement/rest/round phases, monotonic timers,
   skip tracking and an RPE/feel completion summary
 - A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
-- Rolling test APK built by GitHub Actions, with an in-app check for whether the build is current
+- Rolling test APK built by GitHub Actions, updated from inside the app: the APK is downloaded
+  into an Android install session and verified against the release's SHA-256, never opened in a
+  browser or left in the Downloads folder
+  ([ADR-013](docs/DECISIONS.md#adr-013-the-app-installs-its-own-update-through-packageinstaller))
 - App icon and splash screen
 
 **Planned / Missing:**
@@ -94,6 +97,10 @@ The link is permanent and always serves the newest successful build.
 [Release page](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/test-build) ·
 [Actions](https://github.com/merilainen-star/Treenivalmentaja2000/actions) (press *Run workflow* to
 build on demand, works from a phone).
+
+That link is for the **first** install. After that, *Asetukset → Sovelluksen versio* does it:
+**Lataa ja asenna päivitys** downloads the APK inside the app, checks it against the release's
+SHA-256, and opens Android's own install confirmation. Nothing is written to Downloads.
 
 GitHub Actions rebuilds on every push to `main` that touches code, and publishes only when the
 build, unit tests, screenshot comparisons and lint all pass. See

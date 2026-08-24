@@ -47,6 +47,7 @@ import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
 import fi.merilainen.treenivalmentaja.domain.CompletedAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
+import fi.merilainen.treenivalmentaja.domain.InstallUpdateUseCase
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.UpcomingAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
@@ -190,6 +191,13 @@ class WorkoutViewModel(
    * is what the app did before the preference existed.
    */
   private val themeSettingsStore: ThemeSettingsStore? = null,
+  /**
+   * Downloads and installs the published APK, nullable for the reason the collaborators above are:
+   * it needs a `PackageInstaller`, which a plain unit test has no framework for. Null means the
+   * version card can check and report but never install — which is what the app did before it
+   * installed anything itself.
+   */
+  private val installUpdateUseCase: InstallUpdateUseCase? = null,
   /**
    * **`systemDefaultZone`, not `systemUTC`** — and the difference is a bug, not a preference.
    *
@@ -1011,11 +1019,63 @@ class WorkoutViewModel(
   /** Cheap enough to run whenever Settings opens: one GET of a few hundred bytes. */
   fun checkForUpdate() {
     if (_updateStatus.value is UpdateStatus.Checking) return
+    // A download in progress is not interrupted to ask a question it already knows the answer to.
+    // Settings re-checks on every visit, and leaving the screen mid-download is ordinary.
+    if (updateInstallJob?.isActive == true) return
     viewModelScope.launch {
       _updateStatus.value = UpdateStatus.Checking
       _updateStatus.value = checkForUpdateUseCase.execute()
     }
   }
+
+  private var updateInstallJob: Job? = null
+
+  /**
+   * Downloads the published APK and hands it to Android's installer.
+   *
+   * Started from the button and from nowhere else — never on opening Settings — because it moves
+   * tens of megabytes over whatever connection the phone is on. The retry after a refused install
+   * reads the release out of [UpdateStatus.Failed] rather than checking again: it is the same
+   * release the user was shown, with the same digest.
+   */
+  fun downloadAndInstallUpdate() {
+    val install = installUpdateUseCase ?: return
+    val update = offeredUpdate() ?: return
+    if (updateInstallJob?.isActive == true) return
+
+    updateInstallJob =
+      viewModelScope.launch {
+        _updateStatus.value = UpdateStatus.Downloading(update.versionName, 0)
+        install.execute(update).collect { _updateStatus.value = it }
+      }
+  }
+
+  /**
+   * The user came back from "Asenna tuntemattomia sovelluksia" without granting it.
+   *
+   * Reported rather than retried silently: without the permission the button can do nothing, and a
+   * button that does nothing is worse than a sentence saying why.
+   */
+  fun installPermissionRefused() {
+    _updateStatus.value =
+      UpdateStatus.Failed(
+        "Päivitystä ei voi asentaa ilman lupaa asentaa tuntemattomia sovelluksia.",
+        retryable = offeredUpdate(),
+      )
+  }
+
+  /**
+   * The release the card is currently offering, whether it has been tried yet or not.
+   *
+   * A failed install carries the release it failed on, so the two are the same answer to the same
+   * question: what would the button download if it were pressed now.
+   */
+  private fun offeredUpdate(): UpdateStatus.Available? =
+    when (val status = _updateStatus.value) {
+      is UpdateStatus.Available -> status
+      is UpdateStatus.Failed -> status.retryable
+      else -> null
+    }
 
   private val _missedSessionsProposal =
     MutableStateFlow<MissedSessionsProposal>(MissedSessionsProposal.None)
@@ -1455,6 +1515,7 @@ class WorkoutViewModel(
           advisorSettingsStore = application.advisorSettingsStore,
           missedProposalDismissalStore = application.missedProposalDismissalStore,
           themeSettingsStore = application.themeSettingsStore,
+          installUpdateUseCase = application.installUpdateUseCase,
         )
       }
     }

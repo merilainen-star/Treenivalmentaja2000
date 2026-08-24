@@ -61,6 +61,15 @@ The app handles personal health data and training schedules. Threats include una
 
 ## Network Security
 - All external communication enforces HTTPS.
+- **The update APK is verified before it is committed, not merely fetched over TLS.** The release
+  publishes `apkSizeBytes` and `apkSha256`; the app computes the SHA-256 of the bytes as they are
+  written into the install session and refuses to commit unless both match, abandoning the session
+  so nothing unverified is left on the device. `latest.json` is refused outright if its download
+  URL is not HTTPS or its digest is not a SHA-256, and the download itself requires an
+  `HttpsURLConnection`, so a redirect down to plain HTTP fails rather than proceeding. Android
+  checks the package name and the signing certificate on top of this: an APK signed with another
+  key cannot replace this app whatever the digest says.
+  `ApkTransferTest` and `UpdateInfoParsingTest` hold both halves in place.
 
 ## Exported Android Components
 - `OuraCallbackActivity` (`treenivalmentaja://oauth2callback`) is once again the **only** exported
@@ -74,6 +83,23 @@ The app handles personal health data and training schedules. Threats include una
   than the Strava OAuth flow it replaced, not merely a different one. The key lives under its own
   Android Keystore alias in its own preferences file, is excluded from backup and device transfer,
   is never logged, and is never redisplayed in the UI once saved.
+- **`UpdateInstallReceiver` is not exported, and that is the whole reason it exists.**
+  `PackageInstaller` reports the result of an install session by sending back an `Intent` — and
+  when the status is `STATUS_PENDING_USER_ACTION`, that intent carries another intent in
+  `EXTRA_INTENT` which the app then *starts*. Delivered through `MainActivity`, which is exported,
+  any application on the device could send one, and the app would launch whatever it named while
+  believing it was Android's install prompt. The callback therefore goes to a receiver with
+  `android:exported="false"`, reached by an explicit `PendingIntent` that names its component, so
+  the system is the only sender that can reach it. The `PendingIntent` is mutable on Android 12+
+  because the platform fills in the status extras; naming the component is what makes that safe.
+  `UpdateInstallReceiverTest` asserts that the carried intent is started only for
+  `STATUS_PENDING_USER_ACTION` and never for a delivery carrying another action.
+  See [ADR-013](DECISIONS.md#adr-013-the-app-installs-its-own-update-through-packageinstaller).
+- **`REQUEST_INSTALL_PACKAGES` is an entitlement to ask, not to install.** Android still requires
+  the per-app "Asenna tuntemattomia sovelluksia" toggle, and `USER_ACTION_REQUIRED` is set on every
+  session, so the ordinary system confirmation appears for every update. The app requests no
+  storage permission with it: the APK is streamed into the install session and never becomes a file
+  on the device.
 - **The raw-data diagnostics screen is the one place this had to be thought about twice**, because
   it exists to be read and copied. The request line it displays is built from the URL's path and
   query, which cannot carry the credential; the key travels in an `Authorization` header that is

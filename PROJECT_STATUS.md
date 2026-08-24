@@ -6,6 +6,117 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-08-24
+- Base commit: working tree for the sideload-update change on top of `c79c90e`
+- Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
+  and build-tools 36.1.0, on Windows 11
+- Emulator: `treeni-test`, android-36 google_apis x86_64, headless
+
+The first four ran in one invocation with `--rerun-tasks` and a cleared `app/build/test-results`;
+the instrumented run followed with `--rerun-tasks` on the same emulator. No task line carried
+`FROM-CACHE` or `UP-TO-DATE`.
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 638 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 61 comparisons, 0 changed, 61 unchanged |
+| Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,105,695 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 48 tests, 0 failures, 0 errors, 0 skipped |
+
+The unit suite grew by 24 (614 → 638) and the instrumented suite by 4 (44 → 48), all of them for
+the in-app update: the digest and size check as a pure stream copy, every `PackageInstaller` status
+having a sentence of its own, the four `latest.json` payloads that must be refused rather than
+installed, the progress-to-status mapping, and — on a device — that the install callback starts the
+intent it carries only for `STATUS_PENDING_USER_ACTION`.
+
+One screenshot baseline was added (`update_card_install_states`) and one rewritten
+(`update_card_states`); both diffs were looked at before recording. The install states are a
+separate capture because six cards do not fit on the device, and the first attempt clipped the last
+one — a baseline that proves nothing about the part below the fold.
+
+The APK grew **16,432 B (+0.078 %)** over the 21,089,263 B measured for the advisor fix. One 16 KiB
+alignment page plus change, and no new dependency: `PackageInstaller`, `MessageDigest` and
+`HttpsURLConnection` are all platform APIs.
+
+Lint is unchanged at 0 errors and 43 warnings — the same non-functional families as before.
+`REQUEST_INSTALL_PACKAGES` raised nothing new, which is worth writing down rather than assuming: it
+is a permission tooling is entitled to complain about.
+
+## Current implementation
+
+- Room is the offline source of truth at schema version 13. Plans include an IANA timezone;
+  exercises may name equipment and sessions may define a round rest.
+- The ViewModel's current date changes at plan-zone midnight and refreshes on screen resume; sync
+  windows, workout matching and missed-session classification use the same plan timezone.
+- Missed sessions produce a visible, read-only proposal on Today. One missed workout proposes the
+  next rest day; several propose shifting all open sessions. Only explicit acceptance writes Room,
+  rejecting writes nothing, and an accepted/stale proposal cannot be applied twice. Rejecting is
+  remembered for the rest of the plan-zone day, so the card does not return on the next resume of
+  the screen the app opens on.
+- Oura OAuth, intervals.icu activity sync and optional Anthropic/OpenAI/Google workout analysis are
+  implemented. Read-only analysis never edits the plan. The separate Phase C advisor can return one
+  clarification or a strictly parsed MOVE/LIGHTEN preview; only explicit approval applies the whole
+  validated list atomically and records `AI_ADVISOR` events.
+- Active Workout Mode guides structured strength sessions through equipment preparation, movement,
+  rest and round-break phases, keeps the screen awake, and stores skips, duration, RPE and feel in
+  the completion event payload.
+- Two deterministic rules read the stored measurements and speak on the Today screen. The readiness
+  rule offers to shift the programme or lighten a session; the easy-run drift rule offers nothing at
+  all — it reports that the last three comparable easy sessions each exceeded the median intensity
+  of this athlete's own comparable sessions, and has no plan-changing button because there is
+  nothing to change. Both stay silent without a measurement behind them.
+- Credential fields do not enter saved-instance state, and are cleared once the key is stored —
+  only on success, so a failed write leaves the key in the field to retry. Each service keeps its
+  own preferences file and Keystore alias while sharing one AES-GCM implementation. Failed secure
+  writes are visible and never produce a connected/configured state.
+- The colour scheme is a preference: vaalea, tumma, or järjestelmä, kept in the `settings`
+  DataStore under `theme_preference` and read in `MainActivity` so it covers the splash and the
+  system bars as well as the screens. It defaults to following the phone, which is what the app did
+  before the preference existed. Material You dynamic hues are deliberately disabled so the
+  Electric Blue semantic palette is stable across devices.
+- The app updates itself. Settings compares the installed build against the rolling test release
+  and, when they differ, downloads the APK straight into an Android `PackageInstaller` session over
+  HTTPS — no browser, no `DownloadManager`, no Downloads folder and no storage permission. The
+  SHA-256 is computed while the bytes are written and checked against the release's `apkSha256`
+  along with the byte count; a mismatch abandons the session before anything is committed. Android's
+  own install confirmation is required (`USER_ACTION_REQUIRED`) and the status callback lands in a
+  non-exported receiver, never in the exported `MainActivity`.
+- Android backup and device transfer are disabled for the whole app. Defence-in-depth XML rules
+  separately exclude Room, DataStore and all credential files. Room is not SQLCipher-encrypted; the
+  accepted boundary is Android private storage plus backup opt-out for this single-user build.
+
+## Open risks
+
+- Instrumented Keystore, migration and image-cache tests still need an attached Android device or
+  emulator before release.
+- The Oura flow is unit-tested against local HTTP fixtures but still depends on a real Oura account
+  for end-to-end confirmation.
+- A rooted or unlocked device can bypass the Android application sandbox; no at-rest database
+  encryption is provided for that threat model.
+- **The in-app update has not yet been performed end to end.** Every piece is tested — the digest
+  check as a stream copy, the status mapping, the receiver on a device — but no build has actually
+  replaced another through `PackageInstaller` on the phone, because that needs a published release
+  carrying `apkSha256`, and the first one is produced by the CI run that ships this change. Until
+  then the permission prompt, the confirmation dialog and the replacement itself are unproven in the
+  order a user meets them.
+- **A release published before `apkSha256` existed cannot be installed by a build that requires
+  it**, and is reported as a parse failure rather than installed unchecked. The window is one build
+  long: the next CI publish carries the field.
+- Existing lint warnings and Kotlin/Java deprecations remain non-blocking maintenance work.
+
+## Measurement history
+
+**This section is append-only, and deleting it is not how a stale number gets fixed.** It was
+removed once, on 2026-08-20, as the cure for the "Last verified build" block above having gone six
+commits out of date. That was the wrong cure: the complaint was that the numbers were old, and the
+fix for an old measurement is a new measurement. What went with it was the reasoning behind the
+numbers — including the one methodological finding on this page that cost a full afternoon to
+establish, and that anyone measuring an APK here needs before they start. Restored below,
+unchanged, as it was written when each figure was taken.
+
+### 2026-08-24 — the advisor fix, the skip accounting and the theme (measured on `1fcaa36`)
+
+- Date: 2026-08-24
 - Base commit: working tree for this change on top of `1fcaa36`
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
@@ -52,62 +163,6 @@ Twice during the 2026-08-20 session `:app:testDebugUnitTest` failed with `NoSuch
 …/binary/in-progress-results-generic.bin` after every test had already run and been written. It
 recurred both with and without `--no-daemon`, so the cause is not established; deleting
 `app/build/test-results` before the run has cleared it each time.
-
-## Current implementation
-
-- Room is the offline source of truth at schema version 13. Plans include an IANA timezone;
-  exercises may name equipment and sessions may define a round rest.
-- The ViewModel's current date changes at plan-zone midnight and refreshes on screen resume; sync
-  windows, workout matching and missed-session classification use the same plan timezone.
-- Missed sessions produce a visible, read-only proposal on Today. One missed workout proposes the
-  next rest day; several propose shifting all open sessions. Only explicit acceptance writes Room,
-  rejecting writes nothing, and an accepted/stale proposal cannot be applied twice. Rejecting is
-  remembered for the rest of the plan-zone day, so the card does not return on the next resume of
-  the screen the app opens on.
-- Oura OAuth, intervals.icu activity sync and optional Anthropic/OpenAI/Google workout analysis are
-  implemented. Read-only analysis never edits the plan. The separate Phase C advisor can return one
-  clarification or a strictly parsed MOVE/LIGHTEN preview; only explicit approval applies the whole
-  validated list atomically and records `AI_ADVISOR` events.
-- Active Workout Mode guides structured strength sessions through equipment preparation, movement,
-  rest and round-break phases, keeps the screen awake, and stores skips, duration, RPE and feel in
-  the completion event payload.
-- Two deterministic rules read the stored measurements and speak on the Today screen. The readiness
-  rule offers to shift the programme or lighten a session; the easy-run drift rule offers nothing at
-  all — it reports that the last three comparable easy sessions each exceeded the median intensity
-  of this athlete's own comparable sessions, and has no plan-changing button because there is
-  nothing to change. Both stay silent without a measurement behind them.
-- Credential fields do not enter saved-instance state, and are cleared once the key is stored —
-  only on success, so a failed write leaves the key in the field to retry. Each service keeps its
-  own preferences file and Keystore alias while sharing one AES-GCM implementation. Failed secure
-  writes are visible and never produce a connected/configured state.
-- The colour scheme is a preference: vaalea, tumma, or järjestelmä, kept in the `settings`
-  DataStore under `theme_preference` and read in `MainActivity` so it covers the splash and the
-  system bars as well as the screens. It defaults to following the phone, which is what the app did
-  before the preference existed. Material You dynamic hues are deliberately disabled so the
-  Electric Blue semantic palette is stable across devices.
-- Android backup and device transfer are disabled for the whole app. Defence-in-depth XML rules
-  separately exclude Room, DataStore and all credential files. Room is not SQLCipher-encrypted; the
-  accepted boundary is Android private storage plus backup opt-out for this single-user build.
-
-## Open risks
-
-- Instrumented Keystore, migration and image-cache tests still need an attached Android device or
-  emulator before release.
-- The Oura flow is unit-tested against local HTTP fixtures but still depends on a real Oura account
-  for end-to-end confirmation.
-- A rooted or unlocked device can bypass the Android application sandbox; no at-rest database
-  encryption is provided for that threat model.
-- Existing lint warnings and Kotlin/Java deprecations remain non-blocking maintenance work.
-
-## Measurement history
-
-**This section is append-only, and deleting it is not how a stale number gets fixed.** It was
-removed once, on 2026-08-20, as the cure for the "Last verified build" block above having gone six
-commits out of date. That was the wrong cure: the complaint was that the numbers were old, and the
-fix for an old measurement is a new measurement. What went with it was the reasoning behind the
-numbers — including the one methodological finding on this page that cost a full afternoon to
-establish, and that anyone measuring an APK here needs before they start. Restored below,
-unchanged, as it was written when each figure was taken.
 
 ### 2026-08-24 — Material 3, Active Workout Mode and AI Phase C
 
