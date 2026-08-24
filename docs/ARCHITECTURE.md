@@ -114,11 +114,17 @@ assumed. They reach only the daily activity and readiness scores. See
 ### AI Proposal Flow
 1. User requests an AI plan proposal from an upcoming workout.
 2. App bundles recent health data and schedule into a prompt.
-3. Remote AI service returns a clarification question or JSON containing only `MOVE` and
-   `LIGHTEN` operations.
+3. Remote AI service returns one of three answers: a clarification question, `no_change`, or JSON
+   containing only `MOVE` and `LIGHTEN` operations.
 4. The app validates and previews the whole proposal without writing Room.
 5. Explicit approval applies every operation atomically through `TrainingRepository`; each event
    is tagged `AI_ADVISOR`. Rejection, malformed JSON or one invalid operation writes nothing.
+
+`no_change` exists because most days need no change, and a protocol whose only two answers are
+"ask something" and "propose something" pushes the model into inventing an operation to have
+something to say. It is rendered as its own card, not as an error. A `proposal` carrying an empty
+operation list is read as `no_change` for the same reason: that is what a model says when the
+vocabulary offers it nothing better. A parse failure keeps the raw response so it can be shown.
 ### Theme selection flow
 1. `ThemeSettingsStore` reads `theme_preference` from the `settings` DataStore — the same file the
    notification times, the AI model and the missed-session refusal live in — as a

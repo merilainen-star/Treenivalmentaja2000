@@ -1197,12 +1197,17 @@ class WorkoutViewModel(
           clarificationAnswer = clarificationAnswer,
         )
       _aiPlanProposals.update { it + (sessionId to AiPlanProposalState.Loading) }
+      // The raw answer is held outside the parse so a failure can show what it choked on; the
+      // request was already visible, and without the response a parse error cannot be diagnosed.
+      var raw: String? = null
       val state =
         try {
-          when (val response = advisorResponseParser.parse(client.analyse(prompt, model)).getOrThrow()) {
+          raw = client.analyse(prompt, model)
+          when (val response = advisorResponseParser.parse(raw).getOrThrow()) {
             is AdvisorResponse.Clarification ->
               AiPlanProposalState.NeedsClarification(response.question, prompt)
             is AdvisorResponse.Proposal -> AiPlanProposalState.Ready(response.value, prompt)
+            is AdvisorResponse.NoChange -> AiPlanProposalState.NoChange(response.reason, prompt)
           }
         } catch (e: AnalysisException) {
           AiPlanProposalState.Failed(e.message ?: "AI-ehdotus epäonnistui.", e.canRetry)
@@ -1210,6 +1215,7 @@ class WorkoutViewModel(
           AiPlanProposalState.Failed(
             "AI-vastaus ei ollut turvallisesti toteutettava: ${e.message ?: "tuntematon muoto"}",
             canRetry = true,
+            rawResponse = raw,
           )
         }
       _aiPlanProposals.update { it + (sessionId to state) }

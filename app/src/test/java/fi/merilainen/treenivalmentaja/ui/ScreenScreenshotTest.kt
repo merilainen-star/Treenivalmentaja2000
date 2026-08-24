@@ -369,6 +369,35 @@ class ScreenScreenshotTest {
         )
     }
 
+    /** The advisor is allowed to conclude that nothing needs changing; that is not an error card. */
+    @Test
+    fun aiAdvisor_noChange() = capture("card_ai_advisor_no_change") {
+        AiPlanAdvisorSection(
+            state = AiPlanProposalState.NoChange(
+                reason = "Kuormitus näyttää sopivalta. Jatka suunnitelman mukaan.",
+                prompt = "Tarkistettava esimerkkipyyntö",
+            ),
+            onRequest = {},
+            onApply = {},
+            onDismiss = {},
+        )
+    }
+
+    /** A malformed answer keeps its evidence, so the next parse failure can be diagnosed. */
+    @Test
+    fun aiAdvisor_failedShowsItsEvidence() = capture("card_ai_advisor_failed") {
+        AiPlanAdvisorSection(
+            state = AiPlanProposalState.Failed(
+                message = "AI-vastaus ei ollut turvallisesti toteutettava: tuntematon muoto",
+                canRetry = true,
+                rawResponse = """{"status":"ehkä"}""",
+            ),
+            onRequest = {},
+            onApply = {},
+            onDismiss = {},
+        )
+    }
+
     // ------------------------------------------------------------------ the recovery card
 
     /** Oura not connected: no indicator at all, which is what this card said before Oura existed. */
