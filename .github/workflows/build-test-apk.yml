@@ -127,6 +127,9 @@ jobs:
           # whose SHA-256 is not this one — see app/src/main/.../data/update/ApkInstaller.kt.
           APK_SHA256=$(sha256sum dist/Treenivalmentaja-test.apk | cut -d ' ' -f1)
           echo "APK SHA-256: $APK_SHA256"
+          # Also an output, so the release notes can quote the same digest the app checks against
+          # rather than a second one computed somewhere else.
+          echo "apk_sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
 
           # The app reads this to tell whether the installed build is the published one, and to
           # verify the APK it downloads. It is a release asset rather than a call to GitHub's API,
@@ -201,13 +204,19 @@ jobs:
           | Actions run | [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) |
           | Version | 1.0-${GITHUB_SHA::7} |
           | Signing certificate SHA-256 | \`${KEYSTORE_SHA256}\` |
+          | APK SHA-256 | \`${{ steps.results.outputs.apk_sha256 }}\` |
 
           Unit tests ${{ steps.results.outputs.unit_tests }}/${{ steps.results.outputs.unit_failures }}/${{ steps.results.outputs.unit_errors }} ·
           ${{ steps.results.outputs.screenshots }} screenshot comparisons ·
           lint ${{ steps.results.outputs.lint_errors }} errors, ${{ steps.results.outputs.lint_warnings }} warnings.
           Instrumented tests are **not** run in CI; they need a device.
 
-          Open **Treenivalmentaja-test.apk** below on Android to install or update.
+          **First install:** open **Treenivalmentaja-test.apk** below on Android.
+
+          **Already installed?** Update from inside the app instead:
+          *Asetukset -> Sovelluksen versio -> "Lataa ja asenna päivitys"*. The APK is downloaded
+          in the app, checked against the SHA-256 above, and installed through Android's own
+          confirmation - it never reaches the Downloads folder.
           EOF
 
           if gh release view test-build --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then

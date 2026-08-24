@@ -67,6 +67,10 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   sovellus avaisi sen luullen sitä Androidin asennusvahvistukseksi. `PendingIntent` on Android
   12+:ssa mutable, jotta alusta saa lisätä status-extrat — turvallista nimenomaan siksi, että se
   nimeää käynnistettävän komponentin. Ks. `docs/SECURITY.md`.
+- Julkaisun release notes kertoo APK:n SHA-256:n ja ohjaa päivittämään sovelluksen sisältä; ennen
+  se tunsi vain selainpolun ("open the APK below to install or update"), joka ei enää ole se tapa
+  jolla päivitys tehdään. Digest tulee samasta muuttujasta kuin `latest.json`in `apkSha256`, ei
+  toisesta laskennasta.
 - CI laskee APK:n SHA-256:n samassa vaiheessa jossa tiedosto kopioidaan julkaistavaksi, kirjoittaa
   sen `latest.json`iin, ja julkaisun jälkeen lataa molemmat assetit takaisin ja tarkistaa että
   julkaistun APK:n digest ja koko vastaavat julkaistua `latest.json`ia. Puolittain onnistunut
