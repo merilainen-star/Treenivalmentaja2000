@@ -20,6 +20,16 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   read-only-esikatselu ja erillinen hyväksyntä. Hyväksytty lista toteutetaan atomisesti ja merkitään
   tapahtumalokiin lähteellä `AI_ADVISOR`; virheellinen lista ei muuta mitään.
 
+### Added
+- **Ilmoitus siitä, että sovellus on päivitetty**, omalla kanavallaan ("Sovelluksen päivitykset").
+  Päivitys tappaa korvattavan prosessin — se on päivityksen määritelmä — eikä Android anna uuden
+  käynnistää activityä `ACTION_MY_PACKAGE_REPLACED`-vastaanottimesta: taustalta käynnistäminen on
+  estetty Android 10:stä asti eikä tämä vastaanotin ole millään poikkeuslistalla. `startActivity`
+  epäonnistuisi hiljaa jokaisessa puhelimessa ja koodi näyttäisi siltä kuin sovellus käynnistäisi
+  itsensä uudelleen. Sen sijaan ilmoitus kertoo asennetun version ja avaa sovelluksen yhdellä
+  painalluksella. Automaattista uudelleenkäynnistystä ei siis ole, koska sellaista ei ole
+  tarjolla — ei siksi, ettei sitä olisi yritetty.
+
 ### Fixed
 - **AI:n muutosehdotus kaatui aina kun muutosta ei tarvittu.** Neuvojan protokollassa oli vain
   kaksi vastausta — tarkentava kysymys tai ehdotus operaatioineen — joten kun malli päätyi siihen
