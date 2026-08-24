@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 12 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 13 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -51,6 +51,7 @@ erDiagram
   - `distanceKm` (Double?)
   - `intensity` (Enum?: `EASY`, `MODERATE`, `HARD`, `MAX`)
   - `rounds` (Int?) — circuit rounds, if the session is round-based
+  - `roundRestSec` (Int?) — optional pause between circuit rounds (schema v13)
   - `exercisesJson` (String?) — the session's movements serialised as a JSON array (see below)
   - `lighterAlternativeJson` (String?) — the plan's explicit lighter variant, serialised
   - `description` (String?)
@@ -75,7 +76,7 @@ promoted to their own table with a migration.
 
 `exercisesJson` holds an array of:
 ```json
-[{ "name": "Kyykky", "sets": 3, "reps": 10, "weightKg": 60.0, "restSec": 90, "notes": null }]
+[{ "name": "Kyykky", "sets": 3, "reps": 10, "weightKg": 60.0, "restSec": 90, "equipment": ["Kahvakuula"], "notes": null }]
 ```
 
 An exercise whose sets differ from each other carries `setPlan` instead of `sets`/`reps`/
@@ -126,6 +127,9 @@ The order of priority is:
     its movements can no longer be named. The AI analysis reads it back to tell a workout carried
     out in full from one abandoned half way; a session with no such payload has **nothing
     recorded**, which is not the same as nothing done and never renders as zero.
+  - `activeWorkout` — the same guided shape plus skipped movements, optional session RPE, feel and
+    duration. The full-screen mode writes it once on completion; readers still accept the older
+    `guided` shape so existing history remains meaningful.
 - **Ordering:** queried as `ORDER BY timestampUtc ASC, id ASC` so events written within the same
   millisecond still have a stable order.
 - **Lifecycle:** Insert-only. There is no `update` or `delete` method on `SessionEventDao`.

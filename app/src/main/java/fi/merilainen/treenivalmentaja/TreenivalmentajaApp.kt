@@ -20,19 +20,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 @Composable
 fun TreenivalmentajaApp(
     viewModel: WorkoutViewModel = viewModel(factory = WorkoutViewModel.Factory)
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    val activeWorkoutVisible = currentDestination?.route?.startsWith("active/") == true
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
-
+          if (!activeWorkoutVisible) {
+            NavigationBar(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer) {
                 NavigationBarItem(
                     icon = { Icon(Icons.Filled.Home, contentDescription = "Tänään") },
                     label = { Text("Tänään") },
@@ -49,7 +52,7 @@ fun TreenivalmentajaApp(
                 )
                 NavigationBarItem(
                     icon = { Icon(Icons.Filled.CalendarMonth, contentDescription = "Viikko") },
-                    label = { Text("Viikko") },
+                    label = { Text("Kalenteri") },
                     selected = currentDestination?.hierarchy?.any { it.route == "week" } == true,
                     onClick = {
                         navController.navigate("week") {
@@ -76,6 +79,7 @@ fun TreenivalmentajaApp(
                     }
                 )
             }
+          }
         }
     ) { innerPadding ->
         NavHost(
@@ -83,9 +87,24 @@ fun TreenivalmentajaApp(
             startDestination = "today",
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable("today") { TodayScreen(viewModel) }
+            composable("today") {
+              TodayScreen(
+                viewModel = viewModel,
+                onOpenActiveWorkout = { sessionId -> navController.navigate("active/$sessionId") },
+              )
+            }
             composable("week") { WeekScreen(viewModel) }
             composable("settings") { SettingsScreen(viewModel) }
+            composable(
+              route = "active/{sessionId}",
+              arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) { entry ->
+              ActiveWorkoutScreen(
+                sessionId = entry.arguments?.getString("sessionId").orEmpty(),
+                viewModel = viewModel,
+                onClose = { navController.popBackStack() },
+              )
+            }
         }
     }
 }

@@ -197,7 +197,7 @@ almost nothing to say about the sessions that matter most.
    "enintään 110 sanaa" rather than "2–4 kappaletta". Gemini is used on its **paid** tier, because
    the free tier permits Google to use submitted content to improve their products and this app
    submits HRV.
-5. **AI plan adjustments with approval (Phase C)** — the advisor may propose changes as
+5. ~~**AI plan adjustments with approval (Phase C)**~~ — built 2026-08-24. The advisor may propose changes as
    structured operations (move session X to day Y, lighten session Z) that map onto the same
    engine operations Phase A uses. Nothing is written without the user accepting, and accepted
    changes go through the append-only session-event log like every other transition. Standing
@@ -207,7 +207,7 @@ almost nothing to say about the sessions that matter most.
 
 ## Designed, not built
 
-- **Active Workout Mode V1** — specified 2026-08-22 in [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md). A
+- ~~**Active Workout Mode V1**~~ — specified 2026-08-22 and built 2026-08-24; see [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md). A
   guided session that shows one thing at a time and carries the workout from the first movement to
   the last: a start summary with the equipment needed, a **preparation step before every movement**,
   the movement itself, a rest that counts down and names what follows, automatic round tracking, and
@@ -233,9 +233,8 @@ almost nothing to say about the sessions that matter most.
   frozen. It has to be computed from a wall-clock deadline, and the alarm and notification machinery
   the reminders already use is what makes a sound with the screen off.
 
-  *Two schema questions:* Plan Schema v1 has **no equipment field** (the one in the exercise-guide
-  responses is English, fetched, and not cacheable, so it cannot serve), and `restSec` is per
-  exercise with nothing for the pause between rounds.
+  Plan Schema v1 now has optional authored `equipment` per movement and `roundRestSec` per session.
+  The latter is the only new Room column (schema v13); equipment stays inside `exercisesJson`.
 
 ## Later (Phase 4 & Beyond)
 - Logging what was actually lifted, so a strength session can be compared with the last time it

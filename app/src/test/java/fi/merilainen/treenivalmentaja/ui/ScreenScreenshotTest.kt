@@ -9,6 +9,8 @@ import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.CompletedMetricsRow
+import fi.merilainen.treenivalmentaja.ActiveWorkoutContent
+import fi.merilainen.treenivalmentaja.AiPlanAdvisorSection
 import fi.merilainen.treenivalmentaja.RunMetricsRow
 import fi.merilainen.treenivalmentaja.OuraCard
 import fi.merilainen.treenivalmentaja.RecoveryCard
@@ -19,6 +21,9 @@ import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
+import fi.merilainen.treenivalmentaja.domain.AdvisorOperation
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposal
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuideRef
@@ -295,6 +300,72 @@ class ScreenScreenshotTest {
                     distanceKm = 4.1,
                 )
             ),
+        )
+    }
+
+    // ------------------------------------------------------------------ Active workout and AI advisor
+
+    @Test
+    fun activeWorkout_overview() = capture("screen_active_workout_overview") {
+        ActiveWorkoutContent(
+            workout = strength(0, "active-1").copy(
+                exercises = listOf(
+                    Exercise("Kahvakuulakyykky", reps = 10, weightKg = 16.0, equipment = listOf("16 kg kahvakuula")),
+                    Exercise("Sivulankku", durationSec = 30, perSide = true, equipment = listOf("jumppamatto")),
+                ),
+                rounds = 3,
+                roundRestSec = 60,
+            ),
+            trackElapsed = false,
+        )
+    }
+
+    @Test
+    fun activeWorkout_perform() = capture("screen_active_workout_perform") {
+        ActiveWorkoutContent(
+            workout = strength(0, "active-2").copy(
+                exercises = listOf(
+                    Exercise("Kahvakuulakyykky", reps = 10, weightKg = 16.0, equipment = listOf("16 kg kahvakuula")),
+                    Exercise("Askelkyykky", reps = 8, perSide = true),
+                ),
+                rounds = 3,
+                roundRestSec = 60,
+            ),
+            initialOverviewVisible = false,
+            initialStepIndex = 1,
+            trackElapsed = false,
+        )
+    }
+
+    @Test
+    fun aiAdvisor_proposalPreview() = capture("card_ai_advisor_proposal") {
+        AiPlanAdvisorSection(
+            state = AiPlanProposalState.Ready(
+                proposal = AiPlanProposal(
+                    summary = "Siirrä pitkä lenkki sunnuntaille ja kevennä voimaharjoitusta.",
+                    operations = listOf(
+                        AdvisorOperation.Move("run-1", LocalDate.of(2026, 8, 16)),
+                        AdvisorOperation.Lighten("strength-1"),
+                    ),
+                ),
+                prompt = "Tarkistettava esimerkkipyyntö",
+            ),
+            onRequest = {},
+            onApply = {},
+            onDismiss = {},
+        )
+    }
+
+    @Test
+    fun aiAdvisor_clarification() = capture("card_ai_advisor_clarification") {
+        AiPlanAdvisorSection(
+            state = AiPlanProposalState.NeedsClarification(
+                question = "Sopiiko pitkä lenkki sunnuntaille?",
+                prompt = "Tarkistettava esimerkkipyyntö",
+            ),
+            onRequest = {},
+            onApply = {},
+            onDismiss = {},
         )
     }
 

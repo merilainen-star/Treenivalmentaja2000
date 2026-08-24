@@ -111,13 +111,14 @@ Workouts **imported into Oura from Strava or Suunto do not arrive here at all** 
 assumed. They reach only the daily activity and readiness scores. See
 [API_INTEGRATIONS.md](API_INTEGRATIONS.md#third-party-imports--this-document-was-wrong).
 
-### Future AI Proposal Flow
-1. User requests AI advice.
+### AI Proposal Flow
+1. User requests an AI plan proposal from an upcoming workout.
 2. App bundles recent health data and schedule into a prompt.
-3. Remote AI service returns a JSON proposal.
-4. App validates the JSON and presents it to the user.
-5. User explicitly approves -> applied to Room.
-
+3. Remote AI service returns a clarification question or JSON containing only `MOVE` and
+   `LIGHTEN` operations.
+4. The app validates and previews the whole proposal without writing Room.
+5. Explicit approval applies every operation atomically through `TrainingRepository`; each event
+   is tagged `AI_ADVISOR`. Rejection, malformed JSON or one invalid operation writes nothing.
 ### Theme selection flow
 1. `ThemeSettingsStore` reads `theme_preference` from the `settings` DataStore — the same file the
    notification times, the AI model and the missed-session refusal live in — as a

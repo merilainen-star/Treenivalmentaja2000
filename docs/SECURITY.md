@@ -105,6 +105,10 @@ OAuth exchange and provider calls happen in the app; a local build that opts int
   and that **not entering a key disables the feature entirely**. Recorded as a change of position
   rather than edited away, because a security document that quietly drops a promise it broke is
   worse than one that never made it.
+- **AI plan proposals are untrusted input.** Only `MOVE` and `LIGHTEN` JSON operations parse; every
+  referenced session, date and legal transition is checked again inside one Room transaction.
+  Nothing is written before the user taps **Hyväksy muutokset**, and a partly invalid list rolls
+  back as a whole. Accepted event rows are tagged `AI_ADVISOR`.
 - User can trigger a complete local data wipe from the Settings screen.
 
 ## Known Security Gaps

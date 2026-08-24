@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import fi.merilainen.treenivalmentaja.data.importer.ImportResult
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
+import fi.merilainen.treenivalmentaja.data.repository.AdvisorApplyResult
 import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettings
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
@@ -31,10 +32,16 @@ import fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient
 import fi.merilainen.treenivalmentaja.data.analysis.AnalysisConnection
 import fi.merilainen.treenivalmentaja.data.analysis.AnalysisException
 import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
+import fi.merilainen.treenivalmentaja.data.settings.AdvisorSettingsStore
 import fi.merilainen.treenivalmentaja.data.settings.ThemeSettingsStore
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
+import fi.merilainen.treenivalmentaja.domain.AdvisorPromptBuilder
+import fi.merilainen.treenivalmentaja.domain.AdvisorResponseParser
+import fi.merilainen.treenivalmentaja.domain.AdvisorResponse
 import fi.merilainen.treenivalmentaja.domain.AnalysisModel
 import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
@@ -106,6 +113,7 @@ data class Workout(
   val exercises: List<Exercise> = emptyList(),
   /** Circuit rounds the whole exercise list is repeated for, when the plan says so. */
   val rounds: Int = 1,
+  val roundRestSec: Int? = null,
   /**
    * The effort the plan asked for, when it said.
    *
@@ -164,6 +172,9 @@ class WorkoutViewModel(
   private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
+  private val advisorSettingsStore: AdvisorSettingsStore? = null,
+  private val advisorPromptBuilder: AdvisorPromptBuilder = AdvisorPromptBuilder(),
+  private val advisorResponseParser: AdvisorResponseParser = AdvisorResponseParser(),
   /**
    * Where a refusal of the missed-session card is written down, nullable for the same reason the
    * collaborators above are: it is backed by DataStore, whose IO sits outside a test's scheduler,
@@ -846,6 +857,9 @@ class WorkoutViewModel(
   private val _aiAnalyses = MutableStateFlow<Map<String, AiAnalysisState>>(emptyMap())
   val aiAnalyses: StateFlow<Map<String, AiAnalysisState>> = _aiAnalyses.asStateFlow()
 
+  private val _aiPlanProposals = MutableStateFlow<Map<String, AiPlanProposalState>>(emptyMap())
+  val aiPlanProposals: StateFlow<Map<String, AiPlanProposalState>> = _aiPlanProposals.asStateFlow()
+
   fun saveAnalysisApiKey(provider: AnalysisProvider, key: String) {
     val connection = analysisConnection ?: return
     viewModelScope.launch { connection.saveApiKey(provider, key) }
@@ -1130,6 +1144,121 @@ class WorkoutViewModel(
     guidedProgress.update { it + (sessionId to progress) }
   }
 
+  fun dismissAiPlanProposal(sessionId: String) {
+    _aiPlanProposals.update { it - sessionId }
+  }
+
+  fun requestAiPlanProposal(sessionId: String, clarificationAnswer: String? = null) {
+    val model = analysisModel.value
+    val client = analysisClients[model.provider] ?: return
+    if (_aiPlanProposals.value[sessionId] is AiPlanProposalState.Loading) return
+    val previousQuestion =
+      (_aiPlanProposals.value[sessionId] as? AiPlanProposalState.NeedsClarification)?.question
+
+    viewModelScope.launch {
+      val target = repository.getSession(sessionId) ?: return@launch
+      if (!target.status.isOpen) return@launch
+      val sessions = repository.getSessions()
+      val targetDate = runCatching { LocalDate.parse(target.scheduledDate) }.getOrDefault(currentDate.value)
+      val recovery =
+        ouraRepository
+          .observeRecoveryRange(targetDate.minusDays(6), targetDate)
+          .first()
+      val load = intervalsRepository?.loadOn(targetDate)
+      val healthContext = buildString {
+        if (recovery.isEmpty()) {
+          appendLine("Oura: ei saatavilla")
+        } else {
+          recovery.toSortedMap().forEach { (date, day) ->
+            appendLine(
+              "Oura $date: readiness=${day.readiness ?: "puuttuu"}; " +
+                "sleep=${day.sleep ?: "puuttuu"}; activity=${day.activity ?: "puuttuu"}; " +
+                "HRV=${day.averageHrvMs ?: "puuttuu"} ms; lepo-HR=${day.restingHeartRate ?: "puuttuu"}"
+            )
+          }
+        }
+        if (load == null) {
+          appendLine("Kuormitus: ei saatavilla")
+        } else {
+          appendLine(
+            "Kuormitus ${load.date}: ATL=${load.acute ?: "puuttuu"}; " +
+              "CTL=${load.chronic ?: "puuttuu"}; TSB=${load.stressBalance ?: "puuttuu"}"
+          )
+        }
+      }.trim()
+      val prompt =
+        advisorPromptBuilder.build(
+          target = target,
+          sessions = sessions,
+          today = currentDate.value,
+          constraints = advisorConstraints.value,
+          healthContext = healthContext,
+          clarificationQuestion = previousQuestion,
+          clarificationAnswer = clarificationAnswer,
+        )
+      _aiPlanProposals.update { it + (sessionId to AiPlanProposalState.Loading) }
+      val state =
+        try {
+          when (val response = advisorResponseParser.parse(client.analyse(prompt, model)).getOrThrow()) {
+            is AdvisorResponse.Clarification ->
+              AiPlanProposalState.NeedsClarification(response.question, prompt)
+            is AdvisorResponse.Proposal -> AiPlanProposalState.Ready(response.value, prompt)
+          }
+        } catch (e: AnalysisException) {
+          AiPlanProposalState.Failed(e.message ?: "AI-ehdotus epäonnistui.", e.canRetry)
+        } catch (e: Exception) {
+          AiPlanProposalState.Failed(
+            "AI-vastaus ei ollut turvallisesti toteutettava: ${e.message ?: "tuntematon muoto"}",
+            canRetry = true,
+          )
+        }
+      _aiPlanProposals.update { it + (sessionId to state) }
+    }
+  }
+
+  fun applyAiPlanProposal(sessionId: String) {
+    val ready = _aiPlanProposals.value[sessionId] as? AiPlanProposalState.Ready ?: return
+    _aiPlanProposals.update {
+      it + (sessionId to AiPlanProposalState.Applying(ready.proposal))
+    }
+    viewModelScope.launch {
+      val result = repository.applyAdvisorProposal(ready.proposal)
+      val state =
+        when (result) {
+          is AdvisorApplyResult.Applied -> {
+            rescheduleAlarmsUseCase.execute()
+            AiPlanProposalState.Applied(
+              "Hyväksytty ja toteutettu ${result.operationCount} muutosta."
+            )
+          }
+          is AdvisorApplyResult.Rejected -> AiPlanProposalState.Failed(result.message, canRetry = false)
+        }
+      _aiPlanProposals.update { it + (sessionId to state) }
+    }
+  }
+
+  val advisorConstraints: StateFlow<String> =
+    (advisorSettingsStore?.constraintsFlow ?: MutableStateFlow(""))
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
+  fun setAdvisorConstraints(value: String) {
+    val store = advisorSettingsStore ?: return
+    viewModelScope.launch { store.setConstraints(value) }
+  }
+
+  fun startActiveWorkout(sessionId: String) {
+    viewModelScope.launch {
+      val session = repository.getSession(sessionId) ?: return@launch
+      if (session.status != SessionStatus.STARTED) {
+        repository.transition(sessionId, SessionStatus.STARTED, EventSource.USER)
+      }
+    }
+  }
+
+  fun completeActiveWorkout(sessionId: String, outcome: ActiveWorkoutOutcome) {
+    viewModelScope.launch { repository.completeActiveWorkout(sessionId, outcome) }
+  }
+
   fun updateWorkoutStatus(workoutId: String, newStatus: SessionStatus) {
     viewModelScope.launch {
       when (newStatus) {
@@ -1317,6 +1446,7 @@ class WorkoutViewModel(
           analysisClients = application.analysisClients,
           analysisSettingsStore = application.analysisSettingsStore,
           analysisPromptBuilder = application.analysisPromptBuilder,
+          advisorSettingsStore = application.advisorSettingsStore,
           missedProposalDismissalStore = application.missedProposalDismissalStore,
           themeSettingsStore = application.themeSettingsStore,
         )
@@ -1339,6 +1469,7 @@ class WorkoutViewModel(
             movedHere = session.originalSessionId != null,
             exercises = session.exercises.orEmpty(),
             rounds = (session.rounds ?: session.roundsMin ?: 1).coerceAtLeast(1),
+            roundRestSec = session.roundRestSec,
             intensity = session.intensity,
           )
         }

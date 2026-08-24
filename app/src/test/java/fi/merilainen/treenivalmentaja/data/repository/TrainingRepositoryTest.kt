@@ -7,6 +7,8 @@ import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
 import fi.merilainen.treenivalmentaja.domain.EventSource
+import fi.merilainen.treenivalmentaja.domain.AdvisorOperation
+import fi.merilainen.treenivalmentaja.domain.AiPlanProposal
 import fi.merilainen.treenivalmentaja.data.repository.TransitionResult
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import java.time.Clock
@@ -335,6 +337,53 @@ class TrainingRepositoryTest {
     val session = repository.getSession("s-1")!!
     assertEquals(SessionStatus.REPLACED_WITH_LIGHTER_VERSION, session.status)
     assertEquals(27, session.durationMin) // 45 * 0.6
+  }
+
+  @Test
+  fun `approved advisor proposal is atomic and records AI_ADVISOR as its source`() = runTest {
+    repository.importPlan(PLAN)
+    val proposal =
+      AiPlanProposal(
+        summary = "Tilaa palautumiselle",
+        operations =
+          listOf(
+            AdvisorOperation.Lighten("s-1"),
+            AdvisorOperation.Move("s-2", LocalDate.parse("2026-08-12")),
+          ),
+      )
+
+    val result = repository.applyAdvisorProposal(proposal)
+
+    assertEquals(AdvisorApplyResult.Applied(2), result)
+    assertEquals(SessionStatus.REPLACED_WITH_LIGHTER_VERSION, repository.getSession("s-1")?.status)
+    assertEquals(EventSource.AI_ADVISOR, repository.getEvents("s-1").last().source)
+    assertEquals(SessionStatus.RESCHEDULED, repository.getSession("s-2")?.status)
+    assertEquals(EventSource.AI_ADVISOR, repository.getEvents("s-2").last().source)
+    val moved = repository.getSessions().single { it.originalSessionId == "s-2" }
+    assertEquals("2026-08-12", moved.scheduledDate)
+    assertEquals(EventSource.AI_ADVISOR, repository.getEvents(moved.id).single().source)
+  }
+
+  @Test
+  fun `invalid advisor proposal writes none of its otherwise valid operations`() = runTest {
+    repository.importPlan(PLAN)
+    val beforeEvents = repository.getEvents("s-1").size
+    val proposal =
+      AiPlanProposal(
+        summary = "Virheellinen mennyt siirto",
+        operations =
+          listOf(
+            AdvisorOperation.Lighten("s-1"),
+            AdvisorOperation.Move("s-2", LocalDate.parse("2026-08-09")),
+          ),
+      )
+
+    val result = repository.applyAdvisorProposal(proposal)
+
+    assertTrue(result is AdvisorApplyResult.Rejected)
+    assertEquals(SessionStatus.PLANNED, repository.getSession("s-1")?.status)
+    assertEquals(beforeEvents, repository.getEvents("s-1").size)
+    assertEquals(SessionStatus.PLANNED, repository.getSession("s-2")?.status)
   }
 
   // ------------------------------------------------------------------ rescheduling

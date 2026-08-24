@@ -5,22 +5,33 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
-- Date: 2026-08-23
-- Base commit: the theme preference merged with `2f79a9e`; measured on the merge result
-- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36.1 and
-  build-tools 36.1.0
+- Date: 2026-08-24
+- Base commit: working tree for this change on top of `1fcaa36`
+- Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
+  and build-tools 36.1.0, on Windows 11
+- Emulator: `treeni-test`, android-36 google_apis x86_64, headless
+
+All five ran in one invocation with `--rerun-tasks` and a cleared `app/build/test-results`, so every
+number below was executed rather than replayed: Gradle reported `91 actionable tasks: 91 executed`
+and no task line carried `FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `rm -rf app/build/test-results && ./gradlew :app:testDebugUnitTest --rerun` | 589 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 54 comparisons, 0 changed, 54 unchanged |
-| Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 44 warnings |
-| Debug APK | `./gradlew clean :app:assembleDebug`, and a fresh `git worktree` for the comparison | 20,941,783 bytes |
-| Instrumented | `adb devices -l` | Not run: no device or emulator attached |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 606 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 58 comparisons, 0 changed, 58 unchanged |
+| Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,072,879 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 44 tests, 0 failures, 0 errors, 0 skipped |
 
-The 44 warnings are the same set as on 2026-08-21 — dependency-update notices, two `UseKtx`
+The 43 warnings are the same non-functional families as before — dependency-update notices, two `UseKtx`
 suggestions on the API-key stores, one `RedundantLabel` and one `ObsoleteSdkInt` that must stay.
 None is in the code added here.
+
+**The instrumented run is the one that had been outstanding.** Schema 13 is the first migration this
+branch adds, and `MigrationTest.migrate12To13` can only prove anything on a device — it ran here and
+passed, alongside the other 43 instrumented cases. The APK is byte-identical to the measurement taken
+before the skip-accounting change, which is what a pure refactor of already-compiled call sites
+should produce.
 
 **Read `--rerun` and a cleared `app/build/test-results` as part of the method, not as decoration.**
 `org.gradle.caching=true` means a plain re-run can report `testDebugUnitTest FROM-CACHE` and execute
@@ -37,7 +48,8 @@ recurred both with and without `--no-daemon`, so the cause is not established; d
 
 ## Current implementation
 
-- Room is the offline source of truth at schema version 12. Plans include an IANA timezone.
+- Room is the offline source of truth at schema version 13. Plans include an IANA timezone;
+  exercises may name equipment and sessions may define a round rest.
 - The ViewModel's current date changes at plan-zone midnight and refreshes on screen resume; sync
   windows, workout matching and missed-session classification use the same plan timezone.
 - Missed sessions produce a visible, read-only proposal on Today. One missed workout proposes the
@@ -46,7 +58,12 @@ recurred both with and without `--no-daemon`, so the cause is not established; d
   remembered for the rest of the plan-zone day, so the card does not return on the next resume of
   the screen the app opens on.
 - Oura OAuth, intervals.icu activity sync and optional Anthropic/OpenAI/Google workout analysis are
-  implemented. AI analysis is requested manually, stored only in memory and never edits the plan.
+  implemented. Read-only analysis never edits the plan. The separate Phase C advisor can return one
+  clarification or a strictly parsed MOVE/LIGHTEN preview; only explicit approval applies the whole
+  validated list atomically and records `AI_ADVISOR` events.
+- Active Workout Mode guides structured strength sessions through equipment preparation, movement,
+  rest and round-break phases, keeps the screen awake, and stores skips, duration, RPE and feel in
+  the completion event payload.
 - Two deterministic rules read the stored measurements and speak on the Today screen. The readiness
   rule offers to shift the programme or lighten a session; the easy-run drift rule offers nothing at
   all — it reports that the last three comparable easy sessions each exceeded the median intensity
@@ -59,7 +76,8 @@ recurred both with and without `--no-daemon`, so the cause is not established; d
 - The colour scheme is a preference: vaalea, tumma, or järjestelmä, kept in the `settings`
   DataStore under `theme_preference` and read in `MainActivity` so it covers the splash and the
   system bars as well as the screens. It defaults to following the phone, which is what the app did
-  before the preference existed. Dynamic colour on Android 12+ is unaffected.
+  before the preference existed. Material You dynamic hues are deliberately disabled so the
+  Electric Blue semantic palette is stable across devices.
 - Android backup and device transfer are disabled for the whole app. Defence-in-depth XML rules
   separately exclude Room, DataStore and all credential files. Room is not SQLCipher-encrypted; the
   accepted boundary is Android private storage plus backup opt-out for this single-user build.
@@ -83,6 +101,18 @@ fix for an old measurement is a new measurement. What went with it was the reaso
 numbers — including the one methodological finding on this page that cost a full afternoon to
 establish, and that anyone measuring an APK here needs before they start. Restored below,
 unchanged, as it was written when each figure was taken.
+
+### 2026-08-24 — Material 3, Active Workout Mode and AI Phase C
+
+The clean debug APK is **21,072,879 B**. A fresh detached worktree at the exact base `1fcaa36`,
+built in the same sitting with the same copied debug keystore, is **20,941,783 B**. The combined
+change is therefore **+131,096 B (+0.626%)**. No new runtime dependency was added; the delta is app
+code, Room schema metadata and resources.
+
+The verified JVM suite is 604 tests and the Roborazzi bank is 58 comparisons. Lint reports 0 errors
+and 43 warnings, none in the new files. Instrumented tests were not run because `adb devices -l`
+listed no device or emulator; schema 12→13, Keystore and image-cache coverage therefore still need
+an attached Android target before release.
 
 
 **2026-08-21.** The easy-run drift rule cost **16,384 B (+0.078 %)** — 20,909,015 B before and

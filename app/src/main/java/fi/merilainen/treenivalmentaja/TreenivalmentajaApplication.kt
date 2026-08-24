@@ -47,6 +47,7 @@ import fi.merilainen.treenivalmentaja.data.analysis.AnthropicClient
 import fi.merilainen.treenivalmentaja.data.analysis.GeminiClient
 import fi.merilainen.treenivalmentaja.data.analysis.OpenAiClient
 import fi.merilainen.treenivalmentaja.data.settings.AnalysisSettingsStore
+import fi.merilainen.treenivalmentaja.data.settings.AdvisorSettingsStore
 import fi.merilainen.treenivalmentaja.data.settings.ThemeSettingsStore
 import fi.merilainen.treenivalmentaja.domain.AnalysisPromptBuilder
 import fi.merilainen.treenivalmentaja.domain.AnalysisProvider
@@ -248,6 +249,8 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
   }
 
   val analysisSettingsStore: AnalysisSettingsStore by lazy { AnalysisSettingsStore(this) }
+
+  val advisorSettingsStore: AdvisorSettingsStore by lazy { AdvisorSettingsStore(this) }
 
   /** The light/dark/system choice, read by `MainActivity` before the first frame is themed. */
   val themeSettingsStore: ThemeSettingsStore by lazy { ThemeSettingsStore(this) }

@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-08-24
+
+### Added
+- Material 3 Electric Blue -uudistus: yhtenäinen vaalea/tumma paletti, kolme toimivaa
+  navigaatiokohdetta, Oura-pisteiden yhteenvetorenkaat ja `java.time`-kalenterista laskettu
+  kuukausiruudukko. Material You -dynaamiset värit poistettiin tietoisena käyttäytymismuutoksena;
+  harjoitusten semanttiset statusvärit säilyivät.
+- Active Workout Mode: koko näytön ohjattu treeni, valmistautuminen ennen jokaista liikettä,
+  deadline-pohjaiset lepoajat, ruudun hereilläpito, ääni/värinä, ohitetut liikkeet sekä RPE/tuntuma.
+  Lopputulos tallentuu completion-eventin `activeWorkout`-payloadiin. Plan Schema v1 sai valinnaiset
+  `equipment`- ja `roundRestSec`-kentät; jälkimmäinen nosti Roomin skeemaan 13.
+- AI Phase C: tarkentava kysymys tai validoitu MOVE/LIGHTEN-ehdotus, pysyvät käyttäjärajoitteet,
+  read-only-esikatselu ja erillinen hyväksyntä. Hyväksytty lista toteutetaan atomisesti ja merkitään
+  tapahtumalokiin lähteellä `AI_ADVISOR`; virheellinen lista ei muuta mitään.
+
+### Fixed
+- Ohitettu liike ei enää näy tehtynä kesken treenin. Edistymispalkki laski `Perform`-askelia
+  katsomatta ohituslistaa, joten "Ohita" siirsi mittaria eteenpäin samalla tavalla kuin "Valmis" —
+  vaikka tallennettu `GuidedProgress` on koko ajan vähentänyt ohitetut oikein. Näytöllä näkyvä luku
+  ja tapahtumalokiin kirjoitettu luku ovat nyt sama luku.
+
+### Changed
+- Ohjatun treenin askellogiikka on siirretty domainiin funktioina, joita näyttö kutsuu:
+  `Perform.key()`, `completedMovements(index, skippedKeys)` ja `skippedMovements(skippedKeys)`.
+  `ActiveWorkoutProgress` poistettiin — se oli kirjoitettu tähän tarkoitukseen mutta jäi
+  kytkemättä, joten `ActiveWorkoutScreen` rakensi samat `"$round:$position"`-avaimet käsin
+  kahdessa paikassa ja luokan testit todistivat koodista, jota sovellus ei ajanut. Ei
+  käyttäytymismuutosta yllä mainitun korjauksen lisäksi; kuvakaappausperustasot eivät muuttuneet.
+
 ## [Unreleased] - 2026-08-23
 
 ### Added

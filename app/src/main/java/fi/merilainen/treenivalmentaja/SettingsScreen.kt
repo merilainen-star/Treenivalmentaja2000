@@ -66,6 +66,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisSaveFailure by viewModel.analysisSaveFailure.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
+    val advisorConstraints by viewModel.advisorConstraints.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
 
     /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
@@ -188,6 +189,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onSaveAnalysisApiKey = viewModel::saveAnalysisApiKey,
         onClearAnalysisApiKey = viewModel::clearAnalysisApiKey,
         onAnalysisModelChange = viewModel::setAnalysisModel,
+        advisorConstraints = advisorConstraints,
+        onAdvisorConstraintsChange = viewModel::setAdvisorConstraints,
         themePreference = themePreference,
         onThemePreferenceChange = viewModel::setThemePreference,
         hasNotificationPermission = hasPermission,
@@ -263,6 +266,8 @@ fun SettingsScreenContent(
     onSaveAnalysisApiKey: (AnalysisProvider, String) -> Unit = { _, _ -> },
     onClearAnalysisApiKey: (AnalysisProvider) -> Unit = {},
     onAnalysisModelChange: (AnalysisModel) -> Unit = {},
+    advisorConstraints: String = "",
+    onAdvisorConstraintsChange: (String) -> Unit = {},
     themePreference: ThemePreference = ThemePreference.DEFAULT,
     onThemePreferenceChange: (ThemePreference) -> Unit = {},
     onTimeChange: (WorkoutType, String) -> Unit = { _, _ -> },
@@ -389,6 +394,11 @@ fun SettingsScreenContent(
             onModelChange = onAnalysisModelChange,
             onSaveApiKey = onSaveAnalysisApiKey,
             onClearApiKey = onClearAnalysisApiKey,
+        )
+
+        AdvisorConstraintsCard(
+            constraints = advisorConstraints,
+            onSave = onAdvisorConstraintsChange,
         )
 
         Card(

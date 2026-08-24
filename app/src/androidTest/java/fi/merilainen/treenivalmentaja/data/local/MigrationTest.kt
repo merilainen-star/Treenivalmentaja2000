@@ -443,4 +443,31 @@ class MigrationTest {
     assertEquals(51, summaries.getInt(summaries.getColumnIndex("restingHrBpm")))
     summaries.close()
   }
+
+  /** Version 13 adds the optional circuit-round pause without changing existing sessions. */
+  @Test
+  fun migrate12To13() {
+    var db = helper.createDatabase(TEST_DB, 12)
+    db.execSQL(
+      """
+      INSERT INTO `training_plans` (`id`, `name`, `schemaVersion`, `timeZone`, `startDate`, `description`, `createdAt`, `contentHash`, `isActive`)
+      VALUES ('p1', 'Plan', 1, 'Europe/Helsinki', '2026-08-24', NULL, 1, 'hash', 1)
+      """
+    )
+    db.execSQL(
+      """
+      INSERT INTO `workout_sessions` (`id`, `planId`, `type`, `weekNumber`, `scheduledDate`, `scheduledTime`, `remindAtUtc`, `timeIsFixed`, `status`, `appliedLighterVariant`, `updatedAt`)
+      VALUES ('s1', 'p1', 'STRENGTH', 1, '2026-08-24', '18:00', 1, 1, 'PLANNED', 0, 1)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 13, true)
+
+    val sessions = db.query("SELECT * FROM workout_sessions WHERE id = 's1'")
+    assertTrue(sessions.moveToFirst())
+    assertTrue(sessions.isNull(sessions.getColumnIndex("roundRestSec")))
+    assertEquals("PLANNED", sessions.getString(sessions.getColumnIndex("status")))
+    sessions.close()
+  }
 }

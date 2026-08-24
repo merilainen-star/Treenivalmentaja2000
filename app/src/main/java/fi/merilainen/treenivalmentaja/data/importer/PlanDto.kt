@@ -48,6 +48,7 @@ data class SessionDto(
   val roundsMax: Int? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
+  val roundRestSec: Int? = null,
   val description: String? = null,
   val exercises: List<ExerciseDto?>? = null,
   val lighterAlternative: LighterAlternativeDto? = null,
@@ -65,6 +66,7 @@ data class ExerciseDto(
   val durationSec: Int? = null,
   val restSec: Int? = null,
   val notes: String? = null,
+  val equipment: List<String?>? = null,
   /** Per-set loads, when the sets are not all alike. See `docs/PLAN_SCHEMA.md`. */
   val setPlan: List<ExerciseSetDto?>? = null,
   /** Which movement this is in an outside catalogue. See `docs/EXERCISE_GUIDE.md`. */
@@ -96,6 +98,7 @@ data class LighterAlternativeDto(
   val roundsMax: Int? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
+  val roundRestSec: Int? = null,
   val description: String? = null,
   val exercises: List<ExerciseDto?>? = null,
 )

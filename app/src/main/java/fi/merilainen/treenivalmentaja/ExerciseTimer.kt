@@ -2,6 +2,11 @@ package fi.merilainen.treenivalmentaja
 
 import android.content.Context
 import android.media.RingtoneManager
+import android.os.Build
+import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -29,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import kotlinx.coroutines.delay
+import kotlin.math.ceil
 
 /**
  * How many times an exercise's clock has to be run, and what to call each run.
@@ -109,6 +116,19 @@ internal fun playTimerFinishedSound(context: Context) {
     runCatching {
         val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         RingtoneManager.getRingtone(context, uri)?.play()
+    }
+}
+
+internal fun vibrateTimerFinished(context: Context) {
+    runCatching {
+        val vibrator =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(VibratorManager::class.java).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+        vibrator.vibrate(VibrationEffect.createOneShot(250, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 }
 
@@ -184,6 +204,7 @@ fun ExerciseTimer(
             onCancelled = { running = false },
             onFinished = {
                 playTimerFinishedSound(context)
+                vibrateTimerFinished(context)
                 running = false
                 completed++
                 if (completed >= rounds.size) onAllRoundsCompleted()
@@ -206,12 +227,15 @@ private fun CountdownDialog(
     onCancelled: () -> Unit,
     onFinished: () -> Unit,
 ) {
+    val deadline = rememberSaveable(seconds) { SystemClock.elapsedRealtime() + seconds * 1000L }
     var timeLeft by remember { mutableIntStateOf(seconds) }
 
-    LaunchedEffect(Unit) {
-        while (timeLeft > 0) {
-            delay(1000)
-            timeLeft--
+    LaunchedEffect(deadline) {
+        while (true) {
+            timeLeft =
+                ceil((deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0) / 1000.0).toInt()
+            if (timeLeft <= 0) break
+            delay(200)
         }
         onFinished()
     }
