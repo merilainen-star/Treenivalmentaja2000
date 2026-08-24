@@ -6,7 +6,7 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-08-24
-- Base commit: working tree for the sideload-update change on top of `c79c90e`
+- Base commit: working tree for the sideload-update work on top of `d9508d4`
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
@@ -21,13 +21,20 @@ the instrumented run followed with `--rerun-tasks` on the same emulator. No task
 | Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 61 comparisons, 0 changed, 61 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
 | Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,105,695 bytes |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 48 tests, 0 failures, 0 errors, 0 skipped |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 53 tests, 0 failures, 0 errors, 0 skipped |
 
-The unit suite grew by 24 (614 → 638) and the instrumented suite by 4 (44 → 48), all of them for
+The unit suite grew by 24 (614 → 638) and the instrumented suite by 9 (44 → 53), all of them for
 the in-app update: the digest and size check as a pure stream copy, every `PackageInstaller` status
 having a sentence of its own, the four `latest.json` payloads that must be refused rather than
 installed, the progress-to-status mapping, and — on a device — that the install callback starts the
-intent it carries only for `STATUS_PENDING_USER_ACTION`.
+intent it carries only for `STATUS_PENDING_USER_ACTION`, and that the "app updated" notice appears
+for `ACTION_MY_PACKAGE_REPLACED` and for neither of the other two actions `BootReceiver` handles.
+
+`UpdateInstalledNotificationTest` failed once before it passed, and the failure was the test's
+rather than the code's: posting a notification and reading `activeNotifications` are separate calls
+into the system, and the read beat the post. Presence is now polled and absence asserted after a
+settle. Worth recording because the sibling test that posted twice passed throughout — a race that
+only fails in the single-post case reads exactly like a feature that does not work.
 
 One screenshot baseline was added (`update_card_install_states`) and one rewritten
 (`update_card_states`); both diffs were looked at before recording. The install states are a
@@ -81,6 +88,10 @@ is a permission tooling is entitled to complain about.
   along with the byte count; a mismatch abandons the session before anything is committed. Android's
   own install confirmation is required (`USER_ACTION_REQUIRED`) and the status callback lands in a
   non-exported receiver, never in the exported `MainActivity`.
+- After an update the app posts a notice on its own channel and opens when tapped. It does **not**
+  relaunch itself: installing kills the process being replaced, and Android blocks background
+  activity starts, including from an `ACTION_MY_PACKAGE_REPLACED` receiver. One tap is what the
+  platform allows.
 - Android backup and device transfer are disabled for the whole app. Defence-in-depth XML rules
   separately exclude Room, DataStore and all credential files. Room is not SQLCipher-encrypted; the
   accepted boundary is Android private storage plus backup opt-out for this single-user build.
@@ -93,15 +104,11 @@ is a permission tooling is entitled to complain about.
   for end-to-end confirmation.
 - A rooted or unlocked device can bypass the Android application sandbox; no at-rest database
   encryption is provided for that threat model.
-- **The in-app update has not yet been performed end to end.** Every piece is tested — the digest
-  check as a stream copy, the status mapping, the receiver on a device — but no build has actually
-  replaced another through `PackageInstaller` on the phone, because that needs a published release
-  carrying `apkSha256`, and the first one is produced by the CI run that ships this change. Until
-  then the permission prompt, the confirmation dialog and the replacement itself are unproven in the
-  order a user meets them.
-- **A release published before `apkSha256` existed cannot be installed by a build that requires
-  it**, and is reported as a parse failure rather than installed unchecked. The window is one build
-  long: the next CI publish carries the field.
+- **The in-app update was performed end to end on the owner's phone on 2026-08-24**: permission
+  prompt, in-app download with progress, digest check and Android's install confirmation, with no
+  APK left in the Downloads folder. What that run did **not** cover is the post-update notice, which
+  was written afterwards — it is proven on an emulator, not yet on the phone, and the first build
+  carrying it is the one that will demonstrate it.
 - Existing lint warnings and Kotlin/Java deprecations remain non-blocking maintenance work.
 
 ## Measurement history

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import fi.merilainen.treenivalmentaja.TreenivalmentajaApplication
+import fi.merilainen.treenivalmentaja.data.update.UpdateInstalledNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,6 +15,14 @@ class BootReceiver : BroadcastReceiver() {
         // three actions has to re-arm them. Anything else is not ours to act on: the manifest
         // filter is the contract, and an intent outside it must not trigger a reschedule.
         if (intent.action !in HANDLED_ACTIONS) return
+
+        // The one action that means "this app was just replaced", whichever route installed it.
+        // The process it replaced was killed, and Android will not let this one start an activity
+        // from here — so the app says it is back and waits to be tapped. See
+        // UpdateInstalledNotification for why an automatic relaunch is not on offer.
+        if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            UpdateInstalledNotification.show(context)
+        }
 
         val app = context.applicationContext as TreenivalmentajaApplication
 
