@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,7 +50,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlin.math.abs
+import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.time.format.TextStyle
 import java.util.Locale
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
@@ -115,6 +120,79 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     )
 }
 
+/**
+ * One day's heading: past, today and future told apart here rather than by the cards under it.
+ *
+ * A day that is over and whose sessions were all completed gets a tick; today gets the one filled
+ * label on the screen; everything ahead stays neutral. It is its own composable because the list
+ * always opens on today, so a past day's heading is never on screen in a full-screen capture — it
+ * could only be given a baseline by being captured directly.
+ */
+@Composable
+internal fun WeekDayHeader(
+    dayName: String,
+    dayIndex: Int,
+    dayWorkouts: List<Workout>,
+    recovery: DailyRecovery? = null,
+) {
+    val isToday = dayIndex == 0
+    val isPast = dayIndex < 0
+    val dayDone =
+        isPast && dayWorkouts.isNotEmpty() && dayWorkouts.all { it.status == SessionStatus.COMPLETED }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (dayDone) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Harjoitukset tehty",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            text = dayName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color =
+                when {
+                    isToday -> MaterialTheme.colorScheme.onPrimaryContainer
+                    dayDone -> MaterialTheme.colorScheme.primary
+                    isPast -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+            modifier =
+                if (isToday) {
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                } else {
+                    Modifier
+                },
+        )
+        recovery?.let { ReadinessBadge(it) }
+    }
+}
+
+/**
+ * Which row of [days] a tap on [date] should bring into view, or `null` when there are no rows.
+ *
+ * Not every date has a row: [days] carries this week plus whatever days have something on them, so
+ * an empty day in a distant month is not in the list at all. Scrolling to the nearest day it does
+ * have is the answer rather than doing nothing, because a tap that changes nothing on screen reads
+ * as a broken control. Ties go to the earlier day, which is `minByOrNull`'s own behaviour and means
+ * a tap between two rows lands on the one that starts the pair.
+ */
+internal fun rowIndexForDate(days: List<Int>, today: LocalDate, date: LocalDate): Int? {
+    if (days.isEmpty()) return null
+    val wanted = ChronoUnit.DAYS.between(today, date).toInt()
+    val nearest = days.minByOrNull { abs(it - wanted) } ?: return null
+    return days.indexOf(nearest)
+}
+
 /** The week, as a function of what it is given. */
 @Composable
 fun WeekScreenContent(
@@ -150,16 +228,9 @@ fun WeekScreenContent(
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        ) {
-            MonthCalendar(
-                today = today,
-                workouts = workouts,
-                modifier = Modifier.padding(12.dp),
-            )
-        }
+        // Declared before the calendar so tapping a square can move the list, and after `days`
+        // would be too late — the calendar is drawn above it.
+        var selectedDate by rememberSaveable(today) { mutableStateOf<LocalDate?>(null) }
 
         // Which days get a row.
         //
@@ -185,6 +256,26 @@ fun WeekScreenContent(
             initialFirstVisibleItemIndex = days.indexOf(0).coerceAtLeast(0)
         )
 
+        val scope = rememberCoroutineScope()
+
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        ) {
+            MonthCalendar(
+                today = today,
+                workouts = workouts,
+                modifier = Modifier.padding(12.dp),
+                selectedDate = selectedDate,
+                onDateClick = { date ->
+                    selectedDate = date
+                    rowIndexForDate(days, today, date)?.let { index ->
+                        scope.launch { listState.animateScrollToItem(index) }
+                    }
+                },
+            )
+        }
+
         // Recomputed when either the plan or Oura's own record changes, so a day that holds only a
         // walk still gets a row.
         LazyColumn(
@@ -197,20 +288,12 @@ fun WeekScreenContent(
                 val dayName = dayLabel(today, dayIndex)
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = dayName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        recoveryByDay[today.plusDays(dayIndex.toLong())]?.let { recovery ->
-                            ReadinessBadge(recovery)
-                        }
-                    }
+                    WeekDayHeader(
+                        dayName = dayName,
+                        dayIndex = dayIndex,
+                        dayWorkouts = dayWorkouts,
+                        recovery = recoveryByDay[today.plusDays(dayIndex.toLong())],
+                    )
 
                     val loose = unmatchedByDay[today.plusDays(dayIndex.toLong())].orEmpty()
 

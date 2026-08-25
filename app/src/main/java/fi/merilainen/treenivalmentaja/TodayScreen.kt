@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -425,14 +426,21 @@ fun RecoveryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
+                // Both tonal rather than one outlined and one filled: neither is the day's main
+                // action, and a filled button next to an outlined one reads as a recommendation.
+                // "Sairastuin" keeps the error colour, because that is what it means.
+                FilledTonalButton(
                     onClick = onSickClicked,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    colors =
+                        ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        )
                 ) {
                     Text("Sairastuin")
                 }
-                Button(
+                FilledTonalButton(
                     onClick = onRecoveredClicked,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -667,16 +675,40 @@ fun WorkoutCardToday(
             
             Spacer(modifier = Modifier.height(8.dp))
             
+            // How many movements the session actually has, read the same way the card below reads
+            // them: the plan's own list when it has one, the parsed description when it does not.
+            //
+            // Gated on STRENGTH, and that gate is not decoration. `parseStrengthDescription`
+            // decides what a movement is by counting commas, so it reads "Rauhallinen
+            // peruskestävyyslenkki, syke alle 145." as two movements and put "Liikkeet 2" on a
+            // running card. A session type that has no movements must not be asked how many it has.
+            val movementCount =
+                if (workout.type != WorkoutType.STRENGTH) 0
+                else if (workout.exercises.isNotEmpty()) workout.exercises.size
+                else parseStrengthDescription(workout.description).exercises.size
+
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     text = "Suunniteltu klo ${workout.time}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = "${workout.durationMin} min",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
+                // The duration moves into the stat row when there is one, so it is not stated twice.
+                if (movementCount == 0) {
+                    Text(
+                        text = "${workout.durationMin} min",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+
+            if (movementCount > 0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                WorkoutStatColumns(
+                    durationMin = workout.durationMin,
+                    movements = movementCount,
+                    rounds = workout.rounds,
                 )
             }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.Button
@@ -30,6 +32,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,10 +55,12 @@ import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutStep
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SkippedMovement
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPositionState
 import fi.merilainen.treenivalmentaja.domain.buildActiveWorkoutSteps
 import fi.merilainen.treenivalmentaja.domain.completedMovements
 import fi.merilainen.treenivalmentaja.domain.key
 import fi.merilainen.treenivalmentaja.domain.skippedMovements
+import fi.merilainen.treenivalmentaja.domain.upcomingInRound
 import kotlin.math.ceil
 import kotlinx.coroutines.delay
 
@@ -68,6 +73,7 @@ fun ActiveWorkoutScreen(
   val workouts by viewModel.workouts.collectAsState()
   val workout = workouts.firstOrNull { it.id == sessionId }
   val guideState by viewModel.guideState.collectAsState()
+  val position by viewModel.activeWorkoutPosition.collectAsState()
 
   LaunchedEffect(sessionId) { viewModel.startActiveWorkout(sessionId) }
 
@@ -78,6 +84,17 @@ fun ActiveWorkoutScreen(
     return
   }
 
+  // Nothing is drawn until the stored position is known. Drawing the first movement first and
+  // correcting it a moment later would tell someone mid-workout that they are starting over.
+  val restored =
+    when (val state = position) {
+      is ActiveWorkoutPositionState.Loading -> {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+      }
+      is ActiveWorkoutPositionState.Ready -> state.value
+    }
+
   ActiveWorkoutContent(
     workout = workout,
     onClose = onClose,
@@ -85,6 +102,14 @@ fun ActiveWorkoutScreen(
     onComplete = { outcome ->
       viewModel.completeActiveWorkout(sessionId, outcome)
       onClose()
+    },
+    // A restored position means the workout was already under way, so the start summary is not
+    // shown again — it is the answer to "what am I about to do", not to "where was I".
+    initialOverviewVisible = restored == null,
+    initialStepIndex = restored?.stepIndex ?: 0,
+    initialSkippedKeys = restored?.skippedKeys.orEmpty(),
+    onPositionChange = { stepIndex, skippedKeys ->
+      viewModel.saveActiveWorkoutPosition(sessionId, stepIndex, skippedKeys)
     },
   )
 
@@ -107,6 +132,8 @@ fun ActiveWorkoutContent(
   onComplete: (ActiveWorkoutOutcome) -> Unit = {},
   initialOverviewVisible: Boolean = true,
   initialStepIndex: Int = 0,
+  initialSkippedKeys: List<String> = emptyList(),
+  onPositionChange: (Int, List<String>) -> Unit = { _, _ -> },
   trackElapsed: Boolean = true,
 ) {
   val steps =
@@ -115,9 +142,14 @@ fun ActiveWorkoutContent(
     }
   var overviewVisible by rememberSaveable(workout.id) { mutableStateOf(initialOverviewVisible) }
   var stepIndex by rememberSaveable(workout.id, steps.size) { mutableIntStateOf(initialStepIndex) }
-  var skippedIds by rememberSaveable(workout.id, steps.size) { mutableStateOf(emptyList<String>()) }
+  var skippedIds by rememberSaveable(workout.id, steps.size) { mutableStateOf(initialSkippedKeys) }
   val startedAt = rememberSaveable(workout.id) { System.currentTimeMillis() }
   val elapsedSec = if (trackElapsed) rememberElapsedSeconds(startedAt) else 0
+
+  // Mirrored upwards on every change so the position outlives this screen. `rememberSaveable`
+  // alone only survives the process being killed — the back arrow pops the destination, and that
+  // takes its saved state with it.
+  LaunchedEffect(workout.id, stepIndex, skippedIds) { onPositionChange(stepIndex, skippedIds) }
 
   val view = LocalView.current
   DisposableEffect(view) {
@@ -186,10 +218,9 @@ fun ActiveWorkoutContent(
             onExerciseClick = onExerciseClick,
             onReady = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
           )
-        is ActiveWorkoutStep.Perform ->
+        is ActiveWorkoutStep.Perform -> {
           PerformStepCard(
             step = step,
-            upcoming = upcomingExercises(steps, safeIndex),
             onExerciseClick = onExerciseClick,
             onDone = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
             onSkip = {
@@ -197,6 +228,8 @@ fun ActiveWorkoutContent(
               stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex)
             },
           )
+          UpcomingCard(upcoming = upcomingInRound(steps, safeIndex))
+        }
         is ActiveWorkoutStep.Rest ->
           CountdownStepCard(
             title = "Lepo",
@@ -288,9 +321,13 @@ private fun WorkoutProgressHeader(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
+      // The track is named explicitly. Material 3 defaults it to `secondaryContainer`, which in
+      // this palette is the green that means "done" — so an empty bar was drawn full-width in the
+      // colour of completion, and "Liikkeet 0 / 6" sat above a bar that looked finished.
       LinearProgressIndicator(
         progress = { if (total == 0) 0f else completed.toFloat() / total },
         modifier = Modifier.fillMaxWidth(),
+        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
       )
     }
   }
@@ -309,9 +346,7 @@ private fun PrepareStepCard(
       val equipment = step.exercise.equipment.orEmpty()
       if (equipment.isNotEmpty()) Text("Välineet: ${equipment.joinToString(", ")}")
       step.exercise.weightKg?.let { Text("Kuorma: ${it.toString().replace('.', ',')} kg") }
-      OutlinedButton(onClick = { onExerciseClick(step.exercise) }, modifier = Modifier.fillMaxWidth()) {
-        Text("Näytä liikeohje")
-      }
+      GuideButton(exercise = step.exercise, onExerciseClick = onExerciseClick)
       Button(onClick = onReady, modifier = Modifier.fillMaxWidth()) { Text("Olen valmis") }
     }
   }
@@ -320,7 +355,6 @@ private fun PrepareStepCard(
 @Composable
 private fun PerformStepCard(
   step: ActiveWorkoutStep.Perform,
-  upcoming: List<String>,
   onExerciseClick: (Exercise) -> Unit,
   onDone: () -> Unit,
   onSkip: () -> Unit,
@@ -330,17 +364,13 @@ private fun PerformStepCard(
       Text(step.exercise.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
       val prescription = step.exercise.prescription()
       if (prescription.isNotBlank()) Text(prescription, style = MaterialTheme.typography.titleLarge)
-      OutlinedButton(onClick = { onExerciseClick(step.exercise) }) { Text("Liikeohje") }
+      GuideButton(exercise = step.exercise, onExerciseClick = onExerciseClick)
       if (step.exercise.durationSec != null) {
         ExerciseTimer(exercise = step.exercise, onAllRoundsCompleted = onDone)
       } else {
         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Liike valmis") }
       }
       OutlinedButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Ohita liike") }
-      if (upcoming.isNotEmpty()) {
-        Text("Seuraavaksi", style = MaterialTheme.typography.labelLarge)
-        Text(upcoming.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant)
-      }
     }
   }
 }
@@ -376,6 +406,7 @@ private fun CountdownStepCard(title: String, seconds: Int, next: String, onFinis
       Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
       Box(contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
+          trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
           progress = { if (seconds == 0) 0f else timeLeft.toFloat() / seconds },
           modifier = Modifier.size(180.dp),
           strokeWidth = 14.dp,
@@ -455,8 +486,60 @@ private fun rememberElapsedSeconds(startedAtMillis: Long): Long {
 private fun formatElapsed(seconds: Long): String =
   "%02d:%02d".format(seconds / 60, seconds % 60)
 
-private fun upcomingExercises(
-  steps: List<ActiveWorkoutStep>,
-  current: Int,
-): List<String> =
-  steps.drop(current + 1).filterIsInstance<ActiveWorkoutStep.Perform>().take(3).map { it.exercise.name }
+/**
+ * The guide, in the same place under the same name on every step.
+ *
+ * It used to be a full-width "Näytä liikeohje" on the preparation screen and a small "Liikeohje"
+ * on the movement itself — two names and two sizes for one control, which reads as two different
+ * things. One name, and pushed to the right so it sits beside the movement rather than in the path
+ * of the button that advances it: the guide is a thing you may want, never the next thing to do.
+ */
+@Composable
+private fun GuideButton(exercise: Exercise, onExerciseClick: (Exercise) -> Unit) {
+  Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    TextButton(onClick = { onExerciseClick(exercise) }) {
+      Icon(
+        imageVector = Icons.AutoMirrored.Filled.HelpOutline,
+        contentDescription = null,
+        modifier = Modifier.size(18.dp),
+      )
+      Spacer(Modifier.width(6.dp))
+      Text("Liikeohje")
+    }
+  }
+}
+
+/**
+ * What comes after this movement, as its own card.
+ *
+ * It was a line at the bottom of the movement's own card, where "now" and "next" were one block of
+ * text and the eye had to separate them. There is room on the screen for the distinction to be made
+ * by the layout instead.
+ */
+@Composable
+private fun UpcomingCard(upcoming: List<String>) {
+  if (upcoming.isEmpty()) return
+  Card(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+  ) {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      Text(
+        "Seuraavaksi",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Text(upcoming.first(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+      // The rest of the round, quietly: the principle is one thing at a time, so what follows the
+      // next movement is context rather than an instruction.
+      val rest = upcoming.drop(1)
+      if (rest.isNotEmpty()) {
+        Text(
+          rest.joinToString(" · "),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+  }
+}
+

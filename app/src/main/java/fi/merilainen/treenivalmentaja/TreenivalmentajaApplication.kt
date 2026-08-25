@@ -10,6 +10,7 @@ import coil.request.CachePolicy
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseDbProvider
 import fi.merilainen.treenivalmentaja.data.guide.WgerProvider
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutProgressStore
 import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.update.HttpUpdateService
@@ -18,6 +19,7 @@ import fi.merilainen.treenivalmentaja.domain.CheckForUpdateUseCase
 import fi.merilainen.treenivalmentaja.domain.InstallUpdateUseCase
 import fi.merilainen.treenivalmentaja.data.repository.TrainingRepository
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
+import fi.merilainen.treenivalmentaja.data.settings.ActiveWorkoutProgressSettingsStore
 import fi.merilainen.treenivalmentaja.data.settings.MissedProposalSettingsStore
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
@@ -270,6 +272,10 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
   /** Keeps a "ei nyt" on the missed-session card across restarts and app updates. */
   val missedProposalDismissalStore: MissedProposalDismissalStore by lazy {
     MissedProposalSettingsStore(this)
+  }
+
+  val activeWorkoutProgressStore: ActiveWorkoutProgressStore by lazy {
+    ActiveWorkoutProgressSettingsStore(this)
   }
 
   /** Pure, stateless, and shared for that reason — it holds nothing between calls. */

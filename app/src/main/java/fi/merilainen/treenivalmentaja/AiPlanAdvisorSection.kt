@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -125,10 +126,17 @@ fun AiPlanAdvisorSection(
       Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
           Text(state.message, color = MaterialTheme.colorScheme.onErrorContainer)
+          // A TextButton draws itself in `primary`, which is blue — and blue actions on a red
+          // container read as belonging to some other card. Inside an error container the
+          // container's own foreground colour is the one that belongs.
+          val onError =
+            ButtonDefaults.textButtonColors(
+              contentColor = MaterialTheme.colorScheme.onErrorContainer
+            )
           val raw = state.rawResponse
           if (!raw.isNullOrBlank()) {
             var rawVisible by rememberSaveable(raw) { mutableStateOf(false) }
-            TextButton(onClick = { rawVisible = !rawVisible }) {
+            TextButton(onClick = { rawVisible = !rawVisible }, colors = onError) {
               Text(if (rawVisible) "Piilota AI:n vastaus" else "Näytä AI:n vastaus")
             }
             if (rawVisible) {
@@ -140,8 +148,10 @@ fun AiPlanAdvisorSection(
             }
           }
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.canRetry) TextButton(onClick = { onRequest(null) }) { Text("Yritä uudelleen") }
-            TextButton(onClick = onDismiss) { Text("Sulje") }
+            if (state.canRetry) {
+              TextButton(onClick = { onRequest(null) }, colors = onError) { Text("Yritä uudelleen") }
+            }
+            TextButton(onClick = onDismiss, colors = onError) { Text("Sulje") }
           }
         }
       }

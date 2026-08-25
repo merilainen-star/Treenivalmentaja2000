@@ -180,3 +180,37 @@ vaihtoehto toteutuksessa voitti.
    tekstivärit korvautuvat kokonaan. Status-värit (`ColorGreen`, `ColorYellow`, `ColorRed`,
    `ColorGray`) ovat eri asia: ne koodaavat harjoituksen tilaa eivätkä ole brändiväriä, joten
    niiden kohtalo on päätettävä erikseen eikä niitä pidä pyyhkiä paletin mukana.
+
+---
+
+## Toteutuksen tila 2026-08-24
+
+Ohje on toteutettu. Mitä missäkin:
+
+| Ohjeen kohta | Tila |
+| --- | --- |
+| §1 `dynamicColor = false`, kolme välilehteä, tilattomat `XScreenContent` | Tehty |
+| §2 Design tokenit | Tehty. `Color.kt` vastaa taulukoiden heksa-arvoja |
+| §3 Palautumisrenkaat | Tehty `MetricRing`illä — palautuminen, uni, aktiivisuus |
+| §3 Tulevan treenin kolme statussaraketta | Tehty `WorkoutStatColumns`illa, **vain voimaharjoituksille** |
+| §3 Aktiivinen treeni | Tehty: `WorkoutProgressHeader`, hero-kortti, ajastinrengas, "Seuraavaksi" |
+| §3 Viikko/kalenteri, mennyt–tänään–tuleva | Tehty `WeekDayHeader`illä |
+| §3 Kuukausiruudukko | Tehty `MonthCalendar`illa `java.time`sta |
+| §4 Ikonit | Käytössä `material-icons-extended`; uusia VectorDrawableja ei tarvittu |
+
+**Kaksi asiaa, joita ohjeesta ei toteutettu, ja miksi.** Kumpikin on päätöslistalla ylempänä, mutta
+ne on syytä lukea myös täältä, koska mockup näyttää molemmat:
+
+1. **Askeleet ja Kalorit -renkaat.** Ei datalähdettä. Vaativat Ouran `daily_activity`-endpointin,
+   uuden sarakkeen ja migraation — datapiirre, ei visuaalinen uudistus.
+2. **Neljäs välilehti "Edistyminen".** Vaatisi oikean näytön; placeholder on ohjeessa kielletty.
+
+**Yksi lisäys, jota ohjeessa ei ollut.** Kalenterin päivää täppäämällä alla oleva lista siirtyy
+siihen päivään. Ruudukko oli siihen asti pelkkä kuva: se näytti missä harjoitukset ovat mutta
+niihin ei päässyt siitä käsin.
+
+**Yksi ohjeen aukko, joka löytyi vasta toteutuksessa.** §2:n taulukot eivät nimeä
+`secondaryContainer`-, `onSecondaryContainer`-, `errorContainer`- eikä `onErrorContainer`-rooleja.
+Material 3 täyttää määrittelemättömän roolin omasta perusparetistaan, joten ensimmäinen tonaalinen
+painike piirtyi liilana. Roolit lisättiin `GreenAccent`in ja `RedAccent`in väriperheistä. Sama
+koskee mitä tahansa tulevaa komponenttia, joka tavoittelee roolia jota tämä skeema ei määrittele.

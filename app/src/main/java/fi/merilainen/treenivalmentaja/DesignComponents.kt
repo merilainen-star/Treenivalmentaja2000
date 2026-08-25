@@ -1,6 +1,8 @@
 package fi.merilainen.treenivalmentaja
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,6 +79,8 @@ internal fun MonthCalendar(
   today: LocalDate,
   workouts: List<Workout>,
   modifier: Modifier = Modifier,
+  selectedDate: LocalDate? = null,
+  onDateClick: ((LocalDate) -> Unit)? = null,
 ) {
   var monthText by rememberSaveable(today) { mutableStateOf(YearMonth.from(today).toString()) }
   val month = runCatching { YearMonth.parse(monthText) }.getOrDefault(YearMonth.from(today))
@@ -127,6 +132,7 @@ internal fun MonthCalendar(
           val sessions = date?.let(sessionsByDate::get).orEmpty()
           val completed = sessions.isNotEmpty() && sessions.all { it.status == SessionStatus.COMPLETED }
           val isToday = date == today
+          val isSelected = date != null && date == selectedDate
           val container =
             when {
               isToday -> MaterialTheme.colorScheme.primaryContainer
@@ -141,7 +147,33 @@ internal fun MonthCalendar(
                 .aspectRatio(1f)
                 .padding(2.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(container),
+                .background(container)
+                // The ring marks the day the list below was scrolled to. It is drawn on top of
+                // the container rather than replacing it, so "today" and "selected" can be the
+                // same square without either one disappearing.
+                .then(
+                  if (isSelected) {
+                    Modifier.border(
+                      width = 2.dp,
+                      color = MaterialTheme.colorScheme.primary,
+                      shape = RoundedCornerShape(8.dp),
+                    )
+                  } else {
+                    Modifier
+                  }
+                )
+                .then(
+                  if (date != null && onDateClick != null) {
+                    Modifier.clickable(
+                      onClickLabel = "Näytä ${date.dayOfMonth}. päivän harjoitukset",
+                      role = Role.Button,
+                    ) {
+                      onDateClick(date)
+                    }
+                  } else {
+                    Modifier
+                  }
+                ),
             contentAlignment = Alignment.Center,
           ) {
             if (date != null) {
@@ -169,5 +201,52 @@ internal fun MonthCalendar(
         }
       }
     }
+  }
+}
+
+/**
+ * Duration, movements and rounds as three equal columns.
+ *
+ * Only drawn for a session that has movements: "Liikkeet 0 · Kierrokset 1" on a run states two
+ * facts that are true and useless, and the run's own line already carries its duration.
+ */
+@Composable
+internal fun WorkoutStatColumns(
+  durationMin: Int,
+  movements: Int,
+  rounds: Int,
+  modifier: Modifier = Modifier,
+) {
+  Row(
+    modifier = modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    WorkoutStat("Kesto", "$durationMin min", Modifier.weight(1f))
+    WorkoutStat("Liikkeet", movements.toString(), Modifier.weight(1f))
+    WorkoutStat("Kierrokset", rounds.toString(), Modifier.weight(1f))
+  }
+}
+
+@Composable
+private fun WorkoutStat(label: String, value: String, modifier: Modifier = Modifier) {
+  Column(
+    modifier =
+      modifier
+        .clip(RoundedCornerShape(10.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainer)
+        .padding(vertical = 10.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(2.dp),
+  ) {
+    Text(
+      text = value,
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold,
+    )
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }

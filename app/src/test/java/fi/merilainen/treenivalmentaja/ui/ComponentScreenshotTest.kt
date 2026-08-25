@@ -26,6 +26,9 @@ import fi.merilainen.treenivalmentaja.WorkoutCardWeek
 import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.ThemeCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
+import fi.merilainen.treenivalmentaja.WeekDayHeader
+import fi.merilainen.treenivalmentaja.MonthCalendar
+import fi.merilainen.treenivalmentaja.WorkoutStatColumns
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
 import fi.merilainen.treenivalmentaja.domain.Exercise
@@ -38,6 +41,7 @@ import fi.merilainen.treenivalmentaja.domain.ThemePreference
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
+import java.time.LocalDate
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -571,5 +575,58 @@ class ComponentScreenshotTest {
     @Test
     fun statusBadges_allStatuses() = capture("status_badges_all") {
         SessionStatus.entries.forEach { WorkoutStatusBadge(it) }
+    }
+
+    /** The month grid with a day picked: the ring marks what the list below was moved to. */
+    @Test
+    fun monthCalendar_selectedDay() = capture("card_month_calendar_selected") {
+        MonthCalendar(
+            today = LocalDate.of(2026, 8, 24),
+            workouts = listOf(
+                runningWorkout.copy(id = "c1", dayOffset = 0, status = SessionStatus.PLANNED),
+                runningWorkout.copy(id = "c2", dayOffset = -2, status = SessionStatus.COMPLETED),
+                runningWorkout.copy(id = "c3", dayOffset = 3, status = SessionStatus.PLANNED),
+            ),
+            selectedDate = LocalDate.of(2026, 8, 27),
+            onDateClick = {},
+        )
+    }
+
+    /** Duration, movements and rounds as the three columns the redesign asks for. */
+    @Test
+    fun workoutStatColumns() = capture("card_workout_stat_columns") {
+        WorkoutStatColumns(durationMin = 15, movements = 10, rounds = 2)
+    }
+
+    /**
+     * The three day headings side by side.
+     *
+     * The list always opens on today, so a past heading never appears in a full-screen capture.
+     * This is the only place the tick has a baseline.
+     */
+    @Test
+    fun weekDayHeaders() = capture("card_week_day_headers") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            WeekDayHeader(
+                dayName = "Lauantai 8.8.",
+                dayIndex = -2,
+                dayWorkouts = listOf(runningWorkout.copy(status = SessionStatus.COMPLETED)),
+            )
+            WeekDayHeader(
+                dayName = "Sunnuntai 9.8.",
+                dayIndex = -1,
+                dayWorkouts = listOf(runningWorkout.copy(status = SessionStatus.SKIPPED)),
+            )
+            WeekDayHeader(
+                dayName = "Tänään · 10.8.",
+                dayIndex = 0,
+                dayWorkouts = listOf(runningWorkout),
+            )
+            WeekDayHeader(
+                dayName = "Huomenna · 11.8.",
+                dayIndex = 1,
+                dayWorkouts = listOf(runningWorkout),
+            )
+        }
     }
 }

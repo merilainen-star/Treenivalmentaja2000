@@ -8,6 +8,44 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-08-24
 
 ### Added
+- Ohjatun treenin seuraava liike on oma korttinsa nykyisen alla, ei rivi sen sisällä.
+- Liikeohje on sama pieni painike samalla nimellä sekä valmistautumis- että suoritusruudulla,
+  oikeassa reunassa pois sen painikkeen tieltä joka vie treeniä eteenpäin. Se oli "Näytä liikeohje"
+  täysleveänä toisessa ja "Liikeohje" pienenä toisessa.
+- **Kalenterin päivää täppäämällä alla oleva lista hyppää siihen päivään.** Ruudut ovat
+  klikattavia, valittu päivä saa renkaan, ja lista animoituu riville. Kalenteri tarjoaa kuukauden
+  jokaisen päivän mutta listassa on vain päivät jotka ovat ansainneet rivin, joten päivä jolla ei
+  ole riviä vie lähimpään sellaiseen — tapahtumaton täppäys lukisi rikkinäisenä kontrollina.
+- Tulevan treenin kortissa kolme statussaraketta: Kesto, Liikkeet ja Kierrokset. Vain
+  voimaharjoituksille: `parseStrengthDescription` päättelee liikkeet pilkkuja laskemalla, joten
+  juoksun kuvaus tuotti "Liikkeet 2".
+- Viikkolistan päiväotsikko erottaa menneen, tämän päivän ja tulevan: tehty mennyt päivä saa
+  kuittausmerkin, tänään saa täytetyn korostuksen, tulevat ovat neutraaleja. Aiemmin jokainen
+  päivänimi oli samaa korostusväriä, eli korostus ei erottanut mitään.
+
+### Fixed
+- **Ohjattu treeni aloitti alusta, jos näytöltä poistui ja palasi.** Eteneminen oli
+  `rememberSaveable`issa, joka säilyy prosessin tappamisen yli mutta ei navigaatiokohteen
+  poistamista — takaisin-nuoli vie mukanaan sen tilan jota se piti. Sijainti ja ohitetut liikkeet
+  kirjoitetaan nyt `settings`-DataStoreen jokaisella askeleella, ja näyttö odottaa lukemista
+  piirtämättä mitään: ensimmäisen liikkeen näyttäminen ja hetken päästä korjaaminen kertoisi kesken
+  treenin olevalle että hän aloittaa alusta. Sessiotunnus tallennetaan mukana, jottei toinen treeni
+  peri vanhaa askelnumeroa.
+- Edistymispalkki piirtyi täytenä kun mitään ei ollut vielä tehty: Material 3 ottaa
+  `LinearProgressIndicator`in taustaraidan `secondaryContainer`-roolista, joka tässä paletissa on
+  valmistumisen vihreä. Raidan väri nimetään nyt eksplisiittisesti, myös ajastinrenkaassa.
+- "Seuraavaksi"-kortti listasi liikkeen jota oltiin parhaillaan tekemässä, koska horisontti ylitti
+  kierrosrajan ja seuraava kierros alkaa samalla liikkeellä. Rajattu kuluvaan kierrokseen.
+- **`secondaryContainer`, `onSecondaryContainer`, `errorContainer` ja `onErrorContainer` puuttuivat
+  molemmista väriskeemoista.** Material 3 johtaa puuttuvan roolin omasta perusparetistaan, joten
+  ensimmäinen `FilledTonalButton` piirtyi liilana sovelluksessa jonka paletissa ei ole liilaa.
+  Roolit on nyt määritelty samoista väriperheistä kuin `GreenAccent` ja `RedAccent`.
+- Virhekortin painikkeet piirtyivät sinisinä punaisella pohjalla, koska `TextButton` käyttää
+  oletuksena `primary`-väriä.
+
+
+
+### Added
 - Material 3 Electric Blue -uudistus: yhtenäinen vaalea/tumma paletti, kolme toimivaa
   navigaatiokohdetta, Oura-pisteiden yhteenvetorenkaat ja `java.time`-kalenterista laskettu
   kuukausiruudukko. Material You -dynaamiset värit poistettiin tietoisena käyttäytymismuutoksena;

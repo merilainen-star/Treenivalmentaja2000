@@ -467,6 +467,27 @@ class ScreenScreenshotTest {
     }
 
     /**
+     * Past, today and future in one frame — the three-way split the redesign asks for.
+     *
+     * The list opens on today, so the past headings sit above the captured frame — the tick itself
+     * is covered by `card_week_day_headers`. What this frame is for is the month grid: a completed
+     * past day and a day that was only partly done must read differently from each other and from
+     * today, and that is decided by the calendar rather than by the list.
+     */
+    @Test
+    fun week_pastTodayAndFuture() = capture("screen_week_past_today_future") {
+        WeekScreenContent(
+            workouts = listOf(
+                run(-2, "s-60", status = SessionStatus.COMPLETED),
+                strength(-1, "s-21").copy(status = SessionStatus.SKIPPED),
+                strength(0, "s-24"),
+                strength(1, "s-25"),
+            ),
+            today = FIXED_TODAY,
+        )
+    }
+
+    /**
      * The week with a session Oura recorded, shown **collapsed**.
      *
      * That placement is the decision worth a baseline: scanning the week for what was actually done
