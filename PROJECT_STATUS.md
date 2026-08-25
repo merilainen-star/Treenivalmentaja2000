@@ -16,33 +16,41 @@ a full `recordRoborazziDebug`. No task line carried `FROM-CACHE` or `UP-TO-DATE`
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 646 tests, 0 failures, 0 errors, 0 skipped |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 656 tests, 0 failures, 0 errors, 0 skipped |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 65 comparisons, 0 changed, 65 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,105,695 bytes |
+| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,122,079 bytes |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 53 tests, 0 failures, 0 errors, 0 skipped |
 
 The suite counts include the update-notice work that landed in `14bef1c` as well as this change's
-own additions — four unit tests for `rowIndexForDate` and three screenshot cases.
+own additions: four for `rowIndexForDate`, four for the stored workout position, four for restoring
+and clearing it through the ViewModel, two for the upcoming-movement horizon, and three screenshot
+cases.
 
-**Two of the three defects in this change were caught by looking at the recorded images, not by a
+**Five of the six defects in this change were caught by looking at the recorded images, not by a
 check passing.** A running card said "Liikkeet 2" because `parseStrengthDescription` counts commas,
 and a `FilledTonalButton` came out lilac because neither colour scheme ever defined
 `secondaryContainer` — Material 3 fills a missing role from its own baseline palette.
 `verifyRoborazziDebug` can catch neither: it compares against a baseline recorded from the same
 code. **It prevents a baseline changing by accident; it does not prevent recording the wrong thing
-on purpose.** The third defect — blue actions on a red error container — was the same. Recording is
-not verification, and the step that does the verifying is a person opening the PNGs.
+on purpose.** Blue actions on a red error container, an empty progress bar drawn full-width in the
+colour of completion, and a "next movement" card listing the movement being performed were all
+found the same way — the last two on a run whose five checks were green. Recording is not
+verification, and the step that does the verifying is a person opening the PNGs.
+
+Two of those were caused by the colour-role fix itself. Defining `secondaryContainer` changed every
+component that takes it by default, and `LinearProgressIndicator` takes its **track** from it: an
+empty bar was drawn full-width in green. Filling a gap in a palette is not a local change.
 
 The three colour roles the scheme was missing (`secondaryContainer`, `errorContainer` and their
 `on-` pairs) had been absent since the Material 3 redesign landed. Nothing had used them, so nothing
 had shown it. Any future component that reaches for a role this scheme does not define will draw
 itself from the baseline palette and look like it belongs to a different app.
 
-The APK is 21,105,695 B against the CI-built 21,105,711 B for `14bef1c`; local builds have measured
-16 B under CI on every comparison so far, so this change fits inside the existing alignment page and
-costs nothing measurable. The base was not rebuilt locally, so that is an inference from a
-consistent offset rather than a measured delta.
+The APK is 21,122,079 B against the CI-built 21,105,711 B for `14bef1c` — one 16 KiB alignment page
+over the base, less the 16 B by which local builds have measured under CI on every comparison so
+far. The base was not rebuilt locally, so the delta is read from that consistent offset rather than
+measured directly.
 
 ## Current implementation
 

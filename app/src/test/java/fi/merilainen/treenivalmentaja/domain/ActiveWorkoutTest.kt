@@ -75,6 +75,37 @@ class ActiveWorkoutTest {
     assertTrue(buildActiveWorkoutSteps(session(exercises = emptyList())).isEmpty())
   }
 
+  @Test
+  fun `the movement being performed is never listed as one of the upcoming ones`() {
+    // Two movements, three rounds: round two begins with the movement round one begins with, so a
+    // horizon that crosses the round boundary lists the current movement as "next".
+    val steps =
+      buildActiveWorkoutSteps(
+        session(
+          rounds = 3,
+          exercises = listOf(Exercise("Kahvakuulakyykky", reps = 10), Exercise("Askelkyykky", reps = 8)),
+        )
+      )
+    val firstPerform = steps.indexOfFirst { it is ActiveWorkoutStep.Perform }
+    val current = (steps[firstPerform] as ActiveWorkoutStep.Perform).exercise.name
+
+    val upcoming = upcomingInRound(steps, firstPerform)
+
+    assertEquals(listOf("Askelkyykky"), upcoming)
+    assertTrue(current !in upcoming)
+  }
+
+  @Test
+  fun `the last movement of a round has nothing upcoming`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(rounds = 2, exercises = listOf(Exercise("Kyykky", reps = 5), Exercise("Punnerrus", reps = 5)))
+      )
+    val performs = steps.mapIndexedNotNull { i, step -> i.takeIf { step is ActiveWorkoutStep.Perform } }
+
+    assertTrue(upcomingInRound(steps, performs[1]).isEmpty())
+  }
+
   private fun session(
     rounds: Int = 1,
     roundRestSec: Int? = null,

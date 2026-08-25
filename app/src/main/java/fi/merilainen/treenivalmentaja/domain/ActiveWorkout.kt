@@ -126,3 +126,24 @@ fun List<ActiveWorkoutStep>.skippedMovements(skippedKeys: List<String>): List<Sk
   filterIsInstance<ActiveWorkoutStep.Perform>()
     .filter { it.key() in skippedKeys }
     .map { SkippedMovement(round = it.round, position = it.position, name = it.exercise.name) }
+
+/**
+ * What is still to come **in this round**.
+ *
+ * Crossing the round boundary is what made the card confusing: with two movements and three rounds
+ * it listed the movement being performed right now as one of the upcoming ones, because round two
+ * begins with it. The round break is a step of its own with its own screen, so the round is the
+ * honest horizon here.
+ */
+fun upcomingInRound(
+  steps: List<ActiveWorkoutStep>,
+  current: Int,
+): List<String> {
+  val round = (steps.getOrNull(current) as? ActiveWorkoutStep.Perform)?.round ?: return emptyList()
+  return steps
+    .drop(current + 1)
+    .filterIsInstance<ActiveWorkoutStep.Perform>()
+    .takeWhile { it.round == round }
+    .take(3)
+    .map { it.exercise.name }
+}

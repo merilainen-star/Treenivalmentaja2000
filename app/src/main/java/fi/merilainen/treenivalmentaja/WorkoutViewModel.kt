@@ -36,6 +36,9 @@ import fi.merilainen.treenivalmentaja.data.settings.AdvisorSettingsStore
 import fi.merilainen.treenivalmentaja.data.settings.ThemeSettingsStore
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPosition
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPositionState
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutProgressStore
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
@@ -184,6 +187,7 @@ class WorkoutViewModel(
    * class did everywhere before the store existed.
    */
   private val missedProposalDismissalStore: MissedProposalDismissalStore? = null,
+  private val activeWorkoutProgressStore: ActiveWorkoutProgressStore? = null,
   /**
    * Where the light/dark choice is kept, nullable for the same reason the collaborators above are:
    * it is DataStore-backed, and a ViewModel that could not be built without one would make every
@@ -1312,8 +1316,25 @@ class WorkoutViewModel(
     viewModelScope.launch { store.setConstraints(value) }
   }
 
+  /**
+   * Where the guided session was left, or `null` once it is known there is nothing stored.
+   *
+   * `Loading` is its own state rather than a null: the screen must not draw the first movement
+   * while the read is still in flight, because that is a person being told to start over for the
+   * length of a disk read. Same reasoning as the missed-session refusal, which had exactly that
+   * bug.
+   */
+  private val _activeWorkoutPosition = MutableStateFlow<ActiveWorkoutPositionState>(
+    ActiveWorkoutPositionState.Loading
+  )
+  val activeWorkoutPosition: StateFlow<ActiveWorkoutPositionState> = _activeWorkoutPosition
+
   fun startActiveWorkout(sessionId: String) {
     viewModelScope.launch {
+      // Read the position before anything else: the screen is waiting on it.
+      val stored = activeWorkoutProgressStore?.load()?.takeIf { it.sessionId == sessionId }
+      _activeWorkoutPosition.value = ActiveWorkoutPositionState.Ready(stored)
+
       val session = repository.getSession(sessionId) ?: return@launch
       if (session.status != SessionStatus.STARTED) {
         repository.transition(sessionId, SessionStatus.STARTED, EventSource.USER)
@@ -1321,8 +1342,21 @@ class WorkoutViewModel(
     }
   }
 
+  /** Called on every step the screen takes, so leaving it loses nothing. */
+  fun saveActiveWorkoutPosition(sessionId: String, stepIndex: Int, skippedKeys: List<String>) {
+    viewModelScope.launch {
+      activeWorkoutProgressStore?.save(
+        ActiveWorkoutPosition(sessionId = sessionId, stepIndex = stepIndex, skippedKeys = skippedKeys)
+      )
+    }
+  }
+
   fun completeActiveWorkout(sessionId: String, outcome: ActiveWorkoutOutcome) {
-    viewModelScope.launch { repository.completeActiveWorkout(sessionId, outcome) }
+    viewModelScope.launch {
+      repository.completeActiveWorkout(sessionId, outcome)
+      activeWorkoutProgressStore?.clear()
+      _activeWorkoutPosition.value = ActiveWorkoutPositionState.Ready(null)
+    }
   }
 
   fun updateWorkoutStatus(workoutId: String, newStatus: SessionStatus) {
@@ -1514,6 +1548,7 @@ class WorkoutViewModel(
           analysisPromptBuilder = application.analysisPromptBuilder,
           advisorSettingsStore = application.advisorSettingsStore,
           missedProposalDismissalStore = application.missedProposalDismissalStore,
+          activeWorkoutProgressStore = application.activeWorkoutProgressStore,
           themeSettingsStore = application.themeSettingsStore,
           installUpdateUseCase = application.installUpdateUseCase,
         )

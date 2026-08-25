@@ -27,6 +27,11 @@ import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.LoadExerciseGuideUseCase
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPosition
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPositionState
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutProgressStore
+import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
@@ -137,12 +142,28 @@ class WorkoutViewModelTest {
   }
 
   /** An in-memory [MissedProposalDismissalStore]: DataStore's persistence without its IO. */
+  private val progressStore = FakeProgressStore()
+
   private class FakeDismissalStore(var dismissedFor: LocalDate? = null) :
     MissedProposalDismissalStore {
     override suspend fun dismissedFor(): LocalDate? = dismissedFor
 
     override suspend fun setDismissedFor(date: LocalDate) {
       dismissedFor = date
+    }
+  }
+
+  /** An in-memory [ActiveWorkoutProgressStore]: DataStore's persistence without its IO. */
+  private class FakeProgressStore(var stored: ActiveWorkoutPosition? = null) :
+    ActiveWorkoutProgressStore {
+    override suspend fun load(): ActiveWorkoutPosition? = stored
+
+    override suspend fun save(position: ActiveWorkoutPosition) {
+      stored = position
+    }
+
+    override suspend fun clear() {
+      stored = null
     }
   }
 
@@ -203,6 +224,7 @@ class WorkoutViewModelTest {
           dao = db.ouraDao(),
         ),
       missedProposalDismissalStore = dismissalStore,
+      activeWorkoutProgressStore = progressStore,
     )
   }
 
@@ -686,5 +708,66 @@ class WorkoutViewModelTest {
         ]
       }
       """
+  }
+
+  @Test
+  fun `an interrupted workout resumes where it was left, not at the first movement`() =
+    runTest(dispatcher) {
+      val vm = viewModel()
+      advanceUntilIdle()
+      // No session needs to exist in the database: the position is read before the session is
+      // looked up, precisely so a slow or failed lookup cannot decide where the workout resumes.
+      val sessionId = "s-1"
+      progressStore.stored = ActiveWorkoutPosition(sessionId, stepIndex = 5, skippedKeys = listOf("1:2"))
+
+      vm.startActiveWorkout(sessionId)
+      advanceUntilIdle()
+
+      val state = vm.activeWorkoutPosition.value
+      assertTrue(state is ActiveWorkoutPositionState.Ready)
+      assertEquals(5, (state as ActiveWorkoutPositionState.Ready).value?.stepIndex)
+      assertEquals(listOf("1:2"), state.value?.skippedKeys)
+    }
+
+  @Test
+  fun `a position stored for another session is not inherited`() = runTest(dispatcher) {
+    val vm = viewModel()
+    advanceUntilIdle()
+    val sessionId = "s-1"
+    progressStore.stored = ActiveWorkoutPosition("some-other-session", stepIndex = 9)
+
+    vm.startActiveWorkout(sessionId)
+    advanceUntilIdle()
+
+    val state = vm.activeWorkoutPosition.value as ActiveWorkoutPositionState.Ready
+    assertNull(state.value)
+  }
+
+  @Test
+  fun `the position is not Ready until it has actually been read`() = runTest(dispatcher) {
+    val vm = viewModel()
+    advanceUntilIdle()
+
+    // Before startActiveWorkout runs there is nothing to report, and the screen must wait rather
+    // than draw the first movement and correct itself.
+    assertTrue(vm.activeWorkoutPosition.value is ActiveWorkoutPositionState.Loading)
+  }
+
+  @Test
+  fun `finishing the workout clears the stored position`() = runTest(dispatcher) {
+    val vm = viewModel()
+    advanceUntilIdle()
+    val sessionId = "s-1"
+    vm.saveActiveWorkoutPosition(sessionId, stepIndex = 4, skippedKeys = emptyList())
+    advanceUntilIdle()
+    assertEquals(4, progressStore.stored?.stepIndex)
+
+    vm.completeActiveWorkout(
+      sessionId,
+      ActiveWorkoutOutcome(guided = GuidedProgress(done = 3, rounds = 1, perRound = 3)),
+    )
+    advanceUntilIdle()
+
+    assertNull(progressStore.stored)
   }
 }
