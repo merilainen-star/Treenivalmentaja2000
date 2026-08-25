@@ -23,7 +23,18 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   kuittausmerkin, tänään saa täytetyn korostuksen, tulevat ovat neutraaleja. Aiemmin jokainen
   päivänimi oli samaa korostusväriä, eli korostus ei erottanut mitään.
 
+### Changed
+- Tänään-kortin täppälista poistui voimaharjoituksilta, joiden liikkeet ovat suunnitelmassa: ohjattu
+  tila omistaa etenemisen, eikä samoja liikkeitä tarvitse kuitata kahdessa paikassa. Kortti näyttää
+  liikkeet luettavana listana, liikeohjeineen. Lista jää niille sessioille, joiden liikkeet on
+  jäsennetty kuvauksesta — ohjattu tila ei osaa ottaa niitä, joten se on niille ainoa tapa pitää lukua.
+
 ### Fixed
+- **Ohitettu liike ei ole enää mikään mihin voi palata.** "Edellinen vaihe" siirtyi yhden askeleen
+  taaksepäin ehdoitta, eli suoraan ohitetun liikkeen päälle — ja tallensi sen jatkamiskohdaksi.
+  Ohitettu liike omistaa nyt kolme vaihetta: valmistautumisruutunsa, itsensä ja sitä seuraavan levon.
+  Kaikki kolme ovat näkymättömiä eteenpäin, taaksepäin ja jatkettaessa. Kierrostauko ei ole niiden
+  joukossa: se kuuluu kierrosten väliin eikä yhteenkään liikkeeseen.
 - **Ohjattu treeni aloitti alusta, jos näytöltä poistui ja palasi.** Eteneminen oli
   `rememberSaveable`issa, joka säilyy prosessin tappamisen yli mutta ei navigaatiokohteen
   poistamista — takaisin-nuoli vie mukanaan sen tilan jota se piti. Sijainti ja ohitetut liikkeet
