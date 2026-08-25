@@ -735,7 +735,12 @@ fun WorkoutCardToday(
             // Reading the description instead was what made a started workout lose the guide links
             // and hand a per-side hold a single clock.
             val fromPlan = workout.exercises.isNotEmpty()
-            val guided = isInteractive && (fromPlan || parsedWorkout.exercises.isNotEmpty())
+            // Two places to tick the same movements off is one too many. Active Workout Mode owns
+            // the progress of a session it can run, so the card falls back to the read-only list
+            // and lets the button be the way in. The checklist stays for sessions the full-screen
+            // mode cannot take — those whose movements were parsed out of the description rather
+            // than authored — because for them it is still the only way to keep count.
+            val guided = isInteractive && !fromPlan && parsedWorkout.exercises.isNotEmpty()
 
             if (guided) {
                 if (parsedWorkout.intro.isNotBlank()) {

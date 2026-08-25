@@ -6,26 +6,37 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-08-24
-- Base commit: working tree for the UI redesign remainder on top of `14bef1c`
+- Base commit: working tree for the guided-workout feedback on top of `e3d5d4a`
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
 
-All five ran in one invocation with `--rerun-tasks` and a cleared `app/build/test-results`, after
-a full `recordRoborazziDebug`. No task line carried `FROM-CACHE` or `UP-TO-DATE`.
+The first four ran in one invocation with `--rerun-tasks` after a full `recordRoborazziDebug`; the
+instrumented run is separate and is the reason why. No task line carried `FROM-CACHE` or
+`UP-TO-DATE`.
+
+**The instrumented suite cannot share an emulator with hand testing.** It failed once here on
+`ReminderReceiverNoPermissionTest` — `expected:<PLANNED> but was:<NOTIFIED>` — because the app had
+been installed by hand for a person to try, and they had granted the notification permission the
+test needs *denied*. Runtime grants survive a reinstall of the same package, so the test ran in a
+state it does not assume. Re-run after `adb uninstall`, it passed. Two further lessons from the same
+session: Gradle uninstalls the app when the run ends, taking the hand-tester's imported plan with
+it; and a Gradle daemon holding `R.jar` open failed a run with `IOException: Couldn't delete` — the
+same Windows file-lock class as the earlier `classes.jar` failure, cured by `--stop` and deleting
+the intermediate. Neither was a code failure, and both cost a full run to tell apart from one.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 656 tests, 0 failures, 0 errors, 0 skipped |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 663 tests, 0 failures, 0 errors, 0 skipped |
 | Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 65 comparisons, 0 changed, 65 unchanged |
 | Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
 | Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,122,079 bytes |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 53 tests, 0 failures, 0 errors, 0 skipped |
 
-The suite counts include the update-notice work that landed in `14bef1c` as well as this change's
-own additions: four for `rowIndexForDate`, four for the stored workout position, four for restoring
-and clearing it through the ViewModel, two for the upcoming-movement horizon, and three screenshot
-cases.
+This change adds seven more: four proving that navigation never lands on a skipped movement — back,
+resume, and both from the movement itself and from its preparation screen — and three for the rest
+that belongs to a skipped movement, including that an ordinary movement still leads to its own rest
+and that the round break survives.
 
 **Five of the six defects in this change were caught by looking at the recorded images, not by a
 check passing.** A running card said "Liikkeet 2" because `parseStrengthDescription` counts commas,
@@ -47,10 +58,8 @@ The three colour roles the scheme was missing (`secondaryContainer`, `errorConta
 had shown it. Any future component that reaches for a role this scheme does not define will draw
 itself from the baseline palette and look like it belongs to a different app.
 
-The APK is 21,122,079 B against the CI-built 21,105,711 B for `14bef1c` — one 16 KiB alignment page
-over the base, less the 16 B by which local builds have measured under CI on every comparison so
-far. The base was not rebuilt locally, so the delta is read from that consistent offset rather than
-measured directly.
+The APK is 21,122,079 B — unchanged from the previous measurement, so this change fits inside the
+existing alignment page.
 
 ## Current implementation
 

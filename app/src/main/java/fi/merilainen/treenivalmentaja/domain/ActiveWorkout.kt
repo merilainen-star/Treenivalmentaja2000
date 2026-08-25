@@ -147,3 +147,61 @@ fun upcomingInRound(
     .take(3)
     .map { it.exercise.name }
 }
+
+/**
+ * Is the step at [index] part of a movement that was skipped?
+ *
+ * A skipped movement owns three steps — its preparation screen, the movement, and the rest that
+ * follows it — and all three have to be invisible to navigation. Preparing for a movement you
+ * declined is the same thing as the movement; and a rest exists to recover from work that, in this
+ * case, was not done.
+ *
+ * The round break is deliberately not one of them: it belongs to the turn between rounds rather
+ * than to any single movement, so skipping the last movement of a round does not abolish it.
+ */
+fun List<ActiveWorkoutStep>.belongsToSkipped(index: Int, skippedKeys: List<String>): Boolean =
+  when (val step = getOrNull(index)) {
+    is ActiveWorkoutStep.Perform -> step.key() in skippedKeys
+    is ActiveWorkoutStep.Prepare ->
+      (getOrNull(index + 1) as? ActiveWorkoutStep.Perform)?.key() in skippedKeys
+    // A Rest is only ever emitted straight after the movement it belongs to.
+    is ActiveWorkoutStep.Rest ->
+      (getOrNull(index - 1) as? ActiveWorkoutStep.Perform)?.key() in skippedKeys
+    else -> false
+  }
+
+/**
+ * The step "Edellinen vaihe" should go to, skipping over anything that was left behind.
+ *
+ * Walking back one index at a time landed straight on a movement that had been skipped — and then
+ * offered it again as the next thing to do, which is the opposite of what skipping meant. Returns
+ * [from] unchanged when there is nothing behind it to go back to, so the caller can hide the
+ * control rather than offer one that does nothing.
+ */
+fun List<ActiveWorkoutStep>.previousStep(from: Int, skippedKeys: List<String>): Int {
+  for (i in (from - 1) downTo 0) {
+    if (!belongsToSkipped(i, skippedKeys)) return i
+  }
+  return from
+}
+
+/**
+ * Where a resumed workout should actually open.
+ *
+ * The stored index can name a skipped movement — skip one, walk back, leave, return — so a resume
+ * moves forward off it rather than putting a person back in front of the thing they declined.
+ */
+fun List<ActiveWorkoutStep>.resumeIndex(stored: Int, skippedKeys: List<String>): Int {
+  if (isEmpty()) return 0
+  var i = stored.coerceIn(0, lastIndex)
+  while (i < lastIndex && belongsToSkipped(i, skippedKeys)) i++
+  return i
+}
+
+/** The step to advance to, passing over anything belonging to a movement that was skipped. */
+fun List<ActiveWorkoutStep>.nextStep(from: Int, skippedKeys: List<String>): Int {
+  if (isEmpty()) return 0
+  var i = (from + 1).coerceAtMost(lastIndex)
+  while (i < lastIndex && belongsToSkipped(i, skippedKeys)) i++
+  return i
+}

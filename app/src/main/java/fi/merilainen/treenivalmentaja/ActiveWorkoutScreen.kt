@@ -60,6 +60,9 @@ import fi.merilainen.treenivalmentaja.domain.buildActiveWorkoutSteps
 import fi.merilainen.treenivalmentaja.domain.completedMovements
 import fi.merilainen.treenivalmentaja.domain.key
 import fi.merilainen.treenivalmentaja.domain.skippedMovements
+import fi.merilainen.treenivalmentaja.domain.nextStep
+import fi.merilainen.treenivalmentaja.domain.previousStep
+import fi.merilainen.treenivalmentaja.domain.resumeIndex
 import fi.merilainen.treenivalmentaja.domain.upcomingInRound
 import kotlin.math.ceil
 import kotlinx.coroutines.delay
@@ -108,6 +111,7 @@ fun ActiveWorkoutScreen(
     initialOverviewVisible = restored == null,
     initialStepIndex = restored?.stepIndex ?: 0,
     initialSkippedKeys = restored?.skippedKeys.orEmpty(),
+    resumed = restored != null,
     onPositionChange = { stepIndex, skippedKeys ->
       viewModel.saveActiveWorkoutPosition(sessionId, stepIndex, skippedKeys)
     },
@@ -133,6 +137,7 @@ fun ActiveWorkoutContent(
   initialOverviewVisible: Boolean = true,
   initialStepIndex: Int = 0,
   initialSkippedKeys: List<String> = emptyList(),
+  resumed: Boolean = false,
   onPositionChange: (Int, List<String>) -> Unit = { _, _ -> },
   trackElapsed: Boolean = true,
 ) {
@@ -141,8 +146,14 @@ fun ActiveWorkoutContent(
       buildActiveWorkoutSteps(workout.exercises, workout.rounds, workout.roundRestSec)
     }
   var overviewVisible by rememberSaveable(workout.id) { mutableStateOf(initialOverviewVisible) }
-  var stepIndex by rememberSaveable(workout.id, steps.size) { mutableIntStateOf(initialStepIndex) }
   var skippedIds by rememberSaveable(workout.id, steps.size) { mutableStateOf(initialSkippedKeys) }
+  // A stored index can name a skipped movement — skip one, walk back, leave, return — so a resume
+  // moves forward off it rather than reopening the thing that was declined.
+  var stepIndex by rememberSaveable(workout.id, steps.size) {
+    mutableIntStateOf(
+      if (resumed) steps.resumeIndex(initialStepIndex, initialSkippedKeys) else initialStepIndex
+    )
+  }
   val startedAt = rememberSaveable(workout.id) { System.currentTimeMillis() }
   val elapsedSec = if (trackElapsed) rememberElapsedSeconds(startedAt) else 0
 
@@ -216,16 +227,19 @@ fun ActiveWorkoutContent(
           PrepareStepCard(
             step = step,
             onExerciseClick = onExerciseClick,
-            onReady = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
+            onReady = { stepIndex = steps.nextStep(safeIndex, skippedIds) },
           )
         is ActiveWorkoutStep.Perform -> {
           PerformStepCard(
             step = step,
             onExerciseClick = onExerciseClick,
-            onDone = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
+            onDone = { stepIndex = steps.nextStep(safeIndex, skippedIds) },
             onSkip = {
-              skippedIds = (skippedIds + step.key()).distinct()
-              stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex)
+              // The new list has to exist before the jump is computed: the movement being skipped
+              // is what the rest after it hangs on, and that rest is what we are stepping over.
+              val keys = (skippedIds + step.key()).distinct()
+              skippedIds = keys
+              stepIndex = steps.nextStep(safeIndex, keys)
             },
           )
           UpcomingCard(upcoming = upcomingInRound(steps, safeIndex))
@@ -235,14 +249,14 @@ fun ActiveWorkoutContent(
             title = "Lepo",
             seconds = step.seconds,
             next = "Seuraavaksi ${step.nextExerciseName}",
-            onFinished = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
+            onFinished = { stepIndex = steps.nextStep(safeIndex, skippedIds) },
           )
         is ActiveWorkoutStep.RoundBreak ->
           CountdownStepCard(
             title = "Kierrostauko",
             seconds = step.seconds,
             next = "Seuraavaksi kierros ${step.nextRound}",
-            onFinished = { stepIndex = (safeIndex + 1).coerceAtMost(steps.lastIndex) },
+            onFinished = { stepIndex = steps.nextStep(safeIndex, skippedIds) },
           )
         ActiveWorkoutStep.Finish -> {
           val skipped = steps.skippedMovements(skippedIds)
@@ -269,8 +283,11 @@ fun ActiveWorkoutContent(
         }
       }
 
-      if (safeIndex > 0 && step !is ActiveWorkoutStep.Finish) {
-        OutlinedButton(onClick = { stepIndex = safeIndex - 1 }, modifier = Modifier.fillMaxWidth()) {
+      // Skipped movements are invisible to this button. Stepping back onto one and being offered
+      // it again as the next thing to do is the opposite of what skipping meant.
+      val previous = steps.previousStep(safeIndex, skippedIds)
+      if (previous != safeIndex && step !is ActiveWorkoutStep.Finish) {
+        OutlinedButton(onClick = { stepIndex = previous }, modifier = Modifier.fillMaxWidth()) {
           Text("Edellinen vaihe")
         }
       }

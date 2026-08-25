@@ -106,6 +106,126 @@ class ActiveWorkoutTest {
     assertTrue(upcomingInRound(steps, performs[1]).isEmpty())
   }
 
+  @Test
+  fun `going back never lands on a movement that was skipped`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(
+          exercises =
+            listOf(
+              Exercise("Kyykky", reps = 5),
+              Exercise("Lankku", durationSec = 15),
+              Exercise("Punnerrus", reps = 5),
+            )
+        )
+      )
+    val performs = steps.mapIndexedNotNull { i, s -> i.takeIf { s is ActiveWorkoutStep.Perform } }
+    // Kyykky skipped, then Lankku and Punnerrus done: standing on the last movement.
+    val skipped = listOf((steps[performs[0]] as ActiveWorkoutStep.Perform).key())
+
+    val back = steps.previousStep(performs[2], skipped)
+
+    // Lands on Punnerrus's own preparation screen, and going back again reaches Lankku — never
+    // Kyykky, and never Kyykky's preparation screen either.
+    assertTrue(back < performs[2])
+    assertTrue(steps.previousStep(back, skipped) < back)
+    var i = performs[2]
+    repeat(6) {
+      i = steps.previousStep(i, skipped)
+      assertTrue(!steps.belongsToSkipped(i, skipped))
+    }
+  }
+
+  @Test
+  fun `a resumed workout moves off a skipped movement rather than reopening it`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(exercises = listOf(Exercise("Kyykky", reps = 5), Exercise("Punnerrus", reps = 5)))
+      )
+    val performs = steps.mapIndexedNotNull { i, s -> i.takeIf { s is ActiveWorkoutStep.Perform } }
+    val skipped = listOf((steps[performs[0]] as ActiveWorkoutStep.Perform).key())
+
+    // Stored right on the skipped movement, and on its preparation screen.
+    assertTrue(!steps.belongsToSkipped(steps.resumeIndex(performs[0], skipped), skipped))
+    assertTrue(!steps.belongsToSkipped(steps.resumeIndex(performs[0] - 1, skipped), skipped))
+  }
+
+  @Test
+  fun `an ordinary resume opens exactly where it was left`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(exercises = listOf(Exercise("Kyykky", reps = 5), Exercise("Punnerrus", reps = 5)))
+      )
+
+    assertEquals(3, steps.resumeIndex(3, emptyList()))
+    assertEquals(0, steps.resumeIndex(0, emptyList()))
+  }
+
+  @Test
+  fun `nothing behind the first step is reported as nowhere to go`() {
+    val steps = buildActiveWorkoutSteps(session(exercises = listOf(Exercise("Kyykky", reps = 5))))
+
+    assertEquals(0, steps.previousStep(0, emptyList()))
+  }
+
+  @Test
+  fun `skipping a movement skips the rest that belonged to it`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(
+          exercises =
+            listOf(
+              Exercise("Kyykky", reps = 5, restSec = 10),
+              Exercise("Punnerrus", reps = 5),
+            )
+        )
+      )
+    val kyykky = steps.indexOfFirst { it is ActiveWorkoutStep.Perform }
+    val skipped = listOf((steps[kyykky] as ActiveWorkoutStep.Perform).key())
+
+    // Straight after Kyykky comes its rest; skipping Kyykky must land past it.
+    assertTrue(steps[kyykky + 1] is ActiveWorkoutStep.Rest)
+    val landed = steps.nextStep(kyykky, skipped)
+    assertTrue(steps[landed] !is ActiveWorkoutStep.Rest)
+    assertEquals("Punnerrus", (steps[landed] as ActiveWorkoutStep.Prepare).exercise.name)
+  }
+
+  @Test
+  fun `a rest is only skipped when its own movement was`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(
+          exercises =
+            listOf(
+              Exercise("Kyykky", reps = 5, restSec = 10),
+              Exercise("Punnerrus", reps = 5),
+            )
+        )
+      )
+    val kyykky = steps.indexOfFirst { it is ActiveWorkoutStep.Perform }
+
+    // Nothing skipped: doing Kyykky leads to its rest, exactly as before.
+    assertTrue(steps[steps.nextStep(kyykky, emptyList())] is ActiveWorkoutStep.Rest)
+  }
+
+  @Test
+  fun `the round break survives skipping the last movement of the round`() {
+    val steps =
+      buildActiveWorkoutSteps(
+        session(
+          rounds = 2,
+          roundRestSec = 20,
+          exercises = listOf(Exercise("Kyykky", reps = 5), Exercise("Punnerrus", reps = 5)),
+        )
+      )
+    val performs = steps.mapIndexedNotNull { i, s -> i.takeIf { s is ActiveWorkoutStep.Perform } }
+    val lastOfRound = performs[1]
+    val skipped = listOf((steps[lastOfRound] as ActiveWorkoutStep.Perform).key())
+
+    // The break belongs to the turn between rounds, not to the movement before it.
+    assertTrue(steps[steps.nextStep(lastOfRound, skipped)] is ActiveWorkoutStep.RoundBreak)
+  }
+
   private fun session(
     rounds: Int = 1,
     roundRestSec: Int? = null,
