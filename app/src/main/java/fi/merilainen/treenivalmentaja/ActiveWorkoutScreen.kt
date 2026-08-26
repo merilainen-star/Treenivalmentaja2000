@@ -415,9 +415,11 @@ private fun PerformStepCard(
       )
       val prescription = step.exercise.prescription(verbose = true)
       if (prescription.isNotBlank()) {
+        // Same size as the name: this is read from the floor mid-movement, not glanced at from a
+        // hand holding the phone, and "kuinka monta" is as essential there as "mikä liike".
         Text(
           prescription,
-          style = MaterialTheme.typography.titleMedium,
+          style = MaterialTheme.typography.headlineMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           textAlign = TextAlign.Center,
         )
