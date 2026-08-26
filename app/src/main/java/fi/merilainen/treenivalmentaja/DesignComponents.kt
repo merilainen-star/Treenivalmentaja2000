@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -34,9 +36,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.WorkoutType
+import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
+import fi.merilainen.treenivalmentaja.ui.theme.ColorGreen
+import fi.merilainen.treenivalmentaja.ui.theme.ColorRed
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
 
@@ -73,129 +78,124 @@ internal fun MetricRing(
   }
 }
 
-/** A real Gregorian month grid. Mockup coordinates are never used as calendar data. */
+/**
+ * The week, seven days wide.
+ *
+ * This replaced a full month grid. The month took a third of the screen to answer a question nobody
+ * was asking on this screen — the list underneath is what people read, and the grid was pushing it
+ * below the fold. A week is what a training plan is written in anyway.
+ *
+ * Under each day sit up to three dots, coloured by what kind of session was on that day. The colour
+ * is the same one the session's own row carries, so the strip and the list agree without a legend.
+ */
 @Composable
-internal fun MonthCalendar(
+internal fun WeekStrip(
   today: LocalDate,
   workouts: List<Workout>,
   modifier: Modifier = Modifier,
   selectedDate: LocalDate? = null,
   onDateClick: ((LocalDate) -> Unit)? = null,
 ) {
-  var monthText by rememberSaveable(today) { mutableStateOf(YearMonth.from(today).toString()) }
-  val month = runCatching { YearMonth.parse(monthText) }.getOrDefault(YearMonth.from(today))
-  val sessionsByDate =
-    workouts.groupBy { workout -> today.plusDays(workout.dayOffset.toLong()) }
-  val first = month.atDay(1)
-  val leading = (first.dayOfWeek.value - DayOfWeek.MONDAY.value + 7) % 7
-  val cells = List(42) { index ->
-    val day = index - leading + 1
-    day.takeIf { it in 1..month.lengthOfMonth() }?.let(month::atDay)
-  }
+  val anchor = selectedDate ?: today
+  var weekOffset by rememberSaveable(today) { mutableIntStateOf(0) }
+  val monday =
+    anchor.minusDays((anchor.dayOfWeek.value - DayOfWeek.MONDAY.value).toLong())
+      .plusWeeks(weekOffset.toLong())
+  val days = List(7) { monday.plusDays(it.toLong()) }
+  val byDate = workouts.groupBy { today.plusDays(it.dayOffset.toLong()) }
 
-  Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
     Row(
       modifier = Modifier.fillMaxWidth(),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-      IconButton(onClick = { monthText = month.minusMonths(1).toString() }) {
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Edellinen kuukausi")
+      IconButton(onClick = { weekOffset-- }) {
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Edellinen viikko")
       }
       Text(
         text =
-          month.month
+          monday.month
             .getDisplayName(TextStyle.FULL_STANDALONE, Locale.forLanguageTag("fi-FI"))
-            .replaceFirstChar { it.uppercase(Locale.forLanguageTag("fi-FI")) } + " ${month.year}",
+            .replaceFirstChar { it.uppercase(Locale.forLanguageTag("fi-FI")) } + " ${monday.year}",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
       )
-      IconButton(onClick = { monthText = month.plusMonths(1).toString() }) {
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Seuraava kuukausi")
+      IconButton(onClick = { weekOffset++ }) {
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Seuraava viikko")
       }
     }
 
-    Row(modifier = Modifier.fillMaxWidth()) {
-      listOf("Ma", "Ti", "Ke", "To", "Pe", "La", "Su").forEach { day ->
-        Text(
-          text = day,
-          modifier = Modifier.weight(1f),
-          style = MaterialTheme.typography.labelMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-    }
-
-    cells.chunked(7).forEach { week ->
-      Row(modifier = Modifier.fillMaxWidth()) {
-        week.forEach { date ->
-          val sessions = date?.let(sessionsByDate::get).orEmpty()
-          val completed = sessions.isNotEmpty() && sessions.all { it.status == SessionStatus.COMPLETED }
-          val isToday = date == today
-          val isSelected = date != null && date == selectedDate
-          val container =
-            when {
-              isToday -> MaterialTheme.colorScheme.primaryContainer
-              completed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-              sessions.isNotEmpty() -> MaterialTheme.colorScheme.surfaceContainerHigh
-              else -> Color.Transparent
-            }
-          Box(
-            modifier =
-              Modifier
-                .weight(1f)
-                .aspectRatio(1f)
-                .padding(2.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(container)
-                // The ring marks the day the list below was scrolled to. It is drawn on top of
-                // the container rather than replacing it, so "today" and "selected" can be the
-                // same square without either one disappearing.
-                .then(
-                  if (isSelected) {
-                    Modifier.border(
-                      width = 2.dp,
-                      color = MaterialTheme.colorScheme.primary,
-                      shape = RoundedCornerShape(8.dp),
-                    )
-                  } else {
-                    Modifier
-                  }
-                )
-                .then(
-                  if (date != null && onDateClick != null) {
-                    Modifier.clickable(
-                      onClickLabel = "Näytä ${date.dayOfMonth}. päivän harjoitukset",
-                      role = Role.Button,
-                    ) {
-                      onDateClick(date)
-                    }
-                  } else {
-                    Modifier
-                  }
-                ),
-            contentAlignment = Alignment.Center,
-          ) {
-            if (date != null) {
-              Text(
-                text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = if (isToday || completed) FontWeight.Bold else FontWeight.Normal,
-                color =
-                  if (isToday) MaterialTheme.colorScheme.onPrimaryContainer
-                  else MaterialTheme.colorScheme.onSurface,
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+      days.forEach { date ->
+        val sessions = byDate[date].orEmpty()
+        val isToday = date == today
+        val isSelected = date == selectedDate
+        Column(
+          modifier =
+            Modifier
+              .weight(1f)
+              .clip(RoundedCornerShape(10.dp))
+              .background(
+                when {
+                  isToday -> MaterialTheme.colorScheme.primary
+                  else -> MaterialTheme.colorScheme.surfaceContainerHigh
+                }
               )
-              if (sessions.isNotEmpty()) {
-                Box(
-                  modifier =
-                    Modifier
-                      .align(Alignment.BottomCenter)
-                      .padding(bottom = 3.dp)
-                      .size(4.dp)
-                      .clip(CircleShape)
-                      .background(MaterialTheme.colorScheme.primary)
-                )
-              }
+              .then(
+                if (isSelected && !isToday) {
+                  Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                } else {
+                  Modifier
+                }
+              )
+              .then(
+                if (onDateClick != null) {
+                  Modifier.clickable(
+                    onClickLabel = "Näytä ${date.dayOfMonth}. päivän harjoitukset",
+                    role = Role.Button,
+                  ) { onDateClick(date) }
+                } else {
+                  Modifier
+                }
+              )
+              .padding(vertical = 8.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+          Text(
+            text =
+              date.dayOfWeek
+                .getDisplayName(TextStyle.SHORT, Locale.forLanguageTag("fi-FI"))
+                .replaceFirstChar { it.uppercase(Locale.forLanguageTag("fi-FI")) }
+                .take(2),
+            style = MaterialTheme.typography.labelSmall,
+            color =
+              if (isToday) MaterialTheme.colorScheme.onPrimary
+              else MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          Text(
+            text = date.dayOfMonth.toString(),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color =
+              if (isToday) MaterialTheme.colorScheme.onPrimary
+              else MaterialTheme.colorScheme.onSurface,
+          )
+          // A fixed-height strip whether or not there are dots, so the day numbers stay on one
+          // line across the week instead of jumping wherever a session happens to be.
+          Row(
+            modifier = Modifier.height(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+          ) {
+            sessions.take(3).forEach { session ->
+              Box(
+                modifier =
+                  Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(workoutTypeColor(session.type))
+              )
             }
           }
         }
@@ -203,6 +203,14 @@ internal fun MonthCalendar(
     }
   }
 }
+
+/** The colour a session's kind is drawn in, wherever it appears. */
+internal fun workoutTypeColor(type: WorkoutType): Color =
+  when (type) {
+    WorkoutType.RUNNING -> ColorBlue
+    WorkoutType.STRENGTH -> ColorGreen
+    WorkoutType.SKIING -> ColorRed
+  }
 
 /**
  * Duration, movements and rounds as three equal columns.

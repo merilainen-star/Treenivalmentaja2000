@@ -25,6 +25,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -45,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,6 +68,7 @@ import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
+import fi.merilainen.treenivalmentaja.domain.uniformSetsAndReps
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.ColorBlue
@@ -262,7 +267,7 @@ fun WeekScreenContent(
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         ) {
-            MonthCalendar(
+            WeekStrip(
                 today = today,
                 workouts = workouts,
                 modifier = Modifier.padding(12.dp),
@@ -460,11 +465,7 @@ fun WorkoutCardWeek(
     onApplyPlanProposal: () -> Unit = {},
     onDismissPlanProposal: () -> Unit = {},
 ) {
-    val indicatorColor = when (workout.type) {
-        WorkoutType.RUNNING -> ColorBlue
-        WorkoutType.STRENGTH -> ColorGreen
-        WorkoutType.SKIING -> ColorRed
-    }
+    val indicatorColor = workoutTypeColor(workout.type)
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         label = "chevron"
@@ -584,6 +585,7 @@ fun WorkoutCardWeek(
         ) {
             Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
                 HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+                SessionSummaryRows(workout = workout, completed = completed)
                 WorkoutDetails(workout, onExerciseClick = onExerciseClick)
                 // Inside the expanded content, not the collapsed header: an analysis is something
                 // you go looking for, and a button on every collapsed row would compete with the
@@ -629,6 +631,66 @@ internal fun dayLabel(today: LocalDate, offset: Int): String {
 private val FINNISH = Locale("fi", "FI")
 
 /** Four weeks back and four forward, before the plan's own span is taken into account. */
+/**
+ * The session's core numbers, one labelled line each.
+ *
+ * What is here is what the database can answer. Two of the rows are conditional and that is the
+ * point of them: a heart rate exists only once Oura has recorded the session, and the sets line
+ * exists only when every movement agrees on one — see [uniformSetsAndReps]. A circuit gets its
+ * round count instead, because that is the number a circuit actually shares.
+ */
+@Composable
+private fun SessionSummaryRows(workout: Workout, completed: CompletedSessionMetrics?) {
+    val sets = uniformSetsAndReps(workout.exercises)
+    Column(
+        modifier = Modifier.padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        when {
+            sets != null -> SummaryRow(Icons.Default.FitnessCenter, "Sarjat", sets)
+            workout.rounds > 1 && workout.exercises.isNotEmpty() ->
+                SummaryRow(
+                    Icons.Default.FitnessCenter,
+                    "Kierrokset",
+                    "${workout.rounds} × ${workout.exercises.size} liikettä",
+                )
+        }
+        SummaryRow(
+            icon = Icons.Default.Schedule,
+            label = "Kesto",
+            // Planned first, then what it took. Replacing the plan with the outcome would lose
+            // the comparison, which is the only reason to show both.
+            value =
+                if (completed != null) "${workout.durationMin} min / ${completed.durationMin} min toteutunut"
+                else "${workout.durationMin} min",
+        )
+        completed?.avgHeartRate?.let {
+            SummaryRow(Icons.Default.Favorite, "Keskisyke", "$it bpm")
+        }
+    }
+}
+
+@Composable
+private fun SummaryRow(icon: ImageVector, label: String, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
 private const val DAYS_BACK = 28
 
 private const val DAYS_FORWARD = 27

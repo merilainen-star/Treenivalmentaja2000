@@ -8,6 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
+import fi.merilainen.treenivalmentaja.domain.ExerciseIcon
+import fi.merilainen.treenivalmentaja.drawableRes
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -27,7 +36,7 @@ import fi.merilainen.treenivalmentaja.UpdateCard
 import fi.merilainen.treenivalmentaja.ThemeCard
 import fi.merilainen.treenivalmentaja.WorkoutStatusBadge
 import fi.merilainen.treenivalmentaja.WeekDayHeader
-import fi.merilainen.treenivalmentaja.MonthCalendar
+import fi.merilainen.treenivalmentaja.WeekStrip
 import fi.merilainen.treenivalmentaja.WorkoutStatColumns
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.importer.PendingImport
@@ -577,17 +586,18 @@ class ComponentScreenshotTest {
         SessionStatus.entries.forEach { WorkoutStatusBadge(it) }
     }
 
-    /** The month grid with a day picked: the ring marks what the list below was moved to. */
+    /** The week strip with a day picked, one day carrying two sessions. */
     @Test
-    fun monthCalendar_selectedDay() = capture("card_month_calendar_selected") {
-        MonthCalendar(
-            today = LocalDate.of(2026, 8, 24),
+    fun weekStrip_selectedDay() = capture("card_week_strip_selected") {
+        WeekStrip(
+            today = LocalDate.of(2026, 8, 26),
             workouts = listOf(
-                runningWorkout.copy(id = "c1", dayOffset = 0, status = SessionStatus.PLANNED),
-                runningWorkout.copy(id = "c2", dayOffset = -2, status = SessionStatus.COMPLETED),
-                runningWorkout.copy(id = "c3", dayOffset = 3, status = SessionStatus.PLANNED),
+                runningWorkout.copy(id = "c1", dayOffset = 0, type = WorkoutType.STRENGTH),
+                runningWorkout.copy(id = "c2", dayOffset = 0, type = WorkoutType.RUNNING),
+                runningWorkout.copy(id = "c3", dayOffset = -2, type = WorkoutType.STRENGTH),
+                runningWorkout.copy(id = "c4", dayOffset = 2, type = WorkoutType.RUNNING),
             ),
-            selectedDate = LocalDate.of(2026, 8, 27),
+            selectedDate = LocalDate.of(2026, 8, 28),
             onDateClick = {},
         )
     }
@@ -627,6 +637,48 @@ class ComponentScreenshotTest {
                 dayIndex = 1,
                 dayWorkouts = listOf(runningWorkout),
             )
+        }
+    }
+
+    /**
+     * Every movement icon, at the size it is actually drawn, with the name that selects it.
+     *
+     * `AGENTS.md`: an image is verified by looking at it. A vector that compiles can still be a
+     * tangle of lines, and this is the only place anyone can see that a plank and a push-up differ
+     * by one forearm rather than by nothing at all.
+     */
+    @Test
+    fun exerciseIcons() = capture("card_exercise_icons") {
+        val samples = listOf(
+            "Lankku", "Punnerrus", "Sivulankku",
+            "Kyykky", "Bulgarialainen askelkyykky", "Lonkankoukistajan venytys",
+            "Käsipainosoutu", "Kahvakuulaheilautus", "Vatsarutistus",
+            "Kissanlehmä", "Bird dog", "Hyppynaru",
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            samples.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { name ->
+                        Column(
+                            modifier = Modifier.width(112.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                painter = painterResource(ExerciseIcon.forName(name).drawableRes()),
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                name,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
