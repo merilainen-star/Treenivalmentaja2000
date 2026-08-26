@@ -5,11 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -29,11 +31,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,9 +50,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutStep
@@ -172,6 +179,12 @@ fun ActiveWorkoutContent(
   Scaffold(
     topBar = {
       TopAppBar(
+        colors =
+          TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            titleContentColor = MaterialTheme.colorScheme.onPrimary,
+            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
+          ),
         title = { Text("Harjoitus käynnissä") },
         navigationIcon = {
           IconButton(onClick = onClose) {
@@ -328,23 +341,28 @@ private fun WorkoutProgressHeader(
   elapsedSec: Long,
 ) {
   Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+      // The round on the left and the clock on the right, with the movement count under it.
+      // The mockup carried the clock twice and had the two counts' names the other way round;
+      // the labels here follow what the numbers actually count.
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("Liikkeet $completed / $total")
-        Text("Kierros $round / $rounds")
+        Text("Kierros $round / $rounds", fontWeight = FontWeight.Bold)
+        Text("Kesto ${formatElapsed(elapsedSec)}", fontWeight = FontWeight.Bold)
       }
       Text(
-        text = "Kesto ${formatElapsed(elapsedSec)}",
-        style = MaterialTheme.typography.bodySmall,
+        text = "Liikkeet $completed / $total",
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
+      Spacer(Modifier.height(4.dp))
       // The track is named explicitly. Material 3 defaults it to `secondaryContainer`, which in
       // this palette is the green that means "done" — so an empty bar was drawn full-width in the
       // colour of completion, and "Liikkeet 0 / 6" sat above a bar that looked finished.
       LinearProgressIndicator(
         progress = { if (total == 0) 0f else completed.toFloat() / total },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
         trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        strokeCap = StrokeCap.Round,
       )
     }
   }
@@ -359,6 +377,7 @@ private fun PrepareStepCard(
   Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Text("Valmistaudu", style = MaterialTheme.typography.labelLarge)
+      ExerciseIcon(step.exercise.name, size = 64.dp, tint = MaterialTheme.colorScheme.onPrimaryContainer)
       Text(step.exercise.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
       val equipment = step.exercise.equipment.orEmpty()
       if (equipment.isNotEmpty()) Text("Välineet: ${equipment.joinToString(", ")}")
@@ -376,18 +395,48 @@ private fun PerformStepCard(
   onDone: () -> Unit,
   onSkip: () -> Unit,
 ) {
-  Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-      Text(step.exercise.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-      val prescription = step.exercise.prescription()
-      if (prescription.isNotBlank()) Text(prescription, style = MaterialTheme.typography.titleLarge)
+  // The movement is what the screen is for, so it is centred and everything else is arranged
+  // around it: the figure first, then the name, then what to do — read top to bottom.
+  OutlinedCard(
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    modifier = Modifier.fillMaxWidth(),
+  ) {
+    Column(
+      Modifier.padding(20.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      ExerciseIcon(step.exercise.name, size = 72.dp, tint = MaterialTheme.colorScheme.onSurface)
+      Text(
+        step.exercise.name,
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+      )
+      val prescription = step.exercise.prescription(verbose = true)
+      if (prescription.isNotBlank()) {
+        Text(
+          prescription,
+          style = MaterialTheme.typography.titleMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          textAlign = TextAlign.Center,
+        )
+      }
       GuideButton(exercise = step.exercise, onExerciseClick = onExerciseClick)
       if (step.exercise.durationSec != null) {
+        // A held movement finishes when its clock does, so there is no "Liike valmis" to place
+        // beside the skip — the timer is the action.
         ExerciseTimer(exercise = step.exercise, onAllRoundsCompleted = onDone)
+        OutlinedButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Ohita liike") }
       } else {
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Liike valmis") }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+          OutlinedButton(onClick = onSkip, modifier = Modifier.weight(1f)) { Text("Ohita liike") }
+          Button(onClick = onDone, modifier = Modifier.weight(1f)) { Text("Liike valmis") }
+        }
       }
-      OutlinedButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Ohita liike") }
     }
   }
 }
@@ -514,13 +563,10 @@ private fun formatElapsed(seconds: Long): String =
 @Composable
 private fun GuideButton(exercise: Exercise, onExerciseClick: (Exercise) -> Unit) {
   Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-    TextButton(onClick = { onExerciseClick(exercise) }) {
-      Icon(
-        imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-        contentDescription = null,
-        modifier = Modifier.size(18.dp),
-      )
-      Spacer(Modifier.width(6.dp))
+    Button(
+      onClick = { onExerciseClick(exercise) },
+      contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+    ) {
       Text("Liikeohje")
     }
   }
@@ -541,11 +587,14 @@ private fun UpcomingCard(upcoming: List<String>) {
   ) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Text(
-        "Seuraavaksi",
+        "Seuraavaksi:",
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
-      Text(upcoming.first(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        ExerciseIcon(upcoming.first(), size = 32.dp)
+        Text(upcoming.first(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+      }
       // The rest of the round, quietly: the principle is one thing at a time, so what follows the
       // next movement is context rather than an instruction.
       val rest = upcoming.drop(1)

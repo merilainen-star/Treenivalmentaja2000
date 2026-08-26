@@ -73,7 +73,14 @@ internal fun Exercise.timedRounds(): List<String> {
  * Empty when the plan says nothing beyond the name, so the caller can leave the line out rather
  * than print a stray separator.
  */
-internal fun Exercise.prescription(): String {
+/**
+ * [verbose] spells out what a bare number counts.
+ *
+ * A list row has the movement's name right above it and room for one line, so "10" is enough there.
+ * The guided screen shows one movement on a whole screen with nothing else to read, and there "10"
+ * alone is a number with no unit.
+ */
+internal fun Exercise.prescription(verbose: Boolean = false): String {
     // A ramp is listed set by set: the weights are the whole point of writing it that way.
     setPlan?.takeIf { it.isNotEmpty() }?.let { plan ->
         return plan.joinToString(" · ") { set ->
@@ -87,9 +94,10 @@ internal fun Exercise.prescription(): String {
         }
     }
 
+    val reps = if (verbose) " toistoa" else ""
     val work = when {
-        reps != null -> "$reps"
-        repsMin != null && repsMax != null -> "$repsMin–$repsMax"
+        this.reps != null -> "${this.reps}$reps"
+        repsMin != null && repsMax != null -> "$repsMin–$repsMax$reps"
         durationSec != null -> "$durationSec s"
         else -> null
     } ?: return ""
