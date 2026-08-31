@@ -412,7 +412,7 @@ class AnalysisPromptBuilder {
       1. Miten harjoitus meni suhteessa siihen, mitä oli suunniteltu?
       2. Miltä kuormitus näyttää sen aamun palautumislukemien ja viime päivien kehityksen valossa?
       3. Suositus seuraavaksi: painaako kovempaa, jatkaako suunnitelman mukaan, vai levätäkö.
-         Perustele suositus niillä luvuilla, jotka yllä ovat.
+         Perustele tulkitsemalla dataa — älä luettele lukuja uudelleen, ne näkyvät jo sovelluksessa.
       """
         .trimIndent()
 
@@ -423,12 +423,12 @@ class AnalysisPromptBuilder {
       1. Miltä palautuminen näyttää juuri nyt?
       2. Kannattaako harjoitus tehdä suunnitellusti, keventää tehoa, lyhentää kestoa, vai jättää
          kokonaan väliin?
-      3. Perustele niillä luvuilla, jotka yllä ovat.
+      3. Perustele tulkitsemalla dataa — älä luettele lukuja uudelleen, ne näkyvät jo sovelluksessa.
       """
         .trimIndent()
 
     /**
-     * The three things the answer must not do.
+     * The four things the answer must not do.
      *
      * The first is ADR-005 in one sentence: this app has no mechanism to act on a proposed plan
      * edit, so an answer that reads like one would be offering something the app cannot deliver.
@@ -442,6 +442,17 @@ class AnalysisPromptBuilder {
      * its own defaults, where 110 words is the same length for all of them. Naming the *screen* as
      * the reason is deliberate too — it gives the model something to reason about when trimming,
      * rather than a limit to obey blindly.
+     *
+     * **The fourth exists because of a real answer, not a hypothetical one:** "Aamun palautuminen
+     * oli erittäin hyvä: palautuminen 91, uni 89, HRV 44 ms ja leposyke 48. Tilanne on selvästi
+     * kohentunut 28.8. notkahduksesta, jolloin palautuminen oli 67, HRV 20 ms ja leposyke 58."
+     * Seven numbers restated verbatim, every one of them already on the screen the user opened
+     * this analysis from, out of a 110-word budget meant to hold a verdict and a recommendation.
+     * "Perustele ... luvuilla" (the task instructions above) was being read as "list the numbers",
+     * which is not the same request as "use them to reason" — so both now say "tulkitsemalla" and
+     * this guardrail says the rest. Not "never cite a number": one named to ground a specific claim
+     * is still fine, and the rule above it about inventing figures still applies to it. The line
+     * being drawn is between reporting the input and interpreting it.
      */
     val GUARDRAILS =
       """
@@ -452,6 +463,9 @@ class AnalysisPromptBuilder {
       - Älä ehdota muutoksia harjoitusohjelmaan kalenterissa; sovellus ei voi toteuttaa niitä.
         Anna arvio ja suositus, ei suunnitelmaa.
       - Älä keksi lukuja, joita ei ole yllä. Jos jokin tieto puuttuu, sano se.
+      - Älä listaa annettuja lukuja takaisin käyttäjälle sellaisenaan — ne näkyvät jo sovelluksessa.
+        Tulkitse niitä sanallisesti: mitä ne tarkoittavat ja mitä kannattaa tehdä. Yksittäisen
+        luvun voi mainita, jos se perustelee suosituksen.
       - Vastaa suomeksi, ilman otsikoita ja listamerkkejä — pelkkää tekstiä.
       """
         .trimIndent()

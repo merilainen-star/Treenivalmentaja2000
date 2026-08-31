@@ -310,6 +310,24 @@ class AnalysisPromptBuilderTest {
     assertTrue(upcoming.contains("Älä keksi lukuja"))
   }
 
+  /**
+   * A real answer recited seven numbers already visible on the user's own screen back to them —
+   * "palautuminen 91, uni 89, HRV 44 ms ja leposyke 48. ... palautuminen oli 67, HRV 20 ms ja
+   * leposyke 58" — out of a 110-word budget meant to hold a verdict. Both the guardrail and the
+   * task question that used to invite it ("perustele ... luvuilla") are covered here.
+   */
+  @Test
+  fun `both prompts forbid reciting the input numbers back as a list`() {
+    val completed =
+      builder.completed(CompletedAnalysisInput(type = WorkoutType.RUNNING, date = day))
+    val upcoming = builder.upcoming(UpcomingAnalysisInput(type = WorkoutType.RUNNING, date = day))
+
+    assertTrue(completed.contains("Älä listaa annettuja lukuja takaisin käyttäjälle"))
+    assertTrue(upcoming.contains("Älä listaa annettuja lukuja takaisin käyttäjälle"))
+    assertTrue(completed.contains("älä luettele lukuja uudelleen"))
+    assertTrue(upcoming.contains("älä luettele lukuja uudelleen"))
+  }
+
   /** Pure: the same input twice is the same string, so the "Näytä pyyntö" panel cannot drift. */
   @Test
   fun `is deterministic`() {
