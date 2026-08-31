@@ -51,15 +51,16 @@ internal class OuraClient(
   private val calls: Call.Factory = defaultCallFactory(),
 ) {
 
-  /** Readiness scores, one document per day the ring reported anything at all. */
-  suspend fun readiness(from: LocalDate, to: LocalDate): List<OuraDailyScoreDto> =
-    fetch(OuraCollection.DAILY_READINESS, from, to, dailyScoreAdapter)
+  /** Readiness scores and their contributor breakdown, one document per day Oura reported. */
+  suspend fun readiness(from: LocalDate, to: LocalDate): List<OuraReadinessDto> =
+    fetch(OuraCollection.DAILY_READINESS, from, to, readinessAdapter)
 
   suspend fun sleep(from: LocalDate, to: LocalDate): List<OuraDailyScoreDto> =
     fetch(OuraCollection.DAILY_SLEEP, from, to, dailyScoreAdapter)
 
-  suspend fun activity(from: LocalDate, to: LocalDate): List<OuraDailyScoreDto> =
-    fetch(OuraCollection.DAILY_ACTIVITY, from, to, dailyScoreAdapter)
+  /** Activity scores and the one contributor this app reads. See [OuraActivityContributorsDto]. */
+  suspend fun activity(from: LocalDate, to: LocalDate): List<OuraActivityDto> =
+    fetch(OuraCollection.DAILY_ACTIVITY, from, to, activityAdapter)
 
   /** Completed workouts, including ones synced into Oura from Suunto or Strava. */
   suspend fun workouts(from: LocalDate, to: LocalDate): List<OuraWorkoutDto> =
@@ -254,6 +255,12 @@ internal class OuraClient(
       moshi.adapter(
         Types.newParameterizedType(OuraPageDto::class.java, OuraDailyScoreDto::class.java)
       )
+
+    private val readinessAdapter: JsonAdapter<OuraPageDto<OuraReadinessDto>> =
+      moshi.adapter(Types.newParameterizedType(OuraPageDto::class.java, OuraReadinessDto::class.java))
+
+    private val activityAdapter: JsonAdapter<OuraPageDto<OuraActivityDto>> =
+      moshi.adapter(Types.newParameterizedType(OuraPageDto::class.java, OuraActivityDto::class.java))
 
     private val workoutAdapter: JsonAdapter<OuraPageDto<OuraWorkoutDto>> =
       moshi.adapter(Types.newParameterizedType(OuraPageDto::class.java, OuraWorkoutDto::class.java))

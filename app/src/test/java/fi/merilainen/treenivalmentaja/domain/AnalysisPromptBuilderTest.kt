@@ -102,6 +102,94 @@ class AnalysisPromptBuilderTest {
     assertFalse(prompt.contains("palautuminen "))
   }
 
+  // ------------------------------------------------------------------ contributors (ADR-014)
+
+  /**
+   * Oura's own breakdown reaches the prompt labelled `/100`, never bare — the reason rule 2 exists
+   * is exactly so this can never be misread as the HRV-in-ms or leposyke-in-bpm lines above, which
+   * are measurements rather than Oura's opinion of them.
+   */
+  @Test
+  fun `contributors are labelled n over 100, distinct from the raw measurements`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.RUNNING,
+          date = day,
+          recoveryByDay =
+            mapOf(
+              day to
+                DailyRecovery(
+                  date = day.toString(),
+                  averageHrvMs = 61,
+                  activityRecoveryTime = 62,
+                  readinessContributors =
+                    ReadinessContributors(hrvBalance = 85, restingHeartRate = 90),
+                )
+            ),
+        )
+      )
+
+    assertTrue(prompt.contains("HRV 61 ms"))
+    assertTrue(prompt.contains("HRV-tasapaino 85/100"))
+    assertTrue(prompt.contains("palautumisaika (7 vrk) 62/100"))
+    assertTrue(prompt.contains("leposykkeen pisteytys 90/100"))
+  }
+
+  /** Nothing to explain the score with is nothing written — no heading standing over a blank section. */
+  @Test
+  fun `omits the contributors section when there is nothing to explain the score with`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.RUNNING,
+          date = day,
+          recoveryByDay = mapOf(day to DailyRecovery(date = day.toString(), readiness = 68)),
+        )
+      )
+
+    assertFalse(prompt.contains("erittely"))
+  }
+
+  /**
+   * Ten more numbers on every line of a week-long trend would swamp it, so the breakdown is written
+   * only for the one day the analysis is about — never for the days the trend section covers.
+   */
+  @Test
+  fun `the breakdown covers only the day being analysed, not the whole trend`() {
+    val yesterday = day.minusDays(1)
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.RUNNING,
+          date = day,
+          recoveryByDay =
+            mapOf(
+              day to DailyRecovery(date = day.toString(), activityRecoveryTime = 62),
+              yesterday to DailyRecovery(date = yesterday.toString(), activityRecoveryTime = 40),
+            ),
+        )
+      )
+
+    assertTrue(prompt.contains("$day: palautumisaika (7 vrk) 62/100"))
+    assertFalse(prompt.contains("$yesterday: palautumisaika"))
+  }
+
+  @Test
+  fun `an upcoming prompt carries today's contributor breakdown`() {
+    val prompt =
+      builder.upcoming(
+        UpcomingAnalysisInput(
+          type = WorkoutType.RUNNING,
+          date = day,
+          recoveryByDay = mapOf(day to DailyRecovery(date = day.toString(), activityRecoveryTime = 55)),
+        )
+      )
+
+    assertTrue(prompt.contains("## Tämän päivän palautumisen erittely"))
+    assertTrue(prompt.contains("palautumisaika (7 vrk) 55/100"))
+  }
+
   // ------------------------------------------------------------------ what each prompt carries
 
   @Test

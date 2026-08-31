@@ -127,6 +127,11 @@ class AnalysisPromptBuilder {
       days = input.date.minusDays(TREND_DAYS_BACK)..input.date,
       recoveryByDay = input.recoveryByDay,
     )
+    appendContributors(
+      heading = "## Palautumisen erittely harjoituspäivältä",
+      day = input.date,
+      recovery = input.recoveryByDay[input.date],
+    )
 
     appendLine(COMPLETED_TASK)
     append(GUARDRAILS)
@@ -150,6 +155,11 @@ class AnalysisPromptBuilder {
       heading = "## Palautumisen kehitys",
       days = input.date.minusDays(TREND_DAYS_BACK)..input.date,
       recoveryByDay = input.recoveryByDay,
+    )
+    appendContributors(
+      heading = "## Tämän päivän palautumisen erittely",
+      day = input.date,
+      recovery = input.recoveryByDay[input.date],
     )
 
     // Written only when intervals.icu actually computed both. The pair is what means something, and
@@ -327,6 +337,41 @@ class AnalysisPromptBuilder {
     if (lines.isEmpty()) return
     appendLine(heading)
     lines.forEach { appendLine(it) }
+    appendLine()
+  }
+
+  /**
+   * Oura's own breakdown of the score, for **the one day this analysis is about** — never the trend
+   * range [appendRecovery] covers. Ten more numbers on every line of a week-long trend would bury it;
+   * "why is today's number what it is" is a question about today, not about the whole week.
+   *
+   * Every contributor is written `n/100`, deliberately unlike [appendRecovery]'s `HRV 61 ms` and
+   * `leposyke 52`: these are Oura's 1–100 opinion of those same measurements relative to this
+   * athlete's own baseline, not the measurements themselves, and rule 2 exists precisely so the two
+   * are never confused for each other. See ADR-014 in `docs/DECISIONS.md`.
+   */
+  private fun StringBuilder.appendContributors(
+    heading: String,
+    day: LocalDate,
+    recovery: DailyRecovery?,
+  ) {
+    if (recovery == null) return
+    val c = recovery.readinessContributors
+    val parts = buildList {
+      recovery.activityRecoveryTime?.let { add("palautumisaika (7 vrk) $it/100") }
+      c?.previousNight?.let { add("edellinen yö $it/100") }
+      c?.sleepBalance?.let { add("unen tasapaino $it/100") }
+      c?.sleepRegularity?.let { add("unen säännöllisyys $it/100") }
+      c?.hrvBalance?.let { add("HRV-tasapaino $it/100") }
+      c?.restingHeartRate?.let { add("leposykkeen pisteytys $it/100") }
+      c?.recoveryIndex?.let { add("palautumisindeksi $it/100") }
+      c?.previousDayActivity?.let { add("edellisen päivän aktiivisuus $it/100") }
+      c?.activityBalance?.let { add("aktiivisuustasapaino $it/100") }
+      c?.bodyTemperature?.let { add("kehon lämpötila $it/100") }
+    }
+    if (parts.isEmpty()) return
+    appendLine(heading)
+    appendLine("- $day: ${parts.joinToString(", ")}")
     appendLine()
   }
 

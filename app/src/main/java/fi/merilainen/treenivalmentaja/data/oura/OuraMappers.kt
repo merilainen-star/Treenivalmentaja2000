@@ -29,37 +29,60 @@ internal object OuraMappers {
    * this app can rank.
    */
   fun toDailySummaries(
-    readiness: List<OuraDailyScoreDto>,
+    readiness: List<OuraReadinessDto>,
     sleep: List<OuraDailyScoreDto>,
-    activity: List<OuraDailyScoreDto>,
+    activity: List<OuraActivityDto>,
     fetchedAtUtc: Long,
     sleepPeriods: List<OuraSleepPeriodDto> = emptyList(),
   ): List<OuraDailySummaryEntity> {
-    val byDay = { list: List<OuraDailyScoreDto> ->
-      list
-        .filter { !it.day.isNullOrBlank() }
-        .groupBy { it.day!! }
-        .mapValues { (_, documents) -> documents.first().score }
-    }
-    val readinessByDay = byDay(readiness)
-    val sleepByDay = byDay(sleep)
-    val activityByDay = byDay(activity)
+    val readinessByDay = readiness.byDay { it.day }
+    val sleepByDay = sleep.byDay { it.day }
+    val activityByDay = activity.byDay { it.day }
     val nightByDay = nightsByDay(sleepPeriods)
     val days = readinessByDay.keys + sleepByDay.keys + activityByDay.keys + nightByDay.keys
     return days.sorted().map { day ->
       val night = nightByDay[day]
+      val readinessDoc = readinessByDay[day]
+      val activityDoc = activityByDay[day]
+      val contributors = readinessDoc?.contributors
       OuraDailySummaryEntity(
         date = day,
-        readinessScore = readinessByDay[day],
-        sleepScore = sleepByDay[day],
-        activityScore = activityByDay[day],
+        readinessScore = readinessDoc?.score,
+        sleepScore = sleepByDay[day]?.score,
+        activityScore = activityDoc?.score,
         averageHrvMs = night?.averageHrv?.takeIf { it > 0 },
         restingHrBpm = night?.lowestHeartRate?.takeIf { it > 0 },
         sleepHrBpm = night?.averageHeartRate?.takeIf { it > 0.0 }?.roundToInt(),
+        // See ADR-014: a contributor score, not a measurement — kept apart from the bpm/ms columns
+        // above by name as much as by the ADR that explains why the two must never merge.
+        activityRecoveryTime = activityDoc?.contributors?.recoveryTime,
+        readinessActivityBalance = contributors?.activityBalance,
+        readinessBodyTemperature = contributors?.bodyTemperature,
+        readinessHrvBalance = contributors?.hrvBalance,
+        readinessPreviousDayActivity = contributors?.previousDayActivity,
+        readinessPreviousNight = contributors?.previousNight,
+        readinessRecoveryIndex = contributors?.recoveryIndex,
+        readinessRestingHeartRate = contributors?.restingHeartRate,
+        readinessSleepBalance = contributors?.sleepBalance,
+        readinessSleepRegularity = contributors?.sleepRegularity,
         fetchedAtUtc = fetchedAtUtc,
       )
     }
   }
+
+  /**
+   * Groups any of the four per-day documents by [day], keeping the first per day.
+   *
+   * Generic over the DTO rather than duplicating this once per type: [OuraReadinessDto],
+   * [OuraActivityDto] and [OuraDailyScoreDto] disagree on almost everything now that the first two
+   * carry their own `contributors` shape, and the only thing this app still needs from all three
+   * uniformly is "which day, and which document wins if Oura sent two" — see [toDailySummaries] for
+   * why a repeated day keeps the first rather than being treated as a correction.
+   */
+  private fun <T> List<T>.byDay(day: (T) -> String?): Map<String, T> =
+    mapNotNull { doc -> day(doc)?.takeIf { it.isNotBlank() }?.let { it to doc } }
+      .groupBy({ it.first }) { it.second }
+      .mapValues { (_, documents) -> documents.first() }
 
   /**
    * The one sleep period per day whose numbers describe *the night*.

@@ -13,6 +13,7 @@ import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.ReadinessContributors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -337,5 +338,19 @@ private fun OuraDailySummaryEntity.toDomain(): DailyRecovery =
     averageHrvMs = averageHrvMs,
     restingHeartRate = restingHrBpm,
     sleepHeartRate = sleepHrBpm,
+    activityRecoveryTime = activityRecoveryTime,
+    readinessContributors =
+      ReadinessContributors(
+          activityBalance = readinessActivityBalance,
+          bodyTemperature = readinessBodyTemperature,
+          hrvBalance = readinessHrvBalance,
+          previousDayActivity = readinessPreviousDayActivity,
+          previousNight = readinessPreviousNight,
+          recoveryIndex = readinessRecoveryIndex,
+          restingHeartRate = readinessRestingHeartRate,
+          sleepBalance = readinessSleepBalance,
+          sleepRegularity = readinessSleepRegularity,
+        )
+        .takeUnless { it.isEmpty },
     fetchedAtUtc = fetchedAtUtc,
   )

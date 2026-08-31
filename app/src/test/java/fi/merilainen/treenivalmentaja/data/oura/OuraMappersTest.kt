@@ -21,9 +21,9 @@ class OuraMappersTest {
   fun `three collections become one row per day`() {
     val summaries =
       OuraMappers.toDailySummaries(
-        readiness = listOf(day("2026-08-07", 66), day("2026-08-08", 71)),
+        readiness = listOf(readinessDay("2026-08-07", 66), readinessDay("2026-08-08", 71)),
         sleep = listOf(day("2026-08-07", 80), day("2026-08-08", 62)),
-        activity = listOf(day("2026-08-07", 91), day("2026-08-08", 88)),
+        activity = listOf(activityDay("2026-08-07", 91), activityDay("2026-08-08", 88)),
         fetchedAtUtc = FETCHED_AT,
       )
 
@@ -45,7 +45,7 @@ class OuraMappersTest {
   fun `a day without a score is a row with no score, not a row with zero`() {
     val summaries =
       OuraMappers.toDailySummaries(
-        readiness = listOf(day("2026-08-08", null)),
+        readiness = listOf(readinessDay("2026-08-08", null)),
         sleep = emptyList(),
         activity = emptyList(),
         fetchedAtUtc = FETCHED_AT,
@@ -78,9 +78,9 @@ class OuraMappersTest {
   fun `rows are ordered by day`() {
     val summaries =
       OuraMappers.toDailySummaries(
-        readiness = listOf(day("2026-08-09", 1)),
+        readiness = listOf(readinessDay("2026-08-09", 1)),
         sleep = listOf(day("2026-08-07", 2)),
-        activity = listOf(day("2026-08-08", 3)),
+        activity = listOf(activityDay("2026-08-08", 3)),
         fetchedAtUtc = FETCHED_AT,
       )
 
@@ -92,13 +92,74 @@ class OuraMappersTest {
   fun `a document with no day is dropped`() {
     val summaries =
       OuraMappers.toDailySummaries(
-        readiness = listOf(day(null, 66), day("", 70), day("2026-08-07", 80)),
+        readiness = listOf(readinessDay(null, 66), readinessDay("", 70), readinessDay("2026-08-07", 80)),
         sleep = emptyList(),
         activity = emptyList(),
         fetchedAtUtc = FETCHED_AT,
       )
 
     assertEquals(listOf("2026-08-07"), summaries.map { it.date })
+  }
+
+  /**
+   * `daily_activity.contributors.recovery_time` and the nine `daily_readiness.contributors` fields
+   * land on the row under their own columns, never mixed with the plain scores — see ADR-014.
+   */
+  @Test
+  fun `contributors are threaded onto the row`() {
+    val summaries =
+      OuraMappers.toDailySummaries(
+        readiness =
+          listOf(
+            readinessDay(
+              "2026-08-30",
+              91,
+              OuraReadinessContributorsDto(
+                activityBalance = 78,
+                bodyTemperature = 96,
+                hrvBalance = 85,
+                previousDayActivity = 80,
+                previousNight = 92,
+                recoveryIndex = 88,
+                restingHeartRate = 90,
+                sleepBalance = 87,
+                sleepRegularity = 83,
+              ),
+            )
+          ),
+        sleep = emptyList(),
+        activity = listOf(activityDay("2026-08-30", 80, recoveryTime = 62)),
+        fetchedAtUtc = FETCHED_AT,
+      )
+
+    val summary = summaries.single()
+    assertEquals(62, summary.activityRecoveryTime)
+    assertEquals(78, summary.readinessActivityBalance)
+    assertEquals(96, summary.readinessBodyTemperature)
+    assertEquals(85, summary.readinessHrvBalance)
+    assertEquals(80, summary.readinessPreviousDayActivity)
+    assertEquals(92, summary.readinessPreviousNight)
+    assertEquals(88, summary.readinessRecoveryIndex)
+    assertEquals(90, summary.readinessRestingHeartRate)
+    assertEquals(87, summary.readinessSleepBalance)
+    assertEquals(83, summary.readinessSleepRegularity)
+  }
+
+  /** No `contributors` document at all reads as no contributors, not as nine zeros. */
+  @Test
+  fun `missing contributors stay null rather than zero`() {
+    val summaries =
+      OuraMappers.toDailySummaries(
+        readiness = listOf(readinessDay("2026-08-30", 91)),
+        sleep = emptyList(),
+        activity = listOf(activityDay("2026-08-30", 80)),
+        fetchedAtUtc = FETCHED_AT,
+      )
+
+    val summary = summaries.single()
+    assertNull(summary.activityRecoveryTime)
+    assertNull(summary.readinessHrvBalance)
+    assertNull(summary.readinessRestingHeartRate)
   }
 
   @Test
@@ -303,6 +364,28 @@ class OuraMappersTest {
 
   private fun day(day: String?, score: Int?) =
     OuraDailyScoreDto(id = "id-$day", day = day, score = score, timestamp = "${day}T00:00:00+03:00")
+
+  private fun readinessDay(
+    day: String?,
+    score: Int?,
+    contributors: OuraReadinessContributorsDto? = null,
+  ) =
+    OuraReadinessDto(
+      id = "id-$day",
+      day = day,
+      score = score,
+      timestamp = "${day}T00:00:00+03:00",
+      contributors = contributors,
+    )
+
+  private fun activityDay(day: String?, score: Int?, recoveryTime: Int? = null) =
+    OuraActivityDto(
+      id = "id-$day",
+      day = day,
+      score = score,
+      timestamp = "${day}T00:00:00+03:00",
+      contributors = recoveryTime?.let { OuraActivityContributorsDto(recoveryTime = it) },
+    )
 
   private fun workout(
     id: String?,
