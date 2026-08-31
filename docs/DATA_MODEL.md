@@ -136,8 +136,8 @@ The order of priority is:
 
 ### 4. Oura Daily Summary (`OuraDailySummary`)
 - **Table:** `oura_daily_summaries`
-- **Purpose:** Caches daily readiness, sleep and activity scores, **and the night's own
-  measurements**.
+- **Purpose:** Caches daily readiness, sleep and activity scores, **the night's own measurements**,
+  and **the score contributors** behind the readiness score and the activity score's recovery time.
 - **Primary Key:** `date` (String — `YYYY-MM-DD`)
 - **Fields:**
   - `readinessScore` (Int?)
@@ -146,6 +146,16 @@ The order of priority is:
   - `averageHrvMs` (Int?) — average heart-rate variability during sleep, milliseconds
   - `restingHrBpm` (Int?) — Oura's `lowest_heart_rate`, the resting figure its own app shows
   - `sleepHrBpm` (Int?) — average heart rate across the night
+  - `activityRecoveryTime` (Int?) — `daily_activity.contributors.recovery_time`, 1..100. A rolling
+    7-day training-load signal, not the readiness score: can read low on a morning `readinessScore`
+    reads high. Added at schema v14 ([ADR-014](DECISIONS.md#adr-014-the-score-contributors--daily_activitycontributorsrecovery_time-and-all-nine-of-daily_readinesscontributors)).
+  - `readinessActivityBalance`, `readinessBodyTemperature`, `readinessHrvBalance`,
+    `readinessPreviousDayActivity`, `readinessPreviousNight`, `readinessRecoveryIndex`,
+    `readinessRestingHeartRate`, `readinessSleepBalance`, `readinessSleepRegularity` (all Int?) —
+    `daily_readiness.contributors`, Oura's own 1..100 breakdown of why `readinessScore` is what it
+    is. Added at schema v14 (ADR-014). The `readiness` prefix is deliberate:
+    `readinessRestingHeartRate` is a contribution score, not `restingHrBpm`'s beats per minute, and
+    the two must never be read as the same kind of number.
   - `fetchedAtUtc` (Long)
 - **Two collections, one row.** The three scores come from `daily_readiness`, `daily_sleep` and
   `daily_activity`; the three measurements come from the **sleep periods** collection (`sleep`),
@@ -155,10 +165,11 @@ The order of priority is:
   when naps are recorded. The night is the `long_sleep` period, falling back to the longest
   remaining one; `rest` and `deleted` periods are discarded. Averaging them would blend a
   twenty-minute nap's HRV into the night's and quietly corrupt the trend. See `OuraMappers`.
-- **Nullability:** All six are nullable as Oura may not provide them (ring not worn, night not
+- **Nullability:** All sixteen are nullable as Oura may not provide them (ring not worn, night not
   scored, or the sleep-periods fetch failing on its own without failing the sync). Missing data is
   **not** treated as zero — the UI shows "ei dataa", and an HRV of 0 would read as autonomic
-  collapse rather than as no reading.
+  collapse rather than as no reading; a contributor score of 0 would read as Oura's lowest possible
+  opinion rather than as "not fetched".
 - **Lifecycle:** Synced via WorkManager. Overwritten on update. Cleared when the user disconnects Oura.
 
 ### 5. Oura Workout (`OuraWorkout`)
@@ -295,6 +306,15 @@ auto migration. `avgSpeedMps` is the one that matters: an activity synced before
 watch's own duration until it is fetched again, and gets a null rather than a zero speed. Version 10
 adds `atl` and `ctl`.
 
+Version 11 added the night's own `averageHrvMs`, `restingHrBpm` and `sleepHrBpm` to
+`oura_daily_summaries` (§4). Version 12 added the whole `intervals_wellness` table (§7). Version 13
+added `roundRestSec` to `workout_sessions` (§2). Version 14 adds ten more nullable columns to
+`oura_daily_summaries` — `activityRecoveryTime` and the nine `readiness*` contributor columns — for
+the score breakdown described in §4 and
+[ADR-014](DECISIONS.md#adr-014-the-score-contributors--daily_activitycontributorsrecovery_time-and-all-nine-of-daily_readinesscontributors).
+All four are additive, by auto migration, and follow the same rule as every version before them: a
+row stored before its columns existed keeps what it had and gets nulls, never zeros.
+
 **Adding a column does not fill it**, and that is worth stating because three versions in a row now
 have run into it. The ordinary sync looks back a fortnight, so an activity older than that keeps its
 null forever unless something goes and asks again. The answer is `IntervalsRepository.backfill`,
@@ -322,7 +342,7 @@ Adding a version means, every time:
 4. Add a case to `MigrationTest`. A migration nobody ran is not a migration — this is the step that
    catches the copy that silently dropped a column.
 
-`app/schemas/` holds `3.json` through `12.json`; versions 1 and 2 predate the export and cannot be
+`app/schemas/` holds `3.json` through `14.json`; versions 1 and 2 predate the export and cannot be
 migrated from. That matters only for an install still sitting on one of them.
 
 Before installing a build that bumps the version, take a copy of the device database with

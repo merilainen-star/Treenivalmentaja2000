@@ -35,7 +35,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       IntervalsActivityEntity::class,
       IntervalsWellnessEntity::class,
     ],
-  version = 13,
+  version = 14,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -63,6 +63,12 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
   // session and never decay, so a three-day-old run reports fatigue the athlete has since shed. The
   // old columns stay, because the load immediately after a session is a true and different fact;
   // nothing reads them for the analysis any more.
+  //
+  // 13→14 is additive again: ten nullable columns on `oura_daily_summaries` for the score
+  // contributors — `daily_activity.contributors.recovery_time` and the nine fields of
+  // `daily_readiness.contributors` (ADR-014). Rows written before v14 keep their scores and get
+  // nulls, indistinguishable from a day Oura had nothing to say about a contributor for, which is
+  // correct either way; the ordinary sync window re-fetches the recent past, so no backfill runs.
   autoMigrations =
     [
       AutoMigration(from = 4, to = 5),
@@ -74,6 +80,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 10, to = 11),
       AutoMigration(from = 11, to = 12),
       AutoMigration(from = 12, to = 13),
+      AutoMigration(from = 13, to = 14),
     ],
 )
 @TypeConverters(Converters::class)

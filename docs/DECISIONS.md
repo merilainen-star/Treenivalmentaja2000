@@ -689,3 +689,82 @@
   `domain/InstallUpdateUseCase.kt`, `domain/CheckForUpdateUseCase.kt`, `UpdateCard.kt`,
   `SettingsScreen.kt`, `AndroidManifest.xml`, `.github/workflows/build-test-apk.yml`,
   `docs/SECURITY.md`
+
+## ADR-014: The score contributors — `daily_activity.contributors.recovery_time` and all nine of `daily_readiness.contributors`
+- **Status:** Accepted (2026-08-31) and built.
+- **Context:** Oura's own app shows an Activity score of 80 ("Hyvä") with a "Recovery time" row
+    under it reading "Pay attention" — the owner's own screen, checked against this build, which
+    that day showed nothing wrong at all: readiness 91, sleep 89, HRV 44 ms, resting heart rate 48,
+    all read as "erittäin hyvä" by the AI analysis. Both are true at once, and this app had no way
+    to say so, because it fetches `daily_readiness`, `daily_activity` and `daily_sleep` for their
+    top-level `score` alone — every collection's `contributors` object has been parsed by nothing
+    since `OuraDailyScoreDto` was written, though `daily_readiness` carries one on every document
+    the specification allows to exist ([API_INTEGRATIONS.md](API_INTEGRATIONS.md) already listed
+    its nine fields) and the fixtures under `app/src/test/resources/oura/` already included it.
+  - **Two different questions, not a contradiction.** `daily_readiness.score` (this app's
+    `palautuminen`) is Oura's opinion of *last night* — sleep, HRV, resting heart rate, all measured
+    since bedtime. `daily_activity.contributors.recovery_time` is "contribution of previous **7-day**
+    recovery time" — a rolling training-load signal. An athlete can wake up to an excellent night and
+    still carry a week of accumulated load the readiness score never asks about. The owner's own
+    words prompted this: "ehkä fiiliskin on sitä että treenit on paljon" — the feeling that training
+    has been heavy is exactly what `recovery_time` measures and `readiness` does not.
+- **Decision:**
+  - **`daily_activity` gets one contributor, `recovery_time`.** The other five
+    (`meet_daily_targets`, `move_every_hour`, `stay_active`, `training_frequency`,
+    `training_volume`) are left unread — nothing in this app has a use for them yet, and a field
+    nothing reads is exactly the abstraction the rest of this layer avoids. `OuraActivityDto` and
+    `OuraActivityContributorsDto` are new types rather than a change to `OuraDailyScoreDto`, because
+    daily_sleep — the collection that still fits that shared shape — must not gain a `contributors`
+    field it never sends.
+  - **`daily_readiness` gets all nine** (`activity_balance`, `body_temperature`, `hrv_balance`,
+    `previous_day_activity`, `previous_night`, `recovery_index`, `resting_heart_rate`,
+    `sleep_balance`, `sleep_regularity`), because the question they answer — why is the composite
+    readiness score what it is — has no single field that answers it alone the way `recovery_time`
+    does for the activity side. `OuraReadinessDto` replaces `OuraDailyScoreDto` for this collection.
+  - **Ten new nullable columns on `oura_daily_summaries`** (schema v14, purely additive —
+    `AutoMigration(from = 13, to = 14)`): `activityRecoveryTime`, and nine `readiness*`-prefixed
+    columns. The prefix is deliberate: `readinessRestingHeartRate` (a 1–100 contribution score) sits
+    in the same table as `restingHrBpm` (beats per minute), and a name is a cheaper safeguard against
+    conflating them than a comment anyone could skip.
+  - **`AnalysisPromptBuilder` writes them for one day only — the session's own day — never across
+    the seven-day trend `appendRecovery` already renders.** Ten more numbers on every line of a
+    week's trend would swamp it, and "why is today's number what it is" is a question about today.
+    Every value is written `n/100`, which is rule 2 (every number labelled with its unit) doing the
+    same job as the column prefix: making a contribution score impossible to mistake for the
+    HRV-in-ms or leposyke-in-bpm line on the same day.
+- **Consequences:**
+  - Rows written before v14 keep their scores and get nulls for all ten new columns — indistinguishable
+    from a day Oura sent a contributor with no value, and correct either way; the ordinary sync
+    window re-fetches the recent past, so nothing is backfilled.
+  - `DailyRecovery.isEmpty` now also checks the new fields, so a day with only a `recovery_time`
+    contributor and nothing else is correctly not-empty.
+  - The AI analysis can now write about a week of accumulated load even on a morning readiness calls
+    good — the gap this ADR was opened to close.
+- **Alternatives Considered:**
+  - *Reuse `OuraDailyScoreDto` for all three collections, adding both contributor shapes to it* — the
+    comment on that type already anticipated a "fourth column"; a fifteen-field `contributors`
+    property (nine names that never appear in an activity response, six that never appear in a
+    readiness one) was rejected as less honest than two types that can only hold what their own
+    document actually sends.
+  - *`daily_readiness.contributors.hrv_balance` and `.resting_heart_rate` as HRV/resting-heart-rate
+    themselves* — already rejected, in the ADR that added schema v11: they are 0–100 opinions of a
+    night relative to this athlete's baseline, not the measurement. That ADR is not reopened here.
+    What is new is reading the same two fields (and the other seven) for a different purpose — not
+    "what was the HRV", but "why is the readiness score what it is" — which the raw measurements
+    cannot answer regardless of how precisely they are stored.
+  - *All six `daily_activity` contributors* — rejected for the same reason `daily_readiness`'s
+    temperature fields have stayed unread since ADR-010: nothing downstream has a use for
+    `meet_daily_targets`, `move_every_hour`, `stay_active`, `training_frequency` or
+    `training_volume` yet, and Moshi already drops what a DTO does not declare at no cost. Easy to
+    add the day something reads them.
+  - *Show the breakdown across the whole trend range, like `appendRecovery`* — rejected on
+    readability grounds alone: nineteen labelled numbers on every line of a seven-day table is not
+    what rule 3 ("written to be readable by a person") describes.
+  - *A UI card mirroring Oura's own contributors list* — no screen asked for one yet, and the owner's
+    question was answered by getting the numbers into the AI analysis, which already explains
+    `palautuminen` in prose. A card is a future, separate decision once someone wants to read the
+    breakdown without asking for an analysis.
+- **Related Files:** `data/oura/OuraDto.kt`, `data/oura/OuraClient.kt`, `data/oura/OuraMappers.kt`,
+  `data/local/entity/Entities.kt`, `data/local/AppDatabase.kt` (v14),
+  `data/repository/OuraRepository.kt`, `domain/DailyRecovery.kt`, `domain/AnalysisPromptBuilder.kt`,
+  `MigrationTest`. Docs: `API_INTEGRATIONS.md`, `DATA_MODEL.md`

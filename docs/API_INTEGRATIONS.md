@@ -117,7 +117,16 @@ to say "ei tietoa" for a day that exists.
 
 Readiness `contributors`: `activity_balance`, `body_temperature`, `hrv_balance`,
 `previous_day_activity`, `previous_night`, `recovery_index`, `resting_heart_rate`, `sleep_balance`,
-`sleep_regularity`.
+`sleep_regularity`. All nine are read (`OuraReadinessDto`, schema v14, [ADR-014](DECISIONS.md#adr-014-the-score-contributors--daily_activitycontributorsrecovery_time-and-all-nine-of-daily_readinesscontributors)) — 1..100 contribution scores relative to this athlete's own baseline, never measurements: `hrv_balance` is not HRV. They explain why [`PublicDailyReadiness.score`](#fields-that-actually-exist) is what it is; the raw HRV and resting heart rate this app also reads come from `sleep` (below), not from here.
+
+**`PublicDailyActivity`** carries twenty-odd fields of step counts and MET minutes this app does not
+read; `OuraActivityDto` (schema v14) reads only `id`, `day`, `score`, `timestamp` and one entry of
+its `contributors`: `recovery_time` — "contribution of previous 7-day recovery time in range
+[1, 100]", Oura's own "Recovery time" row under the Activity score in its app. A rolling training-load
+signal, not a nightly one: it can read low on a morning the readiness score reads high, because it
+answers a week-long question rather than a this-morning one (ADR-014). The other five activity
+contributors (`meet_daily_targets`, `move_every_hour`, `stay_active`, `training_frequency`,
+`training_volume`) are unread — nothing downstream has a use for them.
 
 ### Errors, and which of them are the user's problem
 

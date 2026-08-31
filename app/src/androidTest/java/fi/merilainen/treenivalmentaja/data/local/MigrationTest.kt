@@ -470,4 +470,44 @@ class MigrationTest {
     assertEquals("PLANNED", sessions.getString(sessions.getColumnIndex("status")))
     sessions.close()
   }
+
+  /**
+   * Version 14 adds the score contributors: `activityRecoveryTime` and the nine
+   * `readiness*` columns (ADR-014). Additive, so the familiar assertion applies once more — a day
+   * synced before v14 keeps its scores and gets nulls for the new columns, not zeros, which would
+   * misread as Oura's lowest possible opinion of every contributor rather than as "not fetched yet".
+   */
+  @Test
+  fun migrate13To14() {
+    var db = helper.createDatabase(TEST_DB, 13)
+
+    db.execSQL(
+      """
+      INSERT INTO `oura_daily_summaries` (`date`, `readinessScore`, `sleepScore`, `activityScore`, `averageHrvMs`, `restingHrBpm`, `sleepHrBpm`, `fetchedAtUtc`)
+      VALUES ('2026-08-30', 91, 89, 80, 44, 48, 52, 1786889278000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 14, true)
+
+    val summaries = db.query("SELECT * FROM oura_daily_summaries")
+    assertTrue(summaries.moveToFirst())
+    // What was there survives.
+    assertEquals(91, summaries.getInt(summaries.getColumnIndex("readinessScore")))
+    assertEquals(44, summaries.getInt(summaries.getColumnIndex("averageHrvMs")))
+    assertEquals(48, summaries.getInt(summaries.getColumnIndex("restingHrBpm")))
+    // The new contributor columns are absent, not zero.
+    assertTrue(summaries.isNull(summaries.getColumnIndex("activityRecoveryTime")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessHrvBalance")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessRestingHeartRate")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessRecoveryIndex")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessSleepBalance")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessSleepRegularity")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessPreviousNight")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessPreviousDayActivity")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessActivityBalance")))
+    assertTrue(summaries.isNull(summaries.getColumnIndex("readinessBodyTemperature")))
+    summaries.close()
+  }
 }

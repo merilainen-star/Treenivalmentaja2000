@@ -84,6 +84,16 @@ class OuraRepositoryTest {
   private fun scores(day: String, score: String) =
     """{"data":[{"id":"$day","day":"$day","score":$score,"timestamp":"${day}T00:00:00+03:00"}],"next_token":null}"""
 
+  private fun readinessWithContributors(day: String, score: String) =
+    """{"data":[{"id":"$day","day":"$day","score":$score,"timestamp":"${day}T00:00:00+03:00",
+      "contributors":{"activity_balance":78,"body_temperature":96,"hrv_balance":85,
+      "previous_day_activity":80,"previous_night":92,"recovery_index":88,"resting_heart_rate":90,
+      "sleep_balance":87,"sleep_regularity":83}}],"next_token":null}"""
+
+  private fun activityWithContributors(day: String, score: String, recoveryTime: String) =
+    """{"data":[{"id":"$day","day":"$day","score":$score,"timestamp":"${day}T00:00:00+03:00",
+      "contributors":{"recovery_time":$recoveryTime}}],"next_token":null}"""
+
   // ------------------------------------------------------------------ syncing
 
   @Test
@@ -104,6 +114,30 @@ class OuraRepositoryTest {
     assertEquals(80, stored.sleep)
     assertEquals(91, stored.activity)
     assertEquals(FETCHED_AT, stored.fetchedAtUtc)
+  }
+
+  /**
+   * The contributor breakdown behind `readiness` and `activity` survives the whole path: an HTTP
+   * body, through the entity columns added for it (ADR-014), to the domain object a screen observes.
+   */
+  @Test
+  fun `contributors reach the observed row`() = runTest(dispatcher) {
+    routes =
+      mapOf(
+        READINESS to (200 to readinessWithContributors(DAY, "91")),
+        SLEEP to (200 to EMPTY),
+        ACTIVITY to (200 to activityWithContributors(DAY, "80", "62")),
+        WORKOUT to (200 to EMPTY),
+      )
+
+    repository.sync(from = LocalDate.parse(DAY), to = LocalDate.parse(DAY))
+
+    val stored = repository.observeDay(LocalDate.parse(DAY)).first()!!
+    assertEquals(62, stored.activityRecoveryTime)
+    val contributors = stored.readinessContributors!!
+    assertEquals(85, contributors.hrvBalance)
+    assertEquals(90, contributors.restingHeartRate)
+    assertEquals(92, contributors.previousNight)
   }
 
   /**

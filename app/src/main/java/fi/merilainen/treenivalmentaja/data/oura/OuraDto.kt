@@ -15,13 +15,12 @@ internal data class OuraPageDto<T>(
 )
 
 /**
- * One day's score, for `daily_readiness`, `daily_sleep` and `daily_activity` alike.
+ * One day's score, for `daily_sleep` — and, until each grew its own `contributors` shape below,
+ * also for `daily_readiness` and `daily_activity`.
  *
- * One class for three collections because the three documents agree on exactly the fields this app
- * reads: `id`, `day`, `score`, `timestamp`. What differs is everything it does not read —
- * readiness carries temperature deviations, activity carries twenty-five fields of step counts and
- * MET minutes — and Moshi ignores unknown fields, so a fourth column would be a change here rather
- * than a new type.
+ * `daily_sleep` still fits this shared shape because the app reads nothing from it beyond `id`,
+ * `day`, `score`, `timestamp` — Moshi ignores whatever else its document carries. The other two no
+ * longer do: see [OuraReadinessDto] and [OuraActivityDto].
  *
  * **`score` is nullable in the specification and that is not defensive coding.** A day the ring was
  * not worn comes back as a document *with no score*, not as no document. Anything downstream has to
@@ -39,6 +38,78 @@ internal data class OuraDailyScoreDto(
   /** 1..100, or `null` for a day the ring was not worn. Never read as zero. */
   val score: Int? = null,
   val timestamp: String? = null,
+)
+
+/**
+ * `daily_readiness`'s document: [OuraDailyScoreDto]'s four fields plus the score's own breakdown.
+ *
+ * Split off from the shared shape the moment the app needed [contributors] — see
+ * [OuraDailyScoreDto]'s comment. Nullability follows the same rule throughout: the specification
+ * requires `id`, `contributors`, `day`, `timestamp`, but a service change this app does not control
+ * must become a day without data rather than a Moshi crash.
+ */
+internal data class OuraReadinessDto(
+  val id: String? = null,
+  val day: String? = null,
+  val score: Int? = null,
+  val timestamp: String? = null,
+  val contributors: OuraReadinessContributorsDto? = null,
+)
+
+/**
+ * Why [OuraReadinessDto.score] is what it is, as Oura's own 1–100 opinion of nine inputs.
+ *
+ * **These are contributor scores, not measurements** — the same distinction ADR (`docs/DECISIONS.md`)
+ * drew when it rejected `hrv_balance` and `resting_heart_rate` as a replacement for
+ * [OuraSleepPeriodDto.averageHrv] and [OuraSleepPeriodDto.lowestHeartRate]: `hrv_balance: 82` says
+ * how the night compared to this athlete's own baseline, not what the HRV was. That ADR is not
+ * reversed by this type — the raw measurements stay the only source for HRV and resting heart rate.
+ * What this exists for is different: explaining the composite [OuraReadinessDto.score] itself, which
+ * has no raw-measurement equivalent to fall back on. See ADR-014 in `docs/DECISIONS.md`.
+ *
+ * Every field is 1..100 or `null` — never read as zero, for the usual reason.
+ */
+internal data class OuraReadinessContributorsDto(
+  @Json(name = "activity_balance") val activityBalance: Int? = null,
+  @Json(name = "body_temperature") val bodyTemperature: Int? = null,
+  @Json(name = "hrv_balance") val hrvBalance: Int? = null,
+  @Json(name = "previous_day_activity") val previousDayActivity: Int? = null,
+  @Json(name = "previous_night") val previousNight: Int? = null,
+  @Json(name = "recovery_index") val recoveryIndex: Int? = null,
+  @Json(name = "resting_heart_rate") val restingHeartRate: Int? = null,
+  @Json(name = "sleep_balance") val sleepBalance: Int? = null,
+  @Json(name = "sleep_regularity") val sleepRegularity: Int? = null,
+)
+
+/**
+ * `daily_activity`'s document, trimmed to [OuraDailyScoreDto]'s four fields plus one contributor.
+ *
+ * The specification's `PublicDailyActivity` carries twenty-odd fields of step counts and MET
+ * minutes this app still reads none of; only [contributors] is new, and only for the one contributor
+ * this app has a use for — see [OuraActivityContributorsDto].
+ */
+internal data class OuraActivityDto(
+  val id: String? = null,
+  val day: String? = null,
+  val score: Int? = null,
+  val timestamp: String? = null,
+  val contributors: OuraActivityContributorsDto? = null,
+)
+
+/**
+ * The one activity-score contributor this app reads, of the six the specification defines.
+ *
+ * `recovery_time` is "contribution of previous 7-day recovery time in range [1, 100]" — a rolling
+ * training-load signal, and a different question from [OuraReadinessContributorsDto]'s single-night
+ * one: an athlete can show a strong morning readiness score while this one still reads low, because
+ * it looks at the past week rather than last night. This is Oura's own "Recovery time" row under the
+ * Activity score in its app. The other five (`meet_daily_targets`, `move_every_hour`,
+ * `stay_active`, `training_frequency`, `training_volume`) are left unread — Moshi drops them
+ * silently, and adding a field this app does not use anywhere is exactly the abstraction the rest of
+ * this file avoids.
+ */
+internal data class OuraActivityContributorsDto(
+  @Json(name = "recovery_time") val recoveryTime: Int? = null,
 )
 
 /**

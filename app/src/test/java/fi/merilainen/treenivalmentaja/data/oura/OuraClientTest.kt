@@ -257,6 +257,51 @@ class OuraClientTest {
     assertEquals(66, days.single { it.day == "2026-08-07" }.score)
   }
 
+  /**
+   * The nine `daily_readiness.contributors` fields, read out of fixtures that already carried them —
+   * they were simply dropped on the floor before [OuraReadinessDto] existed to read them. See
+   * ADR-014 in `docs/DECISIONS.md`.
+   */
+  @Test
+  fun `readiness contributors are parsed alongside the score`() = runTest {
+    servePages(fixture("daily_readiness_page1.json"), fixture("daily_readiness_page2.json"))
+
+    val days = client().readiness(FROM, TO)
+
+    val worn = days.single { it.day == "2026-08-07" }.contributors!!
+    assertEquals(56, worn.activityBalance)
+    assertEquals(98, worn.bodyTemperature)
+    assertEquals(75, worn.hrvBalance)
+    assertEquals(35, worn.previousNight)
+    assertEquals(47, worn.recoveryIndex)
+    assertEquals(94, worn.restingHeartRate)
+    assertEquals(73, worn.sleepBalance)
+    assertEquals(61, worn.sleepRegularity)
+    // The unworn day has a contributors document too, every field of it null rather than 0.
+    val unworn = days.single { it.day == "2026-08-08" }.contributors!!
+    assertNull(unworn.hrvBalance)
+    assertNull(unworn.restingHeartRate)
+  }
+
+  /**
+   * The one `daily_activity` contributor this app reads — Oura's own "Recovery time" row, a 7-day
+   * training-load signal rather than a readiness score. See [OuraActivityContributorsDto].
+   */
+  @Test
+  fun `activity score and its recovery_time contributor are parsed`() = runTest {
+    routes = mapOf("/v2/usercollection/daily_activity" to (200 to fixture("daily_activity.json")))
+
+    val days = client().activity(FROM, TO)
+
+    val worn = days.single { it.day == "2026-08-07" }
+    assertEquals(80, worn.score)
+    assertEquals(62, worn.contributors!!.recoveryTime)
+    // Ring off the whole day: no score and no recovery-time contributor, not a zero of either.
+    val unworn = days.single { it.day == "2026-08-08" }
+    assertNull(unworn.score)
+    assertNull(unworn.contributors!!.recoveryTime)
+  }
+
   @Test
   fun `a workout payload maps onto its fields`() = runTest {
     routes = mapOf("/v2/usercollection/workout" to (200 to fixture("workout.json")))

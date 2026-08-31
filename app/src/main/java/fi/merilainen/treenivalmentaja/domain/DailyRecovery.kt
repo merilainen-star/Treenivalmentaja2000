@@ -33,6 +33,15 @@ data class DailyRecovery(
   val restingHeartRate: Int? = null,
   /** Average heart rate across the night. Read beside [restingHeartRate], not instead of it. */
   val sleepHeartRate: Int? = null,
+  /**
+   * `daily_activity.contributors.recovery_time` — Oura's own "Recovery time" row under the Activity
+   * score, 1..100. A rolling 7-day training-load signal, not [readiness]: an athlete can wake up to
+   * an excellent readiness score from one good night while this one still reads low, because it is
+   * asking a week-long question rather than a this-morning one. See ADR-014 in `docs/DECISIONS.md`.
+   */
+  val activityRecoveryTime: Int? = null,
+  /** Oura's own breakdown of why [readiness] is what it is. `null` when Oura sent no document. */
+  val readinessContributors: ReadinessContributors? = null,
   /** When this was last read from Oura. Epoch millis UTC. */
   val fetchedAtUtc: Long = 0L,
 ) {
@@ -50,7 +59,9 @@ data class DailyRecovery(
         activity == null &&
         averageHrvMs == null &&
         restingHeartRate == null &&
-        sleepHeartRate == null
+        sleepHeartRate == null &&
+        activityRecoveryTime == null &&
+        (readinessContributors == null || readinessContributors.isEmpty)
 
   /**
    * A word for the readiness number.
@@ -68,4 +79,41 @@ data class DailyRecovery(
           else -> "Kiinnitä huomiota"
         }
       }
+}
+
+/**
+ * `daily_readiness.contributors` — Oura's own 1..100 opinion of nine inputs to [DailyRecovery.readiness].
+ *
+ * **Contributor scores, not measurements.** `docs/DECISIONS.md` already has an ADR that rejected
+ * `hrv_balance` and `resting_heart_rate` as a *replacement* for [DailyRecovery.averageHrvMs] and
+ * [DailyRecovery.restingHeartRate] — `hrv_balance: 82` says how the night compared to this athlete's
+ * own baseline, not what the HRV was, and the request was for HRV. This type does not reopen that:
+ * the raw measurements stay the only source for HRV and resting heart rate. It exists for a question
+ * those measurements cannot answer — why the *composite* readiness score is what it is — which has
+ * no raw-measurement equivalent to fall back on. See ADR-014.
+ */
+data class ReadinessContributors(
+  val activityBalance: Int? = null,
+  val bodyTemperature: Int? = null,
+  val hrvBalance: Int? = null,
+  val previousDayActivity: Int? = null,
+  val previousNight: Int? = null,
+  val recoveryIndex: Int? = null,
+  /** Contribution of resting heart rate, 1..100 — not [DailyRecovery.restingHeartRate]'s bpm. */
+  val restingHeartRate: Int? = null,
+  val sleepBalance: Int? = null,
+  val sleepRegularity: Int? = null,
+) {
+
+  val isEmpty: Boolean
+    get() =
+      activityBalance == null &&
+        bodyTemperature == null &&
+        hrvBalance == null &&
+        previousDayActivity == null &&
+        previousNight == null &&
+        recoveryIndex == null &&
+        restingHeartRate == null &&
+        sleepBalance == null &&
+        sleepRegularity == null
 }

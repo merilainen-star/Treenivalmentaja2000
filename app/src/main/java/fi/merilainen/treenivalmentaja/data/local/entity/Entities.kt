@@ -135,6 +135,27 @@ data class OuraDailySummaryEntity(
   val restingHrBpm: Int? = null,
   /** Oura's `average_heart_rate` across the night. */
   val sleepHrBpm: Int? = null,
+  /**
+   * `daily_activity.contributors.recovery_time` — "contribution of previous 7-day recovery time",
+   * 1..100. Oura's own "Recovery time" row under the Activity score, not [readinessScore] and not a
+   * measurement: see ADR-014 in `docs/DECISIONS.md`. Added at schema v14.
+   */
+  val activityRecoveryTime: Int? = null,
+  /**
+   * The nine columns below are `daily_readiness.contributors` — Oura's own breakdown of why
+   * [readinessScore] is what it is. All 1..100, all added at schema v14, all named `readiness*` so
+   * none is ever mistaken for the bpm/ms measurements above: `readinessRestingHeartRate` is a
+   * contribution score, [restingHrBpm] is the beats per minute. See ADR-014.
+   */
+  val readinessActivityBalance: Int? = null,
+  val readinessBodyTemperature: Int? = null,
+  val readinessHrvBalance: Int? = null,
+  val readinessPreviousDayActivity: Int? = null,
+  val readinessPreviousNight: Int? = null,
+  val readinessRecoveryIndex: Int? = null,
+  val readinessRestingHeartRate: Int? = null,
+  val readinessSleepBalance: Int? = null,
+  val readinessSleepRegularity: Int? = null,
   val fetchedAtUtc: Long,
 )
 

@@ -80,7 +80,7 @@ class OuraSleepPeriodMappingTest {
   fun `yields no measurements when every period was rejected`() {
     val rows =
       OuraMappers.toDailySummaries(
-        readiness = listOf(OuraDailyScoreDto(day = DAY, score = 70)),
+        readiness = listOf(OuraReadinessDto(day = DAY, score = 70)),
         sleep = emptyList(),
         activity = emptyList(),
         fetchedAtUtc = FETCHED_AT,
@@ -155,7 +155,7 @@ class OuraSleepPeriodMappingTest {
   fun `merges onto the same row as the day's scores`() {
     val rows =
       OuraMappers.toDailySummaries(
-        readiness = listOf(OuraDailyScoreDto(day = DAY, score = 72)),
+        readiness = listOf(OuraReadinessDto(day = DAY, score = 72)),
         sleep = listOf(OuraDailyScoreDto(day = DAY, score = 80)),
         activity = emptyList(),
         fetchedAtUtc = FETCHED_AT,
