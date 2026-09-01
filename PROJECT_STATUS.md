@@ -6,44 +6,44 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-09-01
-- Base commit: working tree for the STARTED/INTERRUPTED status split on top of `82650a4` (branch
-  `fix/started-skipped-analysis-menu`), which itself pulled in ten commits this tree had not yet
-  seen — the header overflow menu and the Oura recovery-contributor work.
+- Base commit: working tree for the `hasRecordedActivity` fix on top of `78ab244` (branch
+  `fix/skipped-with-oura-match-analysis`, PR #17 already merged to `main`)
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
 
-Screenshots and the unit-test run share one task (`verifyRoborazziDebug` depends on
-`testDebugUnitTest`); lint, the APK and the instrumented run are each their own invocation. Every
-line below is a task that actually executed — `testDebugUnitTest`, `verifyRoborazziDebug` and
-`connectedDebugAndroidTest` all reported `--rerun`, and the console line for each carried no
-`FROM-CACHE` or `UP-TO-DATE`.
+Every line below is a task that actually executed — `testDebugUnitTest`, `verifyRoborazziDebug`,
+`lintDebug`, `assembleDebug` and `connectedDebugAndroidTest` all reported `--rerun`, and the console
+line for each carried no `FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 689 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 689 tests, 0 failures — 1 baseline (`status_badges_all.png`) re-recorded for the new "Keskeytetty" badge and re-verified clean |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 694 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 694 tests, 0 failures, 0 baselines changed |
 | Lint | `./gradlew :app:lintDebug --rerun` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,282,967 bytes |
+| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,283,158 bytes |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun` | 54 tests, 0 failures, 0 errors, 0 skipped |
 
-**What changed:** `SessionStatus` gained `INTERRUPTED`, and `STARTED` can no longer transition to
-`SKIPPED` — a session that has begun now reports `INTERRUPTED` instead, so "Ohitettu" is left
-meaning only "never touched". `AiAnalysisAvailability.kindFor` offers the "miten meni?" analysis to
-`STARTED` and `INTERRUPTED` on the same seven-day window as `COMPLETED`, reusing the guided-progress
-description `AnalysisPromptBuilder` already wrote for a session completed early. The header menu on
-Today's card (`SecondaryActionsMenu`) gets a new "Keskeytä treeni" row for a started session, and
-"Ohita", "Kevyempi versio" and "Siirrä huomiselle" no longer show there — none of the three was ever
-in `STARTED`'s allowed transitions, so all three were dead taps the repository silently rejected.
+**What changed, and why it was found the same day PR #17 shipped:** the owner's own installed app
+showed a session `SKIPPED` in the app's own record — never started — with real Oura data attached
+("14 min · 66 kcal") and no way to ask for an analysis of it. `MatchOuraWorkoutsUseCase` never
+changes a session's status (`docs/TRAINING_ENGINE.md`, "Matching imported workouts"), so a ring can
+record activity against a session the app considers untouched. `AiAnalysisAvailability.kindFor`
+gained a third parameter, `hasRecordedActivity: Boolean = false` — `SKIPPED` now offers the same
+"miten meni?" analysis `COMPLETED`/`STARTED`/`INTERRUPTED` do, but only when it is `true`, on the
+same seven-day window. A genuinely untouched `SKIPPED` session — no app progress, no outside match —
+still offers nothing, which is the one thing PR #17 got right that this fix does not undo.
 
-No Room migration: `SessionStatus` is stored by `Converters.sessionStatusToString` as `.name`
-(`TEXT`), so a new enum member needs no schema change. Confirmed by grepping every exhaustive
-`when` over `SessionStatus` in `app/src/main` before compiling, not only by the compiler catching
-what it could.
+`WorkoutViewModel.requestAiAnalysis` now fetches the Oura and intervals.icu matches *before* the
+`kindFor` gate rather than after, and passes them into `buildAnalysisPrompt` instead of re-fetching
+— both so the eligibility check and the prompt agree on the same data, and so a session that passes
+the gate cannot still send an empty request. `AiAnalysisPromptSourcingTest` gained the regression:
+a `SKIPPED` session with a directly-seeded matched `OuraWorkoutEntity` reaches the client with "kesto
+14 min" and "66 kcal" in the prompt, and one with no match is confirmed to send nothing at all.
 
-The APK grew by 160,888 B over the last measurement recorded here (21,122,079 B, 2026-08-24) — most
-of that is the ten pulled commits' own work (the header menu, Oura score contributors), not this
-change alone; no APK measurement exists for the tree immediately before this fix to isolate it.
+No Room migration — `hasRecordedActivity` is computed from data already being read, not a new
+column. The APK grew by 191 B over PR #17's own measurement (21,282,967 B), consistent with a
+three-parameter signature change and no new stored data.
 
 ## Current implementation
 
@@ -116,6 +116,54 @@ fix for an old measurement is a new measurement. What went with it was the reaso
 numbers — including the one methodological finding on this page that cost a full afternoon to
 establish, and that anyone measuring an APK here needs before they start. Restored below,
 unchanged, as it was written when each figure was taken.
+
+### 2026-09-01 — the STARTED/INTERRUPTED status split (measured on `78ab244`, PR #17)
+
+- Date: 2026-09-01
+- Base commit: working tree for the STARTED/INTERRUPTED status split on top of `82650a4` (branch
+  `fix/started-skipped-analysis-menu`), which itself pulled in ten commits this tree had not yet
+  seen — the header overflow menu and the Oura recovery-contributor work.
+- Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
+  and build-tools 36.1.0, on Windows 11
+- Emulator: `treeni-test`, android-36 google_apis x86_64, headless
+
+Screenshots and the unit-test run share one task (`verifyRoborazziDebug` depends on
+`testDebugUnitTest`); lint, the APK and the instrumented run are each their own invocation. Every
+line below is a task that actually executed — `testDebugUnitTest`, `verifyRoborazziDebug` and
+`connectedDebugAndroidTest` all reported `--rerun`, and the console line for each carried no
+`FROM-CACHE` or `UP-TO-DATE`.
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 689 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 689 tests, 0 failures — 1 baseline (`status_badges_all.png`) re-recorded for the new "Keskeytetty" badge and re-verified clean |
+| Lint | `./gradlew :app:lintDebug --rerun` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,282,967 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun` | 54 tests, 0 failures, 0 errors, 0 skipped |
+
+**What changed:** `SessionStatus` gained `INTERRUPTED`, and `STARTED` can no longer transition to
+`SKIPPED` — a session that has begun now reports `INTERRUPTED` instead, so "Ohitettu" is left
+meaning only "never touched". `AiAnalysisAvailability.kindFor` offers the "miten meni?" analysis to
+`STARTED` and `INTERRUPTED` on the same seven-day window as `COMPLETED`, reusing the guided-progress
+description `AnalysisPromptBuilder` already wrote for a session completed early. The header menu on
+Today's card (`SecondaryActionsMenu`) gets a new "Keskeytä treeni" row for a started session, and
+"Ohita", "Kevyempi versio" and "Siirrä huomiselle" no longer show there — none of the three was ever
+in `STARTED`'s allowed transitions, so all three were dead taps the repository silently rejected.
+
+No Room migration: `SessionStatus` is stored by `Converters.sessionStatusToString` as `.name`
+(`TEXT`), so a new enum member needs no schema change. Confirmed by grepping every exhaustive
+`when` over `SessionStatus` in `app/src/main` before compiling, not only by the compiler catching
+what it could.
+
+The APK grew by 160,888 B over the last measurement recorded here (21,122,079 B, 2026-08-24) — most
+of that is the ten pulled commits' own work (the header menu, Oura score contributors), not this
+change alone; no APK measurement exists for the tree immediately before this fix to isolate it.
+
+**One gap this fix left, found and closed the same day:** it only accounted for a session reaching
+`SKIPPED`/`INTERRUPTED` through the app's own guided workout. It did not consider that
+`MatchOuraWorkoutsUseCase` can attach real Oura data to a session regardless of status, so a
+`SKIPPED` session the app never saw touched could still have something worth reviewing. See the
+next entry above.
 
 ### 2026-08-24 — skip-navigation tests and the missing colour roles (measured on `a0e701d`)
 

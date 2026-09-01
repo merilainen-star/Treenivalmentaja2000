@@ -668,6 +668,10 @@ fun WorkoutCardToday(
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
+            // Independent of `workout.status`: a match never changes it (see
+            // docs/TRAINING_ENGINE.md, "Matching imported workouts"), so a SKIPPED session a ring
+            // or watch still recorded something for is not the same as one nobody touched.
+            val hasRecordedActivity = completed != null || run != null
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -684,7 +688,11 @@ fun WorkoutCardToday(
                     // skipped session renders no button row at all, but can still offer
                     // "AI-analyysi: miten meni?" — the menu must not depend on that row existing.
                     SecondaryActionsMenu(
-                        kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
+                        kind = AiAnalysisAvailability.kindFor(
+                            workout.status,
+                            workout.dayOffset,
+                            hasRecordedActivity,
+                        ),
                         analysisConfigured = analysisConfigured,
                         analysis = analysis,
                         planProposal = planProposal,
@@ -873,7 +881,11 @@ fun WorkoutCardToday(
             // — this still renders the Loading/Loaded/Failed result inline exactly as before, since
             // that is state a person is reading, not an action waiting to be offered.
             AiAnalysisSection(
-                kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
+                kind = AiAnalysisAvailability.kindFor(
+                    workout.status,
+                    workout.dayOffset,
+                    hasRecordedActivity,
+                ),
                 state = analysis,
                 configured = analysisConfigured,
                 onRequest = onRequestAnalysis,

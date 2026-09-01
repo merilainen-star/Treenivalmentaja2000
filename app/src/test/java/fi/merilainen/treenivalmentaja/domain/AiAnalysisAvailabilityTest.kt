@@ -124,6 +124,42 @@ class AiAnalysisAvailabilityTest {
     assertNull(AiAnalysisAvailability.kindFor(SessionStatus.SKIPPED, dayOffset = 0))
   }
 
+  // -------------------------------------------------------- skipped, but Oura or a watch saw it
+
+  /**
+   * A ring worn through an untracked session still recorded whatever it recorded — a match never
+   * changes status, so this session is `SKIPPED` in the app's own account and has real data to
+   * review anyway.
+   */
+  @Test
+  fun `a skipped session with a matched activity can be analysed, same as completed`() {
+    assertEquals(
+      AiAnalysisKind.COMPLETED,
+      AiAnalysisAvailability.kindFor(SessionStatus.SKIPPED, dayOffset = 0, hasRecordedActivity = true),
+    )
+  }
+
+  @Test
+  fun `hasRecordedActivity is ignored for every status except skipped`() {
+    val nonSkipped = SessionStatus.entries.filter { it != SessionStatus.SKIPPED }
+    for (status in nonSkipped) {
+      for (offset in -10..10) {
+        assertEquals(
+          AiAnalysisAvailability.kindFor(status, offset),
+          AiAnalysisAvailability.kindFor(status, offset, hasRecordedActivity = true),
+        )
+      }
+    }
+  }
+
+  /** Same seven-day-back boundary as COMPLETED — a match does not widen the review window. */
+  @Test
+  fun `a skipped session with a matched activity eight days ago cannot`() {
+    assertNull(
+      AiAnalysisAvailability.kindFor(SessionStatus.SKIPPED, dayOffset = -8, hasRecordedActivity = true)
+    )
+  }
+
   /** The lightening already happened, so the advice this exists to give has been taken. */
   @Test
   fun `an already-lightened session offers nothing`() {

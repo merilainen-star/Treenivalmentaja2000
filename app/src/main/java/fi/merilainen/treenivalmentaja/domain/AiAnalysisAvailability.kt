@@ -12,8 +12,9 @@ enum class AiAnalysisKind {
 /**
  * Whether a session may be analysed, and as which of the two kinds.
  *
- * A pure function of a status and a day offset, and separate from the UI for the usual reason on
- * this project: the windows are a decision, and a decision belongs somewhere a test can reach it.
+ * A pure function of a status, a day offset and whether anything was recorded for the slot, and
+ * separate from the UI for the usual reason on this project: the windows are a decision, and a
+ * decision belongs somewhere a test can reach it.
  *
  * **The two windows are different sizes, and that asymmetry is the whole point.**
  *
@@ -39,9 +40,17 @@ object AiAnalysisAvailability {
   /**
    * @param status the session's current state.
    * @param dayOffset days from today — negative in the past, 0 today, positive ahead.
+   * @param hasRecordedActivity whether Oura or intervals.icu matched something to this session,
+   *   independent of [status] — a match never changes status (see `docs/TRAINING_ENGINE.md`,
+   *   "Matching imported workouts"), so a ring can see fourteen minutes of movement on a session
+   *   the plan still calls `SKIPPED`. Ignored for every status except `SKIPPED`.
    * @return which analysis to offer, or `null` for no button at all.
    */
-  fun kindFor(status: SessionStatus, dayOffset: Int): AiAnalysisKind? =
+  fun kindFor(
+    status: SessionStatus,
+    dayOffset: Int,
+    hasRecordedActivity: Boolean = false,
+  ): AiAnalysisKind? =
     when (status) {
       // All three have something to review: a full session, one ended early on purpose
       // (INTERRUPTED), or one still under way with whatever the guided list has recorded so far
@@ -52,6 +61,15 @@ object AiAnalysisAvailability {
       SessionStatus.INTERRUPTED ->
         AiAnalysisKind.COMPLETED.takeIf { dayOffset in -COMPLETED_DAYS_BACK..0 }
 
+      // "Never touched, by the app's own account" (see SessionStatus) is not the same fact as
+      // "nothing happened" — a ring worn through an untracked session still recorded whatever it
+      // recorded. Only a genuinely untouched SKIPPED session — no app progress, no outside match —
+      // has nothing to ask about.
+      SessionStatus.SKIPPED ->
+        AiAnalysisKind.COMPLETED.takeIf {
+          hasRecordedActivity && dayOffset in -COMPLETED_DAYS_BACK..0
+        }
+
       // Only the two states that mean "still ahead of you and unchanged".
       //
       // REPLACED_WITH_LIGHTER_VERSION is absent for a different reason — the lightening has already
@@ -60,8 +78,7 @@ object AiAnalysisAvailability {
       SessionStatus.NOTIFIED ->
         AiAnalysisKind.UPCOMING.takeIf { dayOffset in 0..UPCOMING_DAYS_FORWARD }
 
-      // SKIPPED now means "never touched" (see SessionStatus) — nothing completed to assess and
-      // nothing upcoming to advise on. The rest are closed rows the screens do not draw at all.
+      // Closed rows the screens do not draw at all.
       else -> null
     }
 }

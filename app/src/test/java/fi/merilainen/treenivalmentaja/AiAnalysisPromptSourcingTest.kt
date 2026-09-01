@@ -6,6 +6,7 @@ import fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler
 import fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.oura.FakeOuraTokenStorage
 import fi.merilainen.treenivalmentaja.data.oura.OuraAuthService
 import fi.merilainen.treenivalmentaja.data.oura.OuraClient
@@ -27,6 +28,7 @@ import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -273,6 +275,68 @@ class AiAnalysisPromptSourcingTest {
         "an unrecorded workout must not report movements as undone",
         !prompt.contains("liikesuoritusta kuitattiin"),
       )
+    }
+
+  /**
+   * The report that started this file's newest test: a session `SKIPPED` in the app's own record,
+   * with real Oura data attached anyway — because matching a workout to a session never changes
+   * its status (`docs/TRAINING_ENGINE.md`, "Matching imported workouts"). The button has to reach
+   * a session like this exactly as it would a `COMPLETED` one, and the request has to actually go
+   * out rather than the gate inside `requestAiAnalysis` silently disagreeing with it.
+   */
+  @Test
+  fun `a skipped session Oura matched something to can still be analysed`() =
+    runTest(dispatcher) {
+      val today = LocalDate.now()
+      repository.importPlan(planWithSessionOn(today))
+      seedRecovery(today)
+      val startUtc = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() + 9 * 3_600_000L
+      db.ouraDao()
+        .upsertWorkouts(
+          listOf(
+            OuraWorkoutEntity(
+              id = "oura-w-1",
+              activityType = "strengthTraining",
+              startTimeUtc = startUtc,
+              endTimeUtc = startUtc + 14 * 60_000L,
+              calories = 66f,
+              matchedSessionId = SESSION_ID,
+            )
+          )
+        )
+      advanceUntilIdle()
+
+      val vm = viewModel()
+      advanceUntilIdle()
+      vm.updateWorkoutStatus(SESSION_ID, SessionStatus.SKIPPED)
+      advanceUntilIdle()
+
+      vm.requestAiAnalysis(SESSION_ID)
+      advanceUntilIdle()
+
+      val prompt = client.prompt
+      assertNotNull("the client was never called — the gate rejected an eligible session", prompt)
+      assertTrue("the matched duration did not reach the prompt", prompt!!.contains("kesto 14 min"))
+      assertTrue("the matched calories did not reach the prompt", prompt.contains("66 kcal"))
+    }
+
+  /** The other half of the same fact: nothing recorded really does mean nothing to ask about. */
+  @Test
+  fun `a skipped session with no match offers nothing to analyse`() =
+    runTest(dispatcher) {
+      val today = LocalDate.now()
+      repository.importPlan(planWithSessionOn(today))
+      advanceUntilIdle()
+
+      val vm = viewModel()
+      advanceUntilIdle()
+      vm.updateWorkoutStatus(SESSION_ID, SessionStatus.SKIPPED)
+      advanceUntilIdle()
+
+      vm.requestAiAnalysis(SESSION_ID)
+      advanceUntilIdle()
+
+      assertEquals(null, vm.aiAnalyses.value[SESSION_ID])
     }
 
   // ------------------------------------------------------------------ harness
