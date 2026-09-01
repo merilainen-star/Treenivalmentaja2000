@@ -30,6 +30,14 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   jäsennetty kuvauksesta — ohjattu tila ei osaa ottaa niitä, joten se on niille ainoa tapa pitää lukua.
 
 ### Fixed
+- **Ohitettu treeni, jolle Oura oli silti sovittanut liikuntaa, ei tarjonnut "AI-analyysi: miten
+  meni?" -vaihtoehtoa.** Sovitus ei koskaan muuta tilaa (`docs/TRAINING_ENGINE.md`, "Matching
+  imported workouts") — rengas voi kirjata liikuntaa treeniin, jota ei sovelluksen mukaan koskaan
+  aloitettu. `AiAnalysisAvailability.kindFor` sai uuden `hasRecordedActivity`-parametrin: aidosti
+  koskematon `Ohitettu` pysyy yhä ilman analyysiä, mutta yksi jolle Oura tai intervals.icu on
+  sovittanut jotain tarjoaa sen samalla 7 päivän ikkunalla kuin muutkin. `WorkoutViewModel`in oma
+  pyynnön portti tarkistaa saman signaalin kuin valikko, jotta nappi ei enää voi näkyä ilman että
+  pyyntö oikeasti lähtee.
 - **Kolmen pisteen valikko katosi kokonaan kesken jääneestä treenistä, eikä "AI-analyysi: miten
   meni?" ollut silloin tavoitettavissa millekään tehdylle osalle.** `Ohitettu` tarkoitti tähän asti
   kahta eri asiaa — treeniä ei koskaan aloitettu, ja treeni aloitettiin mutta jätettiin kesken —

@@ -591,7 +591,15 @@ fun WorkoutCardWeek(
                 // you go looking for, and a button on every collapsed row would compete with the
                 // scanning the header exists for.
                 AiAnalysisSection(
-                    kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
+                    // Independent of `workout.status`: a match never changes it (see
+                    // docs/TRAINING_ENGINE.md, "Matching imported workouts"), so a SKIPPED session
+                    // Oura or intervals.icu still recorded something for is not the same as one
+                    // nobody touched.
+                    kind = AiAnalysisAvailability.kindFor(
+                        workout.status,
+                        workout.dayOffset,
+                        hasRecordedActivity = completed != null || run != null,
+                    ),
                     state = analysis,
                     configured = analysisConfigured,
                     onRequest = onRequestAnalysis,

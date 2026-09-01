@@ -942,13 +942,23 @@ class WorkoutViewModel(
       val session = repository.getSession(sessionId) ?: return@launch
       val date = runCatching { LocalDate.parse(session.scheduledDate) }.getOrNull() ?: return@launch
       val offset = ChronoUnit.DAYS.between(currentDate.value, date).toInt()
-      // Decided from the same status and offset the button's visibility was, so the two cannot
-      // disagree about what a session is.
-      val kind = AiAnalysisAvailability.kindFor(session.status, offset) ?: return@launch
+
+      // Fetched before the eligibility check, not only for the prompt: a SKIPPED session Oura or
+      // intervals.icu matched something to still has something to review, even though the app's
+      // own record says nothing was ever started (a match never changes status — see
+      // docs/TRAINING_ENGINE.md, "Matching imported workouts").
+      val oura = ouraRepository.observeMatchedMetrics().first()[sessionId]
+      val run = intervalsRepository?.observeMatchedRunMetrics()?.first()?.get(sessionId)
+
+      // Decided from the same status, offset and matched-activity signal the button's visibility
+      // was, so the two cannot disagree about what a session is.
+      val kind =
+        AiAnalysisAvailability.kindFor(session.status, offset, oura != null || run != null)
+          ?: return@launch
 
       // Set only once the request is known to be going out, so an ineligible tap leaves no spinner.
       _aiAnalyses.update { it + (sessionId to AiAnalysisState.Loading) }
-      val prompt = buildAnalysisPrompt(kind, session, date)
+      val prompt = buildAnalysisPrompt(kind, session, date, oura, run)
       val state =
         try {
           AiAnalysisState.Loaded(client.analyse(prompt, model), prompt)
@@ -972,6 +982,8 @@ class WorkoutViewModel(
     kind: AiAnalysisKind,
     session: TrainingSession,
     date: LocalDate,
+    oura: CompletedSessionMetrics?,
+    run: CompletedRunMetrics?,
   ): String {
     val recovery =
       ouraRepository
@@ -980,7 +992,6 @@ class WorkoutViewModel(
           to = date,
         )
         .first()
-    val runs = intervalsRepository?.observeMatchedRunMetrics()?.first().orEmpty()
 
     return when (kind) {
       AiAnalysisKind.COMPLETED ->
@@ -996,8 +1007,8 @@ class WorkoutViewModel(
             // Read from the completion event, not from this class's own map: the analysis can be
             // asked for days later, from a screen that never held the counter.
             guided = repository.guidedProgressFor(session.id),
-            oura = ouraRepository.observeMatchedMetrics().first()[session.id],
-            run = runs[session.id],
+            oura = oura,
+            run = run,
             recoveryByDay = recovery,
           )
         )
