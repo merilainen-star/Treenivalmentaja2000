@@ -214,6 +214,15 @@ private fun Diagnostics(
           "Aktiivisuus ${result.activityDays} pv · Syke ${result.heartRateSamples} näytettä",
       style = MaterialTheme.typography.bodyMedium,
     )
+    // The same question one layer deeper: of the days above, how many actually carried a score
+    // breakdown? A document can arrive with an empty `contributors` object, and "Oura sent no
+    // breakdown" and "the app dropped it" look identical from outside — this line is the answer.
+    Text(
+      text =
+        "Kontribuuttorit: palautuminen ${result.readinessWithContributors}/${result.readinessDays} pv · " +
+          "palautumisaika ${result.activityWithRecoveryTime}/${result.activityDays} pv",
+      style = MaterialTheme.typography.bodyMedium,
+    )
     Text(
       text = "Treenit: ${result.workoutCount}",
       style = MaterialTheme.typography.bodyMedium,

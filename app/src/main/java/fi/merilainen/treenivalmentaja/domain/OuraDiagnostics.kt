@@ -23,6 +23,19 @@ data class OuraDiagnostics(
   val activityDays: Int = 0,
   val workouts: List<String> = emptyList(),
   val heartRateSamples: Int = 0,
+  /**
+   * Of [readinessDays], how many carried at least one non-null `contributors` field.
+   *
+   * The same dead end this whole type was built to close, one layer deeper: a document can arrive
+   * (counted in [readinessDays]) with a `contributors` object that is itself present but empty, and
+   * from the outside "Oura sent no breakdown for this day" and "the app dropped it" look identical.
+   * This counts what the wire response itself carried, read straight off the client's DTOs —
+   * nothing routed through [fi.merilainen.treenivalmentaja.data.oura.OuraMappers] or Room first, so
+   * a mapper bug cannot hide behind a passing count here. See ADR-014 in `docs/DECISIONS.md`.
+   */
+  val readinessWithContributors: Int = 0,
+  /** Of [activityDays], how many carried a non-null `contributors.recovery_time`. */
+  val activityWithRecoveryTime: Int = 0,
   /** Per-collection failures, already in Finnish. Empty when everything answered. */
   val failures: List<String> = emptyList(),
 ) {

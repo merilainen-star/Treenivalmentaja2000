@@ -224,6 +224,42 @@ class OuraRepositoryTest {
       assertTrue(result.failures.toString(), result.failures.isEmpty())
     }
 
+  /**
+   * The same dead end one layer deeper (see `OuraDiagnostics`): a day can be counted in
+   * `readinessDays`/`activityDays` and still carry no score breakdown, and from the screen that
+   * looks identical to a mapper bug dropping one. This is read straight off the client's DTOs, not
+   * through `OuraMappers`, so it answers "did Oura send it" rather than "did we keep it".
+   */
+  @Test
+  fun `diagnostics count how many days actually carried a contributor breakdown`() =
+    runTest(dispatcher) {
+      routes =
+        mapOf(
+          READINESS to (200 to readinessWithContributors(DAY, "91")),
+          ACTIVITY to (200 to activityWithContributors(DAY, "80", "38")),
+        )
+
+      val result = repository.diagnose(LocalDate.parse(DAY), LocalDate.parse(DAY))
+
+      assertEquals(1, result.readinessDays)
+      assertEquals(1, result.readinessWithContributors)
+      assertEquals(1, result.activityDays)
+      assertEquals(1, result.activityWithRecoveryTime)
+    }
+
+  /** A day with a score but no breakdown counts toward the day, never toward the breakdown. */
+  @Test
+  fun `a score with no contributors is not counted as one`() = runTest(dispatcher) {
+    routes = mapOf(READINESS to (200 to scores(DAY, "66")), ACTIVITY to (200 to scores(DAY, "80")))
+
+    val result = repository.diagnose(LocalDate.parse(DAY), LocalDate.parse(DAY))
+
+    assertEquals(1, result.readinessDays)
+    assertEquals(0, result.readinessWithContributors)
+    assertEquals(1, result.activityDays)
+    assertEquals(0, result.activityWithRecoveryTime)
+  }
+
   @Test
   fun `diagnostics list each workout Oura returned`() = runTest(dispatcher) {
     routes = mapOf(WORKOUT to (200 to """{"data":[{"id":"w1","activity":"strength_training","day":"$DAY","start_datetime":"${DAY}T07:38:00+03:00","end_datetime":"${DAY}T08:08:00+03:00","calories":135.0,"intensity":"moderate","source":"autodetected"}],"next_token":null}"""))

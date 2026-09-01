@@ -6,6 +6,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.oura.OuraClient
 import fi.merilainen.treenivalmentaja.data.oura.OuraException
 import fi.merilainen.treenivalmentaja.data.oura.OuraMappers
+import fi.merilainen.treenivalmentaja.data.oura.OuraReadinessContributorsDto
 import fi.merilainen.treenivalmentaja.data.oura.OuraWorkoutDto
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
@@ -125,6 +126,8 @@ class OuraRepository internal constructor(
       activityDays = activity.size,
       workouts = workouts.map { it.describe() },
       heartRateSamples = samples.size,
+      readinessWithContributors = readiness.count { it.contributors.hasAnyValue() },
+      activityWithRecoveryTime = activity.count { it.contributors?.recoveryTime != null },
       failures = failures,
     )
   }
@@ -304,6 +307,26 @@ class OuraRepository internal constructor(
  * for. `source` is included: `autodetected` and `manual` are the difference between Oura noticing a
  * session and someone entering it, and that is exactly the kind of thing worth seeing.
  */
+/**
+ * True when at least one of the nine contributor fields came back non-null.
+ *
+ * `contributors` itself is required by the specification, so it can be present and still say
+ * nothing — a document with a `contributors` object every one of whose fields is `null` is not
+ * the same finding as one with no `contributors` at all, but for the diagnostics screen's question
+ * ("did Oura send a breakdown for this day") the two read the same: no.
+ */
+private fun OuraReadinessContributorsDto?.hasAnyValue(): Boolean =
+  this != null &&
+    (activityBalance != null ||
+      bodyTemperature != null ||
+      hrvBalance != null ||
+      previousDayActivity != null ||
+      previousNight != null ||
+      recoveryIndex != null ||
+      restingHeartRate != null ||
+      sleepBalance != null ||
+      sleepRegularity != null)
+
 private fun OuraWorkoutDto.describe(): String =
   buildString {
     append(day ?: "?")
