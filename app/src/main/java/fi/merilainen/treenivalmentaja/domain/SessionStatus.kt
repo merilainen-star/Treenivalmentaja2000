@@ -20,8 +20,11 @@ enum class SessionStatus(val title: String) {
   /** Done — manually confirmed or matched to an Oura workout. */
   COMPLETED("Tehty"),
 
-  /** Intentionally not done, and not moved to another day. */
+  /** Never started, and not moved to another day. */
   SKIPPED("Ohitettu"),
+
+  /** Started, then ended on purpose before the plan's movements ran out. */
+  INTERRUPTED("Keskeytetty"),
 
   /**
    * Moved to another day. This row is closed; a new session row carries the new date and points
@@ -66,11 +69,13 @@ enum class SessionStatus(val title: String) {
             PAUSED_DUE_TO_ILLNESS,
             CANCELLED,
           )
-        STARTED -> setOf(COMPLETED, SKIPPED, CANCELLED)
+        // SKIPPED is deliberately absent here: once a session is under way there is something to
+        // report, and "never started" would no longer be true. INTERRUPTED is that report.
+        STARTED -> setOf(COMPLETED, INTERRUPTED, CANCELLED)
         REPLACED_WITH_LIGHTER_VERSION ->
           setOf(STARTED, COMPLETED, SKIPPED, RESCHEDULED, PAUSED_DUE_TO_ILLNESS, CANCELLED)
         PAUSED_DUE_TO_ILLNESS -> setOf(PLANNED, RESCHEDULED, CANCELLED)
-        COMPLETED, SKIPPED, RESCHEDULED, CANCELLED -> emptySet()
+        COMPLETED, SKIPPED, RESCHEDULED, CANCELLED, INTERRUPTED -> emptySet()
       }
 
   /** A terminal status can never transition anywhere. */

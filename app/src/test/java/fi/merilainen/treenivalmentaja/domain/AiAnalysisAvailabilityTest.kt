@@ -87,15 +87,38 @@ class AiAnalysisAvailabilityTest {
     assertNull(AiAnalysisAvailability.kindFor(SessionStatus.PLANNED, dayOffset = -1))
   }
 
-  // ------------------------------------------------------------------ statuses with nothing to say
+  // ------------------------------------------------------------------ started / interrupted
 
-  /** Under way: the advice would arrive too late to act on. */
+  /**
+   * Under way, with whatever the guided list has recorded so far — the same review a finished
+   * session gets, not the "how should I execute this" of an upcoming one.
+   */
   @Test
-  fun `a started session offers nothing`() {
-    assertNull(AiAnalysisAvailability.kindFor(SessionStatus.STARTED, dayOffset = 0))
+  fun `a started session can be analysed, same as completed`() {
+    assertEquals(
+      AiAnalysisKind.COMPLETED,
+      AiAnalysisAvailability.kindFor(SessionStatus.STARTED, dayOffset = 0),
+    )
   }
 
-  /** Nothing completed to assess, nothing upcoming to advise on. */
+  /** Ended on purpose partway through — there is a partial session to review. */
+  @Test
+  fun `an interrupted session can be analysed, same as completed`() {
+    assertEquals(
+      AiAnalysisKind.COMPLETED,
+      AiAnalysisAvailability.kindFor(SessionStatus.INTERRUPTED, dayOffset = 0),
+    )
+  }
+
+  /** Same seven-day-back boundary as COMPLETED, since both use the same window. */
+  @Test
+  fun `a started session eight days ago cannot`() {
+    assertNull(AiAnalysisAvailability.kindFor(SessionStatus.STARTED, dayOffset = -8))
+  }
+
+  // ------------------------------------------------------------------ statuses with nothing to say
+
+  /** Never touched: nothing completed to assess and nothing upcoming to advise on. */
   @Test
   fun `a skipped session offers nothing`() {
     assertNull(AiAnalysisAvailability.kindFor(SessionStatus.SKIPPED, dayOffset = 0))

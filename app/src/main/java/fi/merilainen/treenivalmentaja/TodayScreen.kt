@@ -690,7 +690,7 @@ fun WorkoutCardToday(
                         planProposal = planProposal,
                         onRequestAnalysis = onRequestAnalysis,
                         onRequestPlanProposal = onRequestPlanProposal,
-                        isOpen = workout.status.isOpen,
+                        status = workout.status,
                         appliedLighterVariant = workout.appliedLighterVariant,
                         onStatusChange = onStatusChange,
                         onMoveToTomorrow = onMoveToTomorrow,
@@ -930,6 +930,11 @@ fun WorkoutCardToday(
  * via [AiAnalysisSection] with `showTriggers = false`). Renders nothing at all, not even the icon,
  * when every row would be conditional-false — the same "an opt-in feature that has not been opted
  * into should be invisible" rule [AiAnalysisSection] already follows for the AI items on their own.
+ *
+ * "Ohita", "Kevyempi versio" and "Siirrä huomiselle" are further restricted to a session that has
+ * not been started: none of the three is in [SessionStatus.STARTED]'s `allowedTransitions`, so
+ * offering them there was a dead tap the repository silently rejected. A started session gets
+ * "Keskeytä treeni" instead, the only row it can actually act on.
  */
 @Composable
 private fun SecondaryActionsMenu(
@@ -939,18 +944,22 @@ private fun SecondaryActionsMenu(
     planProposal: AiPlanProposalState?,
     onRequestAnalysis: () -> Unit,
     onRequestPlanProposal: (String?) -> Unit,
-    isOpen: Boolean,
+    status: SessionStatus,
     appliedLighterVariant: Boolean,
     onStatusChange: (SessionStatus) -> Unit,
     onMoveToTomorrow: () -> Unit,
 ) {
+    val notYetStarted = status.isOpen && status != SessionStatus.STARTED
     val showAnalysisTrigger = kind != null && analysisConfigured && analysis == null
     val showProposalTrigger =
         kind == AiAnalysisKind.UPCOMING && analysisConfigured && planProposal == null
-    val showLighten = isOpen && !appliedLighterVariant
-    val showSkip = isOpen
-    val showPostpone = isOpen
-    if (!showAnalysisTrigger && !showProposalTrigger && !showLighten && !showSkip && !showPostpone) {
+    val showLighten = notYetStarted && !appliedLighterVariant
+    val showSkip = notYetStarted
+    val showInterrupt = status == SessionStatus.STARTED
+    val showPostpone = notYetStarted
+    if (!showAnalysisTrigger && !showProposalTrigger && !showLighten && !showSkip &&
+        !showInterrupt && !showPostpone
+    ) {
         return
     }
 
@@ -1001,6 +1010,15 @@ private fun SecondaryActionsMenu(
                     onClick = {
                         expanded = false
                         onStatusChange(SessionStatus.SKIPPED)
+                    },
+                )
+            }
+            if (showInterrupt) {
+                DropdownMenuItem(
+                    text = { Text("Keskeytä treeni") },
+                    onClick = {
+                        expanded = false
+                        onStatusChange(SessionStatus.INTERRUPTED)
                     },
                 )
             }
@@ -1085,6 +1103,7 @@ fun WorkoutStatusBadge(status: SessionStatus) {
         SessionStatus.STARTED -> ColorBlue.copy(alpha = 0.2f) to ColorBlue
         SessionStatus.COMPLETED -> ColorGreen.copy(alpha = 0.2f) to ColorGreen
         SessionStatus.SKIPPED -> ColorRed.copy(alpha = 0.2f) to ColorRed
+        SessionStatus.INTERRUPTED -> ColorRed.copy(alpha = 0.2f) to ColorRed
         SessionStatus.RESCHEDULED -> ColorGray.copy(alpha = 0.2f) to ColorGray
         SessionStatus.REPLACED_WITH_LIGHTER_VERSION ->
             ColorYellow.copy(alpha = 0.2f) to Color(0xFFF57F17)

@@ -5,61 +5,45 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
-- Date: 2026-08-24
-- Base commit: working tree for the guided-workout feedback on top of `e3d5d4a`
+- Date: 2026-09-01
+- Base commit: working tree for the STARTED/INTERRUPTED status split on top of `82650a4` (branch
+  `fix/started-skipped-analysis-menu`), which itself pulled in ten commits this tree had not yet
+  seen — the header overflow menu and the Oura recovery-contributor work.
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
 
-The first four ran in one invocation with `--rerun-tasks` after a full `recordRoborazziDebug`; the
-instrumented run is separate and is the reason why. No task line carried `FROM-CACHE` or
-`UP-TO-DATE`.
-
-**The instrumented suite cannot share an emulator with hand testing.** It failed once here on
-`ReminderReceiverNoPermissionTest` — `expected:<PLANNED> but was:<NOTIFIED>` — because the app had
-been installed by hand for a person to try, and they had granted the notification permission the
-test needs *denied*. Runtime grants survive a reinstall of the same package, so the test ran in a
-state it does not assume. Re-run after `adb uninstall`, it passed. Two further lessons from the same
-session: Gradle uninstalls the app when the run ends, taking the hand-tester's imported plan with
-it; and a Gradle daemon holding `R.jar` open failed a run with `IOException: Couldn't delete` — the
-same Windows file-lock class as the earlier `classes.jar` failure, cured by `--stop` and deleting
-the intermediate. Neither was a code failure, and both cost a full run to tell apart from one.
+Screenshots and the unit-test run share one task (`verifyRoborazziDebug` depends on
+`testDebugUnitTest`); lint, the APK and the instrumented run are each their own invocation. Every
+line below is a task that actually executed — `testDebugUnitTest`, `verifyRoborazziDebug` and
+`connectedDebugAndroidTest` all reported `--rerun`, and the console line for each carried no
+`FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 663 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 65 comparisons, 0 changed, 65 unchanged |
-| Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,122,079 bytes |
-| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 53 tests, 0 failures, 0 errors, 0 skipped |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 689 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 689 tests, 0 failures — 1 baseline (`status_badges_all.png`) re-recorded for the new "Keskeytetty" badge and re-verified clean |
+| Lint | `./gradlew :app:lintDebug --rerun` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,282,967 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun` | 54 tests, 0 failures, 0 errors, 0 skipped |
 
-This change adds seven more: four proving that navigation never lands on a skipped movement — back,
-resume, and both from the movement itself and from its preparation screen — and three for the rest
-that belongs to a skipped movement, including that an ordinary movement still leads to its own rest
-and that the round break survives.
+**What changed:** `SessionStatus` gained `INTERRUPTED`, and `STARTED` can no longer transition to
+`SKIPPED` — a session that has begun now reports `INTERRUPTED` instead, so "Ohitettu" is left
+meaning only "never touched". `AiAnalysisAvailability.kindFor` offers the "miten meni?" analysis to
+`STARTED` and `INTERRUPTED` on the same seven-day window as `COMPLETED`, reusing the guided-progress
+description `AnalysisPromptBuilder` already wrote for a session completed early. The header menu on
+Today's card (`SecondaryActionsMenu`) gets a new "Keskeytä treeni" row for a started session, and
+"Ohita", "Kevyempi versio" and "Siirrä huomiselle" no longer show there — none of the three was ever
+in `STARTED`'s allowed transitions, so all three were dead taps the repository silently rejected.
 
-**Five of the six defects in this change were caught by looking at the recorded images, not by a
-check passing.** A running card said "Liikkeet 2" because `parseStrengthDescription` counts commas,
-and a `FilledTonalButton` came out lilac because neither colour scheme ever defined
-`secondaryContainer` — Material 3 fills a missing role from its own baseline palette.
-`verifyRoborazziDebug` can catch neither: it compares against a baseline recorded from the same
-code. **It prevents a baseline changing by accident; it does not prevent recording the wrong thing
-on purpose.** Blue actions on a red error container, an empty progress bar drawn full-width in the
-colour of completion, and a "next movement" card listing the movement being performed were all
-found the same way — the last two on a run whose five checks were green. Recording is not
-verification, and the step that does the verifying is a person opening the PNGs.
+No Room migration: `SessionStatus` is stored by `Converters.sessionStatusToString` as `.name`
+(`TEXT`), so a new enum member needs no schema change. Confirmed by grepping every exhaustive
+`when` over `SessionStatus` in `app/src/main` before compiling, not only by the compiler catching
+what it could.
 
-Two of those were caused by the colour-role fix itself. Defining `secondaryContainer` changed every
-component that takes it by default, and `LinearProgressIndicator` takes its **track** from it: an
-empty bar was drawn full-width in green. Filling a gap in a palette is not a local change.
-
-The three colour roles the scheme was missing (`secondaryContainer`, `errorContainer` and their
-`on-` pairs) had been absent since the Material 3 redesign landed. Nothing had used them, so nothing
-had shown it. Any future component that reaches for a role this scheme does not define will draw
-itself from the baseline palette and look like it belongs to a different app.
-
-The APK is 21,122,079 B — unchanged from the previous measurement, so this change fits inside the
-existing alignment page.
+The APK grew by 160,888 B over the last measurement recorded here (21,122,079 B, 2026-08-24) — most
+of that is the ten pulled commits' own work (the header menu, Oura score contributors), not this
+change alone; no APK measurement exists for the tree immediately before this fix to isolate it.
 
 ## Current implementation
 
@@ -132,6 +116,64 @@ fix for an old measurement is a new measurement. What went with it was the reaso
 numbers — including the one methodological finding on this page that cost a full afternoon to
 establish, and that anyone measuring an APK here needs before they start. Restored below,
 unchanged, as it was written when each figure was taken.
+
+### 2026-08-24 — skip-navigation tests and the missing colour roles (measured on `a0e701d`)
+
+- Date: 2026-08-24
+- Base commit: working tree for the guided-workout feedback on top of `e3d5d4a`
+- Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
+  and build-tools 36.1.0, on Windows 11
+- Emulator: `treeni-test`, android-36 google_apis x86_64, headless
+
+The first four ran in one invocation with `--rerun-tasks` after a full `recordRoborazziDebug`; the
+instrumented run is separate and is the reason why. No task line carried `FROM-CACHE` or
+`UP-TO-DATE`.
+
+**The instrumented suite cannot share an emulator with hand testing.** It failed once here on
+`ReminderReceiverNoPermissionTest` — `expected:<PLANNED> but was:<NOTIFIED>` — because the app had
+been installed by hand for a person to try, and they had granted the notification permission the
+test needs *denied*. Runtime grants survive a reinstall of the same package, so the test ran in a
+state it does not assume. Re-run after `adb uninstall`, it passed. Two further lessons from the same
+session: Gradle uninstalls the app when the run ends, taking the hand-tester's imported plan with
+it; and a Gradle daemon holding `R.jar` open failed a run with `IOException: Couldn't delete` — the
+same Windows file-lock class as the earlier `classes.jar` failure, cured by `--stop` and deleting
+the intermediate. Neither was a code failure, and both cost a full run to tell apart from one.
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun-tasks` | 663 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 65 comparisons, 0 changed, 65 unchanged |
+| Lint | `./gradlew :app:lintDebug --rerun-tasks` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug --rerun-tasks` | 21,122,079 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun-tasks` | 53 tests, 0 failures, 0 errors, 0 skipped |
+
+This change adds seven more: four proving that navigation never lands on a skipped movement — back,
+resume, and both from the movement itself and from its preparation screen — and three for the rest
+that belongs to a skipped movement, including that an ordinary movement still leads to its own rest
+and that the round break survives.
+
+**Five of the six defects in this change were caught by looking at the recorded images, not by a
+check passing.** A running card said "Liikkeet 2" because `parseStrengthDescription` counts commas,
+and a `FilledTonalButton` came out lilac because neither colour scheme ever defined
+`secondaryContainer` — Material 3 fills a missing role from its own baseline palette.
+`verifyRoborazziDebug` can catch neither: it compares against a baseline recorded from the same
+code. **It prevents a baseline changing by accident; it does not prevent recording the wrong thing
+on purpose.** Blue actions on a red error container, an empty progress bar drawn full-width in the
+colour of completion, and a "next movement" card listing the movement being performed were all
+found the same way — the last two on a run whose five checks were green. Recording is not
+verification, and the step that does the verifying is a person opening the PNGs.
+
+Two of those were caused by the colour-role fix itself. Defining `secondaryContainer` changed every
+component that takes it by default, and `LinearProgressIndicator` takes its **track** from it: an
+empty bar was drawn full-width in green. Filling a gap in a palette is not a local change.
+
+The three colour roles the scheme was missing (`secondaryContainer`, `errorContainer` and their
+`on-` pairs) had been absent since the Material 3 redesign landed. Nothing had used them, so nothing
+had shown it. Any future component that reaches for a role this scheme does not define will draw
+itself from the baseline palette and look like it belongs to a different app.
+
+The APK is 21,122,079 B — unchanged from the previous measurement, so this change fits inside the
+existing alignment page.
 
 ### 2026-08-24 — the advisor fix, the skip accounting and the theme (measured on `1fcaa36`)
 
