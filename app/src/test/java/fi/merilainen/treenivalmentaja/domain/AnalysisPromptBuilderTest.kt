@@ -136,6 +136,50 @@ class AnalysisPromptBuilderTest {
     assertTrue(prompt.contains("leposykkeen pisteytys 90/100"))
   }
 
+  /**
+   * The gap this note closes: a real request went out with readiness 91 and `recovery_time`
+   * flagged "Pay attention" in Oura's own app, and the answer that came back only reasoned about
+   * the good night — nothing in the prompt said the two could disagree. `recovery_time` answers a
+   * week-long question, not a this-morning one, and a good night does not answer it.
+   */
+  @Test
+  fun `recovery_time carries a note that it can outweigh a good night`() {
+    val prompt =
+      builder.upcoming(
+        UpcomingAnalysisInput(
+          type = WorkoutType.RUNNING,
+          date = day,
+          recoveryByDay =
+            mapOf(day to DailyRecovery(date = day.toString(), readiness = 91, activityRecoveryTime = 38)),
+        )
+      )
+
+    assertTrue(prompt.contains("eri asia kuin yllä oleva yön palautumislukema"))
+    assertTrue(prompt.contains("riittää yksinään perusteeksi kevyempään suositukseen"))
+  }
+
+  /** The note is about `recovery_time` specifically — it has nothing to say when that is absent. */
+  @Test
+  fun `the recovery_time note is omitted when there is no recovery_time`() {
+    val prompt =
+      builder.upcoming(
+        UpcomingAnalysisInput(
+          type = WorkoutType.RUNNING,
+          date = day,
+          recoveryByDay =
+            mapOf(
+              day to
+                DailyRecovery(
+                  date = day.toString(),
+                  readinessContributors = ReadinessContributors(hrvBalance = 85),
+                )
+            ),
+        )
+      )
+
+    assertFalse(prompt.contains("eri asia kuin"))
+  }
+
   /** Nothing to explain the score with is nothing written — no heading standing over a blank section. */
   @Test
   fun `omits the contributors section when there is nothing to explain the score with`() {

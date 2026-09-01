@@ -349,6 +349,14 @@ class AnalysisPromptBuilder {
    * `leposyke 52`: these are Oura's 1–100 opinion of those same measurements relative to this
    * athlete's own baseline, not the measurements themselves, and rule 2 exists precisely so the two
    * are never confused for each other. See ADR-014 in `docs/DECISIONS.md`.
+   *
+   * [RECOVERY_TIME_NOTE] exists because the number alone was not enough: a real request went out with
+   * readiness 91 and `recovery_time` flagged "Pay attention" in Oura's own app, and the answer that
+   * came back only reasoned about the good night. `recovery_time` answers a different question —
+   * Oura's own copy is "the number of easy days you've had during a week, and the timing of the
+   * last one" — and a good night does not answer it. Nothing else in the prompt says that two
+   * numbers under the same "palautuminen" umbrella can disagree, so this says it once, right next
+   * to the number it is about.
    */
   private fun StringBuilder.appendContributors(
     heading: String,
@@ -372,6 +380,7 @@ class AnalysisPromptBuilder {
     if (parts.isEmpty()) return
     appendLine(heading)
     appendLine("- $day: ${parts.joinToString(", ")}")
+    if (recovery.activityRecoveryTime != null) appendLine(RECOVERY_TIME_NOTE)
     appendLine()
   }
 
@@ -469,5 +478,17 @@ class AnalysisPromptBuilder {
       - Vastaa suomeksi, ilman otsikoita ja listamerkkejä — pelkkää tekstiä.
       """
         .trimIndent()
+
+    /**
+     * Why `palautumisaika` deserves its own sentence and the other nine contributors do not:
+     * it is the one number in this whole prompt that is allowed to disagree with a good night and
+     * still be the more important fact. Written to avoid the bare word "palautuminen" followed by
+     * a space — see [appendContributors]'s own tests for why that specific string is load-bearing
+     * elsewhere in this file.
+     */
+    const val RECOVERY_TIME_NOTE =
+      "  Palautumisaika on eri asia kuin yllä oleva yön palautumislukema: se kertoo viikon " +
+        "kevyistä ja lepopäivistä, ei tämän yön unesta, ja voi olla heikko silloinkin kun yön " +
+        "luvut ovat hyviä. Se riittää yksinään perusteeksi kevyempään suositukseen."
   }
 }
