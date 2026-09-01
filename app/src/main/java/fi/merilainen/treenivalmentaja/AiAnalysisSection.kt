@@ -17,17 +17,22 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
+import kotlinx.coroutines.delay
 
 /**
  * The "AI-analyysi" button, and whatever it has produced.
@@ -128,6 +133,8 @@ fun AiAnalysisSection(
 @Composable
 private fun AnalysisResult(state: AiAnalysisState.Loaded, onDismiss: () -> Unit) {
   var showPrompt by rememberSaveable { mutableStateOf(false) }
+  val clipboard = LocalClipboardManager.current
+  var copied by remember(state) { mutableStateOf(false) }
 
   Card(
     modifier = Modifier.fillMaxWidth(),
@@ -152,19 +159,47 @@ private fun AnalysisResult(state: AiAnalysisState.Loaded, onDismiss: () -> Unit)
       }
 
       AnimatedVisibility(visible = showPrompt) {
-        Text(
-          text = state.prompt,
-          style = MaterialTheme.typography.bodySmall,
-          fontFamily = FontFamily.Monospace,
-          color = MaterialTheme.colorScheme.onSecondaryContainer,
-          // The prompt is pre-formatted text with lines that do not wrap sensibly; scrolling it
-          // sideways beats reflowing it into something that no longer matches what was sent.
-          modifier = Modifier.horizontalScroll(rememberScrollState()),
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          // Same pattern as IntervalsRawDataSheet's copy button: the clipboard gets exactly
+          // state.prompt, the string that was actually sent — nothing pretty-printed or rebuilt.
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(
+              onClick = {
+                clipboard.setText(AnnotatedString(state.prompt))
+                copied = true
+              }
+            ) {
+              Text("Kopioi pyyntö leikepöydälle")
+            }
+          }
+          if (copied) {
+            Text(
+              text = "Pyyntö kopioitu leikepöydälle",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.primary,
+            )
+            LaunchedEffect(state) {
+              delay(COPY_CONFIRMATION_MILLIS)
+              copied = false
+            }
+          }
+          Text(
+            text = state.prompt,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            // The prompt is pre-formatted text with lines that do not wrap sensibly; scrolling it
+            // sideways beats reflowing it into something that no longer matches what was sent.
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+          )
+        }
       }
     }
   }
 }
+
+/** Matches `IntervalsRawDataSheet`'s `CONFIRMATION_MILLIS` — the same confirmation, same length. */
+private const val COPY_CONFIRMATION_MILLIS = 2_500L
 
 /** A failure, and a retry only when waiting could actually help. */
 @Composable

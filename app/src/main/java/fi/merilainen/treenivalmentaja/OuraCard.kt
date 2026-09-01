@@ -17,18 +17,22 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
+import kotlinx.coroutines.delay
 
 /**
  * The Oura connection, as a function of its state.
@@ -201,11 +205,34 @@ private fun Diagnostics(
     Text(if (running) "Haetaan…" else "Tarkista Oura-data")
   }
   diagnostics?.let { result ->
+    // Same pattern as IntervalsRawDataSheet's copy button: plain text, nothing pretty-printed.
+    val clipboard = LocalClipboardManager.current
+    var copied by remember(result) { mutableStateOf(false) }
+
     Text(
       text = "Aikaväli ${result.fromDate} – ${result.toDate}",
       style = MaterialTheme.typography.bodySmall,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+    OutlinedButton(
+      onClick = {
+        clipboard.setText(AnnotatedString(result.asClipboardText()))
+        copied = true
+      }
+    ) {
+      Text("Kopioi leikepöydälle")
+    }
+    if (copied) {
+      Text(
+        text = "Kopioitu leikepöydälle",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.primary,
+      )
+      LaunchedEffect(result) {
+        delay(DIAGNOSTICS_COPY_CONFIRMATION_MILLIS)
+        copied = false
+      }
+    }
     // "päivää" and "näytettä" spelled out: these are row counts, and read as scores without them —
     // "Palautuminen 5" looks like a readiness of 5 rather than five days of it.
     Text(
@@ -245,6 +272,33 @@ private fun Diagnostics(
     }
   }
 }
+
+/**
+ * The same lines this screen renders, as one string — nothing pretty-printed, so what lands on the
+ * clipboard is what a person would type by hand copying the screen, line by line.
+ */
+private fun OuraDiagnostics.asClipboardText(): String =
+  buildString {
+    appendLine("Aikaväli $fromDate – $toDate")
+    appendLine(
+      "Palautuminen $readinessDays pv · Uni $sleepDays pv · Aktiivisuus $activityDays pv · " +
+        "Syke $heartRateSamples näytettä"
+    )
+    appendLine(
+      "Kontribuuttorit: palautuminen $readinessWithContributors/$readinessDays pv · " +
+        "palautumisaika $activityWithRecoveryTime/$activityDays pv"
+    )
+    appendLine("Treenit: $workoutCount")
+    if (workouts.isEmpty()) {
+      appendLine("Oura ei palauttanut yhtään treeniä tältä aikaväliltä.")
+    } else {
+      workouts.forEach { appendLine(it) }
+    }
+    failures.forEach { appendLine(it) }
+  }.trimEnd()
+
+/** Matches `IntervalsRawDataSheet`'s `CONFIRMATION_MILLIS` — the same confirmation, same length. */
+private const val DIAGNOSTICS_COPY_CONFIRMATION_MILLIS = 2_500L
 
 @Composable
 private fun Connected(onDisconnect: () -> Unit) {
