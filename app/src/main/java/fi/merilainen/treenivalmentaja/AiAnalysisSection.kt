@@ -65,6 +65,12 @@ import kotlinx.coroutines.delay
  * @param kind which analysis this session can be asked for, from `AiAnalysisAvailability`.
  * @param state `null` before anything has been asked.
  * @param configured whether an API key exists. `false` draws nothing — see above.
+ * @param showTriggers whether the "AI-analyysi" / "Pyydä AI:lta muutosehdotus" starting buttons
+ *   render here at all. `false` on `TodayScreen`, whose card moved both into a header menu
+ *   ([SecondaryActionsMenu]) to declutter the stacked buttons below — this still renders
+ *   Loading/Loaded/Failed exactly as before, since an answer already in progress or in hand is
+ *   state to read, not an action still waiting to be offered. `true` (the default) is unchanged
+ *   behaviour, which is what `WeekScreen`'s expanded row still wants: no menu there to move into.
  */
 @Composable
 fun AiAnalysisSection(
@@ -77,6 +83,7 @@ fun AiAnalysisSection(
   onRequestProposal: (String?) -> Unit = {},
   onApplyProposal: () -> Unit = {},
   onDismissProposal: () -> Unit = {},
+  showTriggers: Boolean = true,
   modifier: Modifier = Modifier,
 ) {
   if (kind == null || !configured) return
@@ -100,7 +107,7 @@ fun AiAnalysisSection(
 
       state is AiAnalysisState.Failed -> AnalysisFailure(state, onRequest, onDismiss)
 
-      else ->
+      showTriggers ->
         OutlinedButton(onClick = onRequest, modifier = Modifier.fillMaxWidth()) {
           Text(
             when (kind) {
@@ -109,6 +116,10 @@ fun AiAnalysisSection(
             }
           )
         }
+
+      // showTriggers is false and there is no state yet: the trigger lives in the caller's own
+      // menu instead, so there is nothing for this composable to draw.
+      else -> Unit
     }
 
     if (kind == AiAnalysisKind.UPCOMING) {
@@ -116,6 +127,7 @@ fun AiAnalysisSection(
         state = proposalState,
         onRequest = onRequestProposal,
         onApply = onApplyProposal,
+        showTrigger = showTriggers,
         onDismiss = onDismissProposal,
       )
     }

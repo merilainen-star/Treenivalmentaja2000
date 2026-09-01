@@ -15,12 +15,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -38,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,6 +53,7 @@ import androidx.compose.runtime.key
 import fi.merilainen.treenivalmentaja.data.guide.ExerciseGuide
 import fi.merilainen.treenivalmentaja.data.oura.OuraConnectionState
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisAvailability
+import fi.merilainen.treenivalmentaja.domain.AiAnalysisKind
 import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
@@ -670,9 +678,26 @@ fun WorkoutCardToday(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
-                WorkoutStatusBadge(workout.status)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    WorkoutStatusBadge(workout.status)
+                    // In the header rather than beside the primary button below: a completed or
+                    // skipped session renders no button row at all, but can still offer
+                    // "AI-analyysi: miten meni?" — the menu must not depend on that row existing.
+                    SecondaryActionsMenu(
+                        kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
+                        analysisConfigured = analysisConfigured,
+                        analysis = analysis,
+                        planProposal = planProposal,
+                        onRequestAnalysis = onRequestAnalysis,
+                        onRequestPlanProposal = onRequestPlanProposal,
+                        isOpen = workout.status.isOpen,
+                        appliedLighterVariant = workout.appliedLighterVariant,
+                        onStatusChange = onStatusChange,
+                        onMoveToTomorrow = onMoveToTomorrow,
+                    )
+                }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
             
             // How many movements the session actually has, read the same way the card below reads
@@ -842,8 +867,11 @@ fun WorkoutCardToday(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Above the action buttons rather than below them: on a completed session it is the
-            // only thing left to do with the card, and on an upcoming one it is what the buttons
-            // underneath are the answer to.
+            // only thing left to do with the card, and on an upcoming one it is what the button
+            // underneath is the answer to. showTriggers = false: the "AI-analyysi" / "Pyydä
+            // AI:lta" starting buttons now live in the header's "..." menu (SecondaryActionsMenu)
+            // — this still renders the Loading/Loaded/Failed result inline exactly as before, since
+            // that is state a person is reading, not an action waiting to be offered.
             AiAnalysisSection(
                 kind = AiAnalysisAvailability.kindFor(workout.status, workout.dayOffset),
                 state = analysis,
@@ -854,64 +882,136 @@ fun WorkoutCardToday(
                 onRequestProposal = onRequestPlanProposal,
                 onApplyProposal = onApplyPlanProposal,
                 onDismissProposal = onDismissPlanProposal,
+                showTriggers = false,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
 
-            // Action buttons. Only offered while the session is still open — a completed,
-            // skipped or cancelled session has no legal transition left.
+            // One action button. Only offered while the session is still open — a completed,
+            // skipped or cancelled session has no legal transition left. Everything that used to
+            // stack up beside it (Kevyempi versio, Ohita, Siirrä huomiselle) moved into the
+            // header's "..." menu, so this card now has exactly one loud action.
             if (workout.status.isOpen) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (workout.type == WorkoutType.STRENGTH && workout.status != SessionStatus.STARTED) {
-                        Button(
-                            onClick = onOpenActiveWorkout,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Aloita ohjattu treeni")
-                        }
-                    } else if (workout.type == WorkoutType.STRENGTH && workout.status == SessionStatus.STARTED) {
-                        Button(
-                            onClick = onOpenActiveWorkout,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Jatka ohjattua treeniä")
-                        }
-                    } else {
-                        Button(
-                            onClick = { onStatusChange(SessionStatus.COMPLETED) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Merkitse tehdyksi")
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                onStatusChange(SessionStatus.REPLACED_WITH_LIGHTER_VERSION)
-                            },
-                            modifier = Modifier.weight(1f),
-                            enabled = !workout.appliedLighterVariant,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                        ) {
-                            Text("Kevyempi versio", maxLines = 1)
-                        }
-                        OutlinedButton(
-                            onClick = { onStatusChange(SessionStatus.SKIPPED) },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Text("Ohita")
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = onMoveToTomorrow,
+                if (workout.type == WorkoutType.STRENGTH && workout.status != SessionStatus.STARTED) {
+                    Button(
+                        onClick = onOpenActiveWorkout,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Siirrä huomiselle")
+                        Text("Aloita ohjattu treeni")
+                    }
+                } else if (workout.type == WorkoutType.STRENGTH && workout.status == SessionStatus.STARTED) {
+                    Button(
+                        onClick = onOpenActiveWorkout,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Jatka ohjattua treeniä")
+                    }
+                } else {
+                    Button(
+                        onClick = { onStatusChange(SessionStatus.COMPLETED) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Merkitse tehdyksi")
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The "..." menu that replaced the stacked secondary buttons in the header, next to
+ * [WorkoutStatusBadge] — not beside the primary button below, because that button does not always
+ * exist (a completed session renders none) while "AI-analyysi: miten meni?" should still be
+ * reachable there.
+ *
+ * Every row is conditional on its action actually applying right now — a completed session offers
+ * no "Ohita", a session already lightened offers no "Kevyempi versio" again, and once an AI
+ * request is in flight or answered its trigger row is gone (the answer renders on the card itself,
+ * via [AiAnalysisSection] with `showTriggers = false`). Renders nothing at all, not even the icon,
+ * when every row would be conditional-false — the same "an opt-in feature that has not been opted
+ * into should be invisible" rule [AiAnalysisSection] already follows for the AI items on their own.
+ */
+@Composable
+private fun SecondaryActionsMenu(
+    kind: AiAnalysisKind?,
+    analysisConfigured: Boolean,
+    analysis: AiAnalysisState?,
+    planProposal: AiPlanProposalState?,
+    onRequestAnalysis: () -> Unit,
+    onRequestPlanProposal: (String?) -> Unit,
+    isOpen: Boolean,
+    appliedLighterVariant: Boolean,
+    onStatusChange: (SessionStatus) -> Unit,
+    onMoveToTomorrow: () -> Unit,
+) {
+    val showAnalysisTrigger = kind != null && analysisConfigured && analysis == null
+    val showProposalTrigger =
+        kind == AiAnalysisKind.UPCOMING && analysisConfigured && planProposal == null
+    val showLighten = isOpen && !appliedLighterVariant
+    val showSkip = isOpen
+    val showPostpone = isOpen
+    if (!showAnalysisTrigger && !showProposalTrigger && !showLighten && !showSkip && !showPostpone) {
+        return
+    }
+
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Lisää toimintoja")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (showAnalysisTrigger) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            when (kind) {
+                                AiAnalysisKind.COMPLETED -> "AI-analyysi: miten meni?"
+                                AiAnalysisKind.UPCOMING -> "AI-analyysi: miten tämä kannattaa tehdä?"
+                                null -> ""
+                            }
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onRequestAnalysis()
+                    },
+                )
+            }
+            if (showProposalTrigger) {
+                DropdownMenuItem(
+                    text = { Text("Pyydä AI:lta muutosehdotus") },
+                    onClick = {
+                        expanded = false
+                        onRequestPlanProposal(null)
+                    },
+                )
+            }
+            if (showLighten) {
+                DropdownMenuItem(
+                    text = { Text("Kevyempi versio") },
+                    onClick = {
+                        expanded = false
+                        onStatusChange(SessionStatus.REPLACED_WITH_LIGHTER_VERSION)
+                    },
+                )
+            }
+            if (showSkip) {
+                DropdownMenuItem(
+                    text = { Text("Ohita") },
+                    onClick = {
+                        expanded = false
+                        onStatusChange(SessionStatus.SKIPPED)
+                    },
+                )
+            }
+            if (showPostpone) {
+                DropdownMenuItem(
+                    text = { Text("Siirrä huomiselle") },
+                    onClick = {
+                        expanded = false
+                        onMoveToTomorrow()
+                    },
+                )
             }
         }
     }

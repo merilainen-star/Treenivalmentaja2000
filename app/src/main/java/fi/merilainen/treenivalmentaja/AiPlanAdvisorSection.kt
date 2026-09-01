@@ -27,17 +27,27 @@ import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.AdvisorOperation
 import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 
+/**
+ * @param showTrigger whether the "Pyydä AI:lta muutosehdotus" starting button renders when [state]
+ *   is `null`. `false` on `TodayScreen`, whose card moved it into the header's "..." menu
+ *   alongside `AiAnalysisSection`'s own `showTriggers` — every other [state] still renders exactly
+ *   as before, since those are an answer already in progress or in hand, not a button waiting to
+ *   be offered.
+ */
 @Composable
 fun AiPlanAdvisorSection(
   state: AiPlanProposalState?,
   onRequest: (String?) -> Unit,
   onApply: () -> Unit,
   onDismiss: () -> Unit,
+  showTrigger: Boolean = true,
 ) {
   when (state) {
     null ->
-      OutlinedButton(onClick = { onRequest(null) }, modifier = Modifier.fillMaxWidth()) {
-        Text("Pyydä AI:lta muutosehdotus")
+      if (showTrigger) {
+        OutlinedButton(onClick = { onRequest(null) }, modifier = Modifier.fillMaxWidth()) {
+          Text("Pyydä AI:lta muutosehdotus")
+        }
       }
     AiPlanProposalState.Loading ->
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
