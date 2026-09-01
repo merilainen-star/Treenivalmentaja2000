@@ -30,6 +30,15 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   jäsennetty kuvauksesta — ohjattu tila ei osaa ottaa niitä, joten se on niille ainoa tapa pitää lukua.
 
 ### Fixed
+- **Kolmen pisteen valikko katosi kokonaan kesken jääneestä treenistä, eikä "AI-analyysi: miten
+  meni?" ollut silloin tavoitettavissa millekään tehdylle osalle.** `Ohitettu` tarkoitti tähän asti
+  kahta eri asiaa — treeniä ei koskaan aloitettu, ja treeni aloitettiin mutta jätettiin kesken —
+  eikä `AiAnalysisAvailability.kindFor` tarjonnut kummallekaan mitään analyysiä, vaikka promptin
+  rakentaja osasi jo kuvata kesken jääneen ohjatun treenin rehellisesti ("3/5 liikettä tehty").
+  Uusi tila `Keskeytetty` erottaa nämä kaksi: `Aloitettu`-treenin valikossa on nyt "Keskeytä
+  treeni" "Ohitan" sijaan (joka ei siinä tilassa koskaan onnistunutkaan — Room hylkäsi sen hiljaa),
+  ja sekä `Aloitettu` että `Keskeytetty` tarjoavat "AI-analyysi: miten meni?" samalla 7 päivän
+  ikkunalla kuin Valmis-tila.
 - **Ohitettu liike ei ole enää mikään mihin voi palata.** "Edellinen vaihe" siirtyi yhden askeleen
   taaksepäin ehdoitta, eli suoraan ohitetun liikkeen päälle — ja tallensi sen jatkamiskohdaksi.
   Ohitettu liike omistaa nyt kolme vaihetta: valmistautumisruutunsa, itsensä ja sitä seuraavan levon.

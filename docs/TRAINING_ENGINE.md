@@ -19,13 +19,19 @@ A `WorkoutSession` has exactly one of the following states. The enum is
 | `NOTIFIED` | The AlarmManager reminder has fired; the user has been told but has not acted. | No |
 | `STARTED` | The user has started the session (or Oura reports an in-progress workout). | No |
 | `COMPLETED` | Done — manually confirmed or matched to an Oura workout. | **Yes** |
-| `SKIPPED` | Intentionally not done, and not moved to another day. | **Yes** |
+| `SKIPPED` | Never started, and not moved to another day. | **Yes** |
+| `INTERRUPTED` | Started, then ended on purpose before the plan's movements ran out. | **Yes** |
 | `RESCHEDULED` | Moved to another day. This row is closed; a **new** session row carries the new date and points back here via `originalSessionId`. | **Yes** |
 | `REPLACED_WITH_LIGHTER_VERSION` | The user chose the lighter alternative. The session is still to be done, now with the lighter payload. | No |
 | `PAUSED_DUE_TO_ILLNESS` | Illness mode paused this session. It resumes or is rescheduled on recovery. | No |
 | `CANCELLED` | Removed from the plan entirely (plan rebuild, plan replaced, user deleted it). Never counted as missed. | **Yes** |
 
 Notes:
+- `SKIPPED` and `INTERRUPTED` split what used to be one status. `SKIPPED` is now reachable only
+  from a session that has not been started — `STARTED` cannot transition to it. A session ended on
+  purpose partway through goes to `INTERRUPTED` instead, which is what lets the AI analysis ("miten
+  meni?") be asked about it: `SKIPPED` has nothing recorded to review, `INTERRUPTED` has whatever
+  the guided list ticked off before it stopped.
 - `REPLACED_WITH_LIGHTER_VERSION` is **not** terminal: it records that the lighter variant was
   substituted, and the session still has to be completed or skipped afterwards. The session row
   also carries the boolean `appliedLighterVariant`, which stays `true` through the later transition
@@ -52,7 +58,7 @@ stateDiagram-v2
     REPLACED_WITH_LIGHTER_VERSION --> PAUSED_DUE_TO_ILLNESS
     REPLACED_WITH_LIGHTER_VERSION --> CANCELLED
     STARTED --> COMPLETED
-    STARTED --> SKIPPED
+    STARTED --> INTERRUPTED: "Keskeytä treeni"
     PLANNED --> COMPLETED: Oura match
     NOTIFIED --> COMPLETED
     PLANNED --> SKIPPED
@@ -69,6 +75,7 @@ stateDiagram-v2
     STARTED --> CANCELLED
     COMPLETED --> [*]
     SKIPPED --> [*]
+    INTERRUPTED --> [*]
     RESCHEDULED --> [*]
     CANCELLED --> [*]
 ```
@@ -78,10 +85,10 @@ stateDiagram-v2
 | --- | --- |
 | `PLANNED` | `NOTIFIED`, `STARTED`, `COMPLETED`, `SKIPPED`, `RESCHEDULED`, `REPLACED_WITH_LIGHTER_VERSION`, `PAUSED_DUE_TO_ILLNESS`, `CANCELLED` |
 | `NOTIFIED` | `STARTED`, `COMPLETED`, `SKIPPED`, `RESCHEDULED`, `REPLACED_WITH_LIGHTER_VERSION`, `PAUSED_DUE_TO_ILLNESS`, `CANCELLED` |
-| `STARTED` | `COMPLETED`, `SKIPPED`, `CANCELLED` |
+| `STARTED` | `COMPLETED`, `INTERRUPTED`, `CANCELLED` |
 | `REPLACED_WITH_LIGHTER_VERSION` | `STARTED`, `COMPLETED`, `SKIPPED`, `RESCHEDULED`, `PAUSED_DUE_TO_ILLNESS`, `CANCELLED` |
 | `PAUSED_DUE_TO_ILLNESS` | `PLANNED`, `RESCHEDULED`, `CANCELLED` |
-| `COMPLETED`, `SKIPPED`, `RESCHEDULED`, `CANCELLED` | *(terminal — nothing)* |
+| `COMPLETED`, `SKIPPED`, `INTERRUPTED`, `RESCHEDULED`, `CANCELLED` | *(terminal — nothing)* |
 
 An attempted transition outside this table is a programming error. The repository rejects it and
 writes nothing — neither the session update nor a `SessionEvent`.
@@ -99,7 +106,14 @@ future AI advisor summarises rather than re-deriving from mutated rows.
 Marks the session as `COMPLETED`. No schedule shifts occur.
 
 ### Skipping a Session
-Marks as `SKIPPED`. If it's a critical session, the engine may propose moving it. Otherwise, it is ignored in future load calculations.
+Marks as `SKIPPED`. Only offered for a session that has not been started. If it's a critical session, the engine may propose moving it. Otherwise, it is ignored in future load calculations.
+
+### Interrupting a Session
+User taps "Keskeytä treeni" on a session that is `STARTED`. Marks as `INTERRUPTED`, carrying
+whatever the guided workout had recorded (`GuidedProgress`) at that point — the same field a
+session completed early with `COMPLETED` carries. That recorded progress is what lets the AI
+analysis describe a partial session honestly instead of assuming it either never happened or ran
+to the end.
 
 ### Rescheduling (Moving)
 The original row transitions to `RESCHEDULED` and a **new** `WorkoutSession` is inserted for the

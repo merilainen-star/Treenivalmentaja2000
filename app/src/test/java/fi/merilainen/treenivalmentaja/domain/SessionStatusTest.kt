@@ -17,6 +17,7 @@ class SessionStatusTest {
       listOf(
         SessionStatus.COMPLETED,
         SessionStatus.SKIPPED,
+        SessionStatus.INTERRUPTED,
         SessionStatus.RESCHEDULED,
         SessionStatus.CANCELLED,
       )
@@ -69,15 +70,17 @@ class SessionStatusTest {
   }
 
   @Test
-  fun `started can only finish or be cancelled`() {
+  fun `started can only finish, be interrupted, or be cancelled`() {
     assertEquals(
-      setOf(SessionStatus.COMPLETED, SessionStatus.SKIPPED, SessionStatus.CANCELLED),
+      setOf(SessionStatus.COMPLETED, SessionStatus.INTERRUPTED, SessionStatus.CANCELLED),
       SessionStatus.STARTED.allowedTransitions,
     )
     assertFalse(SessionStatus.STARTED.canTransitionTo(SessionStatus.RESCHEDULED))
     assertFalse(
       SessionStatus.STARTED.canTransitionTo(SessionStatus.REPLACED_WITH_LIGHTER_VERSION)
     )
+    // SKIPPED means "never started" now — a started session reports INTERRUPTED instead.
+    assertFalse(SessionStatus.STARTED.canTransitionTo(SessionStatus.SKIPPED))
   }
 
   @Test

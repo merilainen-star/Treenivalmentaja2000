@@ -43,13 +43,16 @@ object AiAnalysisAvailability {
    */
   fun kindFor(status: SessionStatus, dayOffset: Int): AiAnalysisKind? =
     when (status) {
-      SessionStatus.COMPLETED ->
+      // All three have something to review: a full session, one ended early on purpose
+      // (INTERRUPTED), or one still under way with whatever the guided list has recorded so far
+      // (STARTED). `AnalysisPromptBuilder` already renders partial guided progress honestly —
+      // "3/5 liikettä tehty" — so nothing downstream needs to know which of the three it was.
+      SessionStatus.COMPLETED,
+      SessionStatus.STARTED,
+      SessionStatus.INTERRUPTED ->
         AiAnalysisKind.COMPLETED.takeIf { dayOffset in -COMPLETED_DAYS_BACK..0 }
 
       // Only the two states that mean "still ahead of you and unchanged".
-      //
-      // STARTED is deliberately absent: "how should I execute this" is moot once the session is
-      // under way, and the answer would arrive too late to act on either way.
       //
       // REPLACED_WITH_LIGHTER_VERSION is absent for a different reason — the lightening has already
       // happened, so the advice the analysis exists to give has already been taken.
@@ -57,8 +60,8 @@ object AiAnalysisAvailability {
       SessionStatus.NOTIFIED ->
         AiAnalysisKind.UPCOMING.takeIf { dayOffset in 0..UPCOMING_DAYS_FORWARD }
 
-      // SKIPPED has nothing completed to assess and nothing upcoming to advise on. The rest are
-      // closed rows the screens do not draw at all.
+      // SKIPPED now means "never touched" (see SessionStatus) — nothing completed to assess and
+      // nothing upcoming to advise on. The rest are closed rows the screens do not draw at all.
       else -> null
     }
 }
