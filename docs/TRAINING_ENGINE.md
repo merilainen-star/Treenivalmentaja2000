@@ -141,34 +141,29 @@ later be completed or skipped.
 - **Two or more missed sessions:** propose shifting every open session forward so the first missed
   session lands on today; spacing is preserved.
 - Opening or resuming Today computes only a preview. The card states the source/target date or the
-  shift and affected count. Room changes only after **Hyväksy siirto**; **Hylkää** writes nothing.
-  Before applying, the engine recomputes the proposal under a mutex, so a stale or double-accepted
-  proposal cannot move the calendar twice. This flow requires neither Oura nor a recovery reading.
-- **Merkitse tehdyiksi** is the third answer, and the only one that ends the question. It moves
-  exactly the missed sessions — the past-dated open ones, never a future session — to `COMPLETED`
-  on the dates they were planned for, changing no dates at all. It exists because the other two
-  answers both assume the training is still ahead of you: a shift keeps it, a refusal expires at
-  midnight, and a backlog that will never be trained (a plan left half-finished while the app
-  itself was being developed) therefore asked the same question every single day. Each session's
-  event carries `Merkitty tehdyksi jälkikäteen` under `EventSource.USER`, so the history says these
-  rows were ticked off by hand rather than recorded as they happened; a session paused by illness
-  goes via `PLANNED`, which is the transition table's own route out of the pause, and both writes
-  are events. The staleness guard is the one `applyMissedSessions` uses: the proposal is recomputed
-  under the same mutex, and one the situation has outgrown writes nothing.
-- **Hylkää is remembered for the rest of the day**, keyed by the plan-zone date — the same
-  mechanism the readiness card uses. It has to be: the preview is recomputed on every resume of the
-  Today screen, which is the app's start destination, so without a memory of the refusal the card
-  returned every single time the screen was opened. Keyed by *date* rather than by proposal, so a
-  second session going missed later the same day does not get past the answer already given; the
-  question comes back at the next plan-zone midnight, which makes it "not today" rather than
-  "never".
-- **The refusal is persisted**, in the `settings` DataStore under `missed_proposal_dismissed_for`.
-  It used to live only in the ViewModel, which meant it lasted exactly as long as the process:
-  installing a new APK over the app — or any ordinary cold start — asked again about the same
-  sessions on the same day, minutes after they had been refused. The stored value is still a
-  plan-zone date and still expires at midnight, so this makes the answer survive a restart without
-  turning "ei nyt" into "never"; an unparseable value reads as "never refused", because a corrupt
-  preference should ask again rather than silence the card for good.
+  shift and affected count. Room changes only after **Hyväksy siirto**, **Ohita** or **Merkitse
+  tehdyiksi** — before writing, each of the three recomputes the proposal under a mutex, so a stale
+  or double-accepted proposal cannot move (or close) the calendar twice. This flow requires neither
+  Oura nor a recovery reading.
+- **Ohita and Merkitse tehdyiksi are the two honest ways to say the training is not still ahead of
+  you** — Hyväksy siirto assumes it is. They differ only in whether it happened anyway: Ohita
+  closes a session that plainly did not (`SKIPPED`, or `INTERRUPTED` if the session was `STARTED`
+  when it went missed — the same split `AiAnalysisAvailability` reasons about), Merkitse tehdyiksi
+  one that did, off the books (`COMPLETED`). Both move exactly the missed sessions — the past-dated
+  open ones, never a future session — and change no dates. A session paused by illness goes via
+  `PLANNED` first for either, which is the transition table's own route out of the pause, and every
+  write is its own event: `Merkitty tehdyksi jälkikäteen` for the first, `Ohitettu jälkikäteen
+  väliin jääneenä` for the second, both under `EventSource.USER`, so the history says these rows
+  were closed by hand rather than recorded as they happened.
+- **Neither is remembered separately, because neither needs to be.** Both were once one button,
+  "Hylkää", that wrote nothing and was — like the readiness card — remembered only until the next
+  plan-zone midnight; a backlog that would never be trained (rows left behind while the app itself
+  was being developed) then asked the same question every single day. Ohita replaced that with a
+  real status change: a skipped or interrupted session is no longer open, so
+  `proposeMissedSessions()` has nothing left to find about it on the next resume — the same
+  permanence Merkitse tehdyiksi already had, and for the same reason. Nothing equivalent to the old
+  `missed_proposal_dismissed_for` DataStore entry exists any more; there is nothing left to persist
+  once the answer is a status the session already carries.
 
 ### Matching imported workouts
 

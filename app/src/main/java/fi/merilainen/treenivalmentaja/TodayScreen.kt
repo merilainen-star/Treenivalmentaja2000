@@ -146,7 +146,7 @@ fun TodayScreen(
         onDismissDrift = viewModel::dismissEasyRunDrift,
         missedSessionsProposal = missedProposal,
         onAcceptMissedSessions = viewModel::acceptMissedSessionsProposal,
-        onRejectMissedSessions = viewModel::rejectMissedSessionsProposal,
+        onSkipMissedSessions = viewModel::skipMissedSessionsProposal,
         onCompleteMissedSessions = viewModel::completeMissedSessionsProposal,
         analyses = analyses,
         planProposals = planProposals,
@@ -190,7 +190,7 @@ fun TodayScreenContent(
     onDismissDrift: () -> Unit = {},
     missedSessionsProposal: MissedSessionsProposal = MissedSessionsProposal.None,
     onAcceptMissedSessions: () -> Unit = {},
-    onRejectMissedSessions: () -> Unit = {},
+    onSkipMissedSessions: () -> Unit = {},
     onCompleteMissedSessions: () -> Unit = {},
     analyses: Map<String, AiAnalysisState> = emptyMap(),
     planProposals: Map<String, AiPlanProposalState> = emptyMap(),
@@ -229,7 +229,7 @@ fun TodayScreenContent(
             MissedSessionsProposalCard(
                 proposal = missedSessionsProposal,
                 onAccept = onAcceptMissedSessions,
-                onReject = onRejectMissedSessions,
+                onSkip = onSkipMissedSessions,
                 onComplete = onCompleteMissedSessions,
             )
         }
@@ -327,22 +327,24 @@ fun TodayScreenContent(
 }
 
 /**
- * A calendar change shown before it is made; rejecting this card is a pure no-op.
+ * A calendar change shown before it is made.
  *
- * Three answers, because two were not enough. Shifting the programme forward assumes the sessions
- * are still to be done, and rejecting changes nothing — so a backlog that will never be trained
- * came back as the same card every day. "Merkitse tehdyiksi" closes those sessions where they
- * stand, which is the only one of the three that ends the question.
+ * Three honest answers, all of them permanent. Shifting the programme forward assumes the
+ * sessions are still to be done. "Ohita" and "Merkitse tehdyiksi" both assume they are not, and
+ * differ only in whether that training happened anyway: "Ohita" closes a session that plainly did
+ * not, "Merkitse tehdyiksi" one that did, off the books. Neither used to end the question — "Ohita"
+ * was "Hylkää", a refusal the app forgot by the next midnight, so the same card came back daily
+ * until "Merkitse tehdyiksi" was pressed, whether or not that was true.
  *
- * The two writing actions are laid out one per row rather than three across: "Merkitse tehdyiksi"
- * closes sessions for good, and a button that does that should not be a narrow one squeezed in
- * beside the others on a phone.
+ * "Merkitse tehdyiksi" keeps its own full-width row below the other two: it is the one action here
+ * that records something that did not happen as though it did, and a button that does that should
+ * not be a narrow one squeezed in beside the others on a phone.
  */
 @Composable
 private fun MissedSessionsProposalCard(
     proposal: MissedSessionsProposal,
     onAccept: () -> Unit,
-    onReject: () -> Unit,
+    onSkip: () -> Unit,
     onComplete: () -> Unit,
 ) {
     val missedCount = when (proposal) {
@@ -361,6 +363,7 @@ private fun MissedSessionsProposalCard(
     }
     val completeLabel =
         if (missedCount == 1) "Merkitse tehdyksi" else "Merkitse $missedCount tehdyiksi"
+    val skipLabel = if (missedCount == 1) "Ohita" else "Ohita $missedCount"
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -372,15 +375,16 @@ private fun MissedSessionsProposalCard(
             Text("Väliin jääneet harjoitukset", fontWeight = FontWeight.Bold)
             Text(preview, style = MaterialTheme.typography.bodyMedium)
             Text(
-                "Kalenteria muutetaan vasta, jos hyväksyt ehdotuksen. " +
-                    "Jos harjoitukset ovat vanhoja etkä aio tehdä niitä, merkitse ne tehdyiksi — " +
-                    "silloin ne poistuvat listalta eikä tätä kysytä uudelleen.",
+                "Kalenteria muutetaan vasta, jos hyväksyt siirron. " +
+                    "Jos harjoitukset ovat vanhoja etkä aio tehdä niitä, ohita ne tai merkitse " +
+                    "tehdyiksi — kumpikin lopettaa kysymisen, merkitse tehdyiksi vain jos ne " +
+                    "oikeasti tuli tehtyä.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onAccept) { Text("Hyväksy siirto") }
-                OutlinedButton(onClick = onReject) { Text("Hylkää") }
+                OutlinedButton(onClick = onSkip) { Text(skipLabel) }
             }
             OutlinedButton(onClick = onComplete, modifier = Modifier.fillMaxWidth()) {
                 Text(completeLabel)

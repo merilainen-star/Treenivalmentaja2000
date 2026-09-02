@@ -32,7 +32,6 @@ import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPosition
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutPositionState
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutProgressStore
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
-import fi.merilainen.treenivalmentaja.domain.MissedProposalDismissalStore
 import fi.merilainen.treenivalmentaja.domain.MissedSessionsProposal
 import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -141,17 +140,7 @@ class WorkoutViewModelTest {
     Dispatchers.resetMain()
   }
 
-  /** An in-memory [MissedProposalDismissalStore]: DataStore's persistence without its IO. */
   private val progressStore = FakeProgressStore()
-
-  private class FakeDismissalStore(var dismissedFor: LocalDate? = null) :
-    MissedProposalDismissalStore {
-    override suspend fun dismissedFor(): LocalDate? = dismissedFor
-
-    override suspend fun setDismissedFor(date: LocalDate) {
-      dismissedFor = date
-    }
-  }
 
   /** An in-memory [ActiveWorkoutProgressStore]: DataStore's persistence without its IO. */
   private class FakeProgressStore(var stored: ActiveWorkoutPosition? = null) :
@@ -169,7 +158,6 @@ class WorkoutViewModelTest {
 
   private fun viewModel(
     rolloverDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    dismissalStore: MissedProposalDismissalStore? = null,
   ): WorkoutViewModel {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     val settingsStore = NotificationSettingsStore(context)
@@ -223,7 +211,6 @@ class WorkoutViewModelTest {
           client = OuraClient(tokens = { null }, baseUrl = "http://127.0.0.1:1"),
           dao = db.ouraDao(),
         ),
-      missedProposalDismissalStore = dismissalStore,
       activeWorkoutProgressStore = progressStore,
     )
   }
@@ -517,14 +504,15 @@ class WorkoutViewModelTest {
   }
 
   /**
-   * "Ei nyt" survives leaving the screen, which is the only thing that makes it an answer.
+   * "Ohita" ends the question honestly, unlike the "Hylkää" it replaced.
    *
-   * `checkMissedSessions()` runs on every resume of the Today screen. Without a memory of the
-   * refusal the card came straight back, so rejecting bought a few seconds of quiet — and the
-   * screen the app opens on would have asked the same question every time it was opened.
+   * The old refusal wrote nothing and the card came back the next day, forever, until the session
+   * was moved or (falsely) marked done. Skipping is a real status change — SKIPPED for a session
+   * never started — so there is nothing left for [TrainingEngine.proposeMissedSessions] to find,
+   * on the same permanence [completeMissedSessionsProposal] already had.
    */
   @Test
-  fun `a rejected proposal writes nothing and stays rejected for the rest of the day`() =
+  fun `skipping a proposal closes the session honestly and ends the question`() =
     runTest(dispatcher) {
       clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
       repository.importPlan(PLAN)
@@ -533,21 +521,31 @@ class WorkoutViewModelTest {
       advanceUntilIdle()
       viewModel.checkMissedSessions()
       advanceUntilIdle()
+      assertTrue(viewModel.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
 
-      viewModel.rejectMissedSessionsProposal()
-      assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
-      assertEquals("2026-08-10", repository.getSessions().single().scheduledDate)
-
-      // What every later resume of the Today screen does.
-      viewModel.checkMissedSessions()
+      viewModel.skipMissedSessionsProposal()
       advanceUntilIdle()
 
       assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
+      assertEquals(SessionStatus.SKIPPED, repository.getSessions().single().status)
+      // Unmoved: the session stays on the day it was planned for.
+      assertEquals("2026-08-10", repository.getSessions().single().scheduledDate)
+
+      // What every later resume of the Today screen does — and finds nothing left to ask.
+      viewModel.checkMissedSessions()
+      advanceUntilIdle()
+      assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
     }
 
-  /** "Not today" and not "never": tomorrow is a new day, and the session is still in the past. */
+  /**
+   * Not "not today" any more: a skip made yesterday is still a skip today.
+   *
+   * This is the property the old date-keyed refusal never had — see the deleted
+   * `MissedProposalDismissalStore` — and the reason skipping stays gone is different too: not a
+   * remembered answer, but a session that is no longer open at all.
+   */
   @Test
-  fun `a refusal expires with the day it was given on`() = runTest(dispatcher) {
+  fun `a skip does not come back the next day`() = runTest(dispatcher) {
     clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
     repository.importPlan(PLAN)
 
@@ -555,22 +553,23 @@ class WorkoutViewModelTest {
     advanceUntilIdle()
     viewModel.checkMissedSessions()
     advanceUntilIdle()
-    viewModel.rejectMissedSessionsProposal()
+    viewModel.skipMissedSessionsProposal()
+    advanceUntilIdle()
 
     clock.advance(Duration.ofDays(1))
     viewModel.refreshCurrentDate()
     viewModel.checkMissedSessions()
     advanceUntilIdle()
 
-    assertTrue(viewModel.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
+    assertEquals(MissedSessionsProposal.None, viewModel.missedSessionsProposal.value)
   }
 
   /**
-   * The third answer: the missed sessions are closed as done, and the card cannot come back.
+   * The other honest close: the missed session is closed as done, and the card cannot come back.
    *
-   * Shifting the plan and refusing both leave the sessions missed, so a backlog of training that
-   * will never happen — a plan left half-finished while the app was being written — asked the same
-   * question every single day. This is the button that ends it.
+   * Shifting the plan assumes the sessions are still ahead of you, and skipping assumes they plainly
+   * are not — neither fits a session that *was* trained, off the books, and only needs recording.
+   * This is the answer for that case.
    */
   @Test
   fun `marking the missed sessions done closes them and ends the question`() =
@@ -598,40 +597,32 @@ class WorkoutViewModelTest {
     }
 
   /**
-   * A refusal survives the process, which is what "ei nyt" has to mean on a phone.
+   * A skip survives the process without needing anything to remember it, which is what makes it a
+   * real answer rather than "ei nyt" with extra steps.
    *
-   * The answer used to live only in this ViewModel, so every new build installed over the app —
-   * and every ordinary cold start — asked again about the same sessions on the same day. A fresh
-   * ViewModel here is exactly that restart.
+   * The old refusal lived in a DataStore-backed store specifically because the in-memory version
+   * forgot on every restart. Skipping needs no such store: the status change is already in Room, so
+   * a fresh ViewModel over the same database sees the same closed session on its own.
    */
   @Test
-  fun `a refusal survives a restart on the same day`() = runTest(dispatcher) {
+  fun `a skip survives a restart`() = runTest(dispatcher) {
     clock.currentInstant = Instant.parse("2026-08-12T09:00:00Z")
     repository.importPlan(PLAN)
-    val store = FakeDismissalStore()
 
-    val first = viewModel(dismissalStore = store)
+    val first = viewModel()
     advanceUntilIdle()
     first.checkMissedSessions()
     advanceUntilIdle()
-    first.rejectMissedSessionsProposal()
+    first.skipMissedSessionsProposal()
     advanceUntilIdle()
-    assertEquals(LocalDate.of(2026, 8, 12), store.dismissedFor)
 
-    val restarted = viewModel(dismissalStore = store)
+    val restarted = viewModel()
     advanceUntilIdle()
     restarted.checkMissedSessions()
     advanceUntilIdle()
 
     assertEquals(MissedSessionsProposal.None, restarted.missedSessionsProposal.value)
-
-    // Still "not today" rather than "never": yesterday's answer does not silence tomorrow.
-    store.dismissedFor = LocalDate.of(2026, 8, 11)
-    val nextDay = viewModel(dismissalStore = store)
-    advanceUntilIdle()
-    nextDay.checkMissedSessions()
-    advanceUntilIdle()
-    assertTrue(nextDay.missedSessionsProposal.value is MissedSessionsProposal.MoveOne)
+    assertEquals(SessionStatus.SKIPPED, repository.getSessions().single().status)
   }
 
   /**

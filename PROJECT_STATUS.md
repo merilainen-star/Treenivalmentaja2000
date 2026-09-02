@@ -5,9 +5,9 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
-- Date: 2026-09-01
-- Base commit: working tree for the `hasRecordedActivity` fix on top of `78ab244` (branch
-  `fix/skipped-with-oura-match-analysis`, PR #17 already merged to `main`)
+- Date: 2026-09-02
+- Base commit: working tree for the missed-session "Ohita" fix on top of `0fd2aaa` (branch
+  `fix/missed-session-skip-is-permanent`, PR #18's merge commit — not yet its own PR)
 - Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
   and build-tools 36.1.0, on Windows 11
 - Emulator: `treeni-test`, android-36 google_apis x86_64, headless
@@ -18,32 +18,38 @@ line for each carried no `FROM-CACHE` or `UP-TO-DATE`.
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 694 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 694 tests, 0 failures, 0 baselines changed |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 699 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 699 tests, 0 failures — 1 baseline (`screen_today_missed_proposal.png`) re-recorded for the "Ohita 2" button text and re-verified clean |
 | Lint | `./gradlew :app:lintDebug --rerun` → `lint-results-debug.xml` | 0 errors, 43 warnings |
-| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,283,158 bytes |
+| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,284,305 bytes |
 | Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun` | 54 tests, 0 failures, 0 errors, 0 skipped |
 
-**What changed, and why it was found the same day PR #17 shipped:** the owner's own installed app
-showed a session `SKIPPED` in the app's own record — never started — with real Oura data attached
-("14 min · 66 kcal") and no way to ask for an analysis of it. `MatchOuraWorkoutsUseCase` never
-changes a session's status (`docs/TRAINING_ENGINE.md`, "Matching imported workouts"), so a ring can
-record activity against a session the app considers untouched. `AiAnalysisAvailability.kindFor`
-gained a third parameter, `hasRecordedActivity: Boolean = false` — `SKIPPED` now offers the same
-"miten meni?" analysis `COMPLETED`/`STARTED`/`INTERRUPTED` do, but only when it is `true`, on the
-same seven-day window. A genuinely untouched `SKIPPED` session — no app progress, no outside match —
-still offers nothing, which is the one thing PR #17 got right that this fix does not undo.
+**What changed, and why it was found the same day PR #18 shipped:** the owner pointed out having to
+press "Hylkää" on the missed-sessions card daily for the same session. The button was never a
+no-op — a prior fix added `missed_proposal_dismissed_for`, a DataStore date, specifically so the
+refusal would survive the screen and a restart — but it was deliberately keyed by date, documented
+as "not today, not never": it expired at the next plan-zone midnight by design, so the same missed
+session asked again every day until moved or (dishonestly, since nothing happened) marked
+`COMPLETED`. The owner's ask was to make it actually stop.
 
-`WorkoutViewModel.requestAiAnalysis` now fetches the Oura and intervals.icu matches *before* the
-`kindFor` gate rather than after, and passes them into `buildAnalysisPrompt` instead of re-fetching
-— both so the eligibility check and the prompt agree on the same data, and so a session that passes
-the gate cannot still send an empty request. `AiAnalysisPromptSourcingTest` gained the regression:
-a `SKIPPED` session with a directly-seeded matched `OuraWorkoutEntity` reaches the client with "kesto
-14 min" and "66 kcal" in the prompt, and one with no match is confirmed to send nothing at all.
+`TrainingEngine` gained `skipMissedSessions`, mirroring `completeMissedSessions` but closing each
+missed session as `SKIPPED` — or `INTERRUPTED` if it was `STARTED` when it went missed, the split
+`AiAnalysisAvailability` already reasons about — via the same `PLANNED` detour for a session paused
+by illness. `WorkoutViewModel.rejectMissedSessionsProposal` (the date-keyed "not now") became
+`skipMissedSessionsProposal` (a real status write). The button changed from "Hylkää" to "Ohita",
+pluralised the same way "Merkitse tehdyiksi" already was for a `ShiftPlan`.
 
-No Room migration — `hasRecordedActivity` is computed from data already being read, not a new
-column. The APK grew by 191 B over PR #17's own measurement (21,282,967 B), consistent with a
-three-parameter signature change and no new stored data.
+**Removed, not deprecated:** the entire `MissedProposalDismissalStore` mechanism —
+`domain/MissedProposalDismissal.kt`, `data/settings/MissedProposalSettingsStore.kt`, the
+`missedProposalDismissalStore` wiring in `WorkoutViewModel` and `TreenivalmentajaApplication`, and
+the `_missedProposalDismissedFor` field — is dead once the answer is a status the session already
+carries: a skipped or interrupted session is no longer open, so `proposeMissedSessions()` has
+nothing left to find about it, with nothing separate to persist or expire. Confirmed nothing else in
+`app/src/main` referenced any of it before deleting.
+
+No Room migration: `SKIPPED` and `INTERRUPTED` already existed. The APK grew by 1,147 B over PR #18's
+measurement (21,283,158 B) despite removing a whole persistence class — expected, since the new
+engine/ViewModel logic and the deleted DataStore code are not the same size.
 
 ## Current implementation
 
@@ -116,6 +122,48 @@ fix for an old measurement is a new measurement. What went with it was the reaso
 numbers — including the one methodological finding on this page that cost a full afternoon to
 establish, and that anyone measuring an APK here needs before they start. Restored below,
 unchanged, as it was written when each figure was taken.
+
+### 2026-09-01 — SKIPPED sessions with a matched Oura activity (measured on `0fd2aaa`, PR #18)
+
+- Date: 2026-09-01
+- Base commit: working tree for the `hasRecordedActivity` fix on top of `78ab244` (branch
+  `fix/skipped-with-oura-match-analysis`, PR #17 already merged to `main`)
+- Toolchain: JDK 21 (Microsoft build 21.0.12+8), Gradle 9.6.1 via wrapper, Android SDK platform 36.1
+  and build-tools 36.1.0, on Windows 11
+- Emulator: `treeni-test`, android-36 google_apis x86_64, headless
+
+Every line below is a task that actually executed — `testDebugUnitTest`, `verifyRoborazziDebug`,
+`lintDebug`, `assembleDebug` and `connectedDebugAndroidTest` all reported `--rerun`, and the console
+line for each carried no `FROM-CACHE` or `UP-TO-DATE`.
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` | 694 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun` | 694 tests, 0 failures, 0 baselines changed |
+| Lint | `./gradlew :app:lintDebug --rerun` → `lint-results-debug.xml` | 0 errors, 43 warnings |
+| Debug APK | `./gradlew :app:assembleDebug --rerun` | 21,283,158 bytes |
+| Instrumented | `./gradlew :app:connectedDebugAndroidTest --rerun` | 54 tests, 0 failures, 0 errors, 0 skipped |
+
+**What changed, and why it was found the same day PR #17 shipped:** the owner's own installed app
+showed a session `SKIPPED` in the app's own record — never started — with real Oura data attached
+("14 min · 66 kcal") and no way to ask for an analysis of it. `MatchOuraWorkoutsUseCase` never
+changes a session's status (`docs/TRAINING_ENGINE.md`, "Matching imported workouts"), so a ring can
+record activity against a session the app considers untouched. `AiAnalysisAvailability.kindFor`
+gained a third parameter, `hasRecordedActivity: Boolean = false` — `SKIPPED` now offers the same
+"miten meni?" analysis `COMPLETED`/`STARTED`/`INTERRUPTED` do, but only when it is `true`, on the
+same seven-day window. A genuinely untouched `SKIPPED` session — no app progress, no outside match —
+still offers nothing, which is the one thing PR #17 got right that this fix does not undo.
+
+`WorkoutViewModel.requestAiAnalysis` now fetches the Oura and intervals.icu matches *before* the
+`kindFor` gate rather than after, and passes them into `buildAnalysisPrompt` instead of re-fetching
+— both so the eligibility check and the prompt agree on the same data, and so a session that passes
+the gate cannot still send an empty request. `AiAnalysisPromptSourcingTest` gained the regression:
+a `SKIPPED` session with a directly-seeded matched `OuraWorkoutEntity` reaches the client with "kesto
+14 min" and "66 kcal" in the prompt, and one with no match is confirmed to send nothing at all.
+
+No Room migration — `hasRecordedActivity` is computed from data already being read, not a new
+column. The APK grew by 191 B over PR #17's own measurement (21,282,967 B), consistent with a
+three-parameter signature change and no new stored data.
 
 ### 2026-09-01 — the STARTED/INTERRUPTED status split (measured on `78ab244`, PR #17)
 
