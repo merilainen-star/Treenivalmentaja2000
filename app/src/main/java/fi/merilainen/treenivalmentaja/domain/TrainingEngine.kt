@@ -193,14 +193,14 @@ class TrainingEngine(
     }
 
   /**
-   * Clears the backlog the other way: the missed sessions are marked done where they stand, and
-   * nothing on the calendar moves.
+   * Clears the backlog one way: the missed sessions are marked done where they stand, and nothing
+   * on the calendar moves.
    *
    * The shift proposal assumes the training still has to happen. That is the wrong assumption for a
    * backlog that accumulated while the app itself was being built — sessions nobody ever intended
-   * to do — and with only "siirrä" and "hylkää" on offer there was no way to say so: rejecting is a
-   * pure no-op, so the same 35 sessions were still missed tomorrow, and the card came back. This is
-   * the third answer, and the only one that ends the question for good.
+   * to do. This and [skipMissedSessions] are the two honest ways to say so: this one for a session
+   * that did happen, off the books, and only needs recording; that one for a session that plainly
+   * did not.
    *
    * It marks exactly the sessions named by [proposal] — the past-dated open ones — and never a
    * future session. Each transition is an ordinary user-sourced status change through the
@@ -235,6 +235,39 @@ class TrainingEngine(
       completed
     }
 
+  /**
+   * Clears the backlog the other way: the missed sessions are closed as not having happened, and
+   * not moved either.
+   *
+   * This is what "hylkää" used to be and was not — a genuine third answer next to "siirrä" and
+   * "merkitse tehdyksi", rather than a refusal the app forgot by the next day and asked again.
+   * "Merkitse tehdyksi" was the only one of the original two writing actions that ended the
+   * question, and only by a small dishonesty: a session nobody did was recorded as COMPLETED
+   * because there was no other way to make the card stop. This is that other way — SKIPPED for a
+   * session that was never started, INTERRUPTED for one Oura or the guided workout shows was, on
+   * the same reasoning [SessionStatus] itself splits the two on.
+   *
+   * @return how many sessions were closed.
+   */
+  suspend fun skipMissedSessions(proposal: MissedSessionsProposal): Int =
+    missedSessionsMutex.withLock {
+      if (proposal == MissedSessionsProposal.None || proposeMissedSessions() != proposal) {
+        return@withLock 0
+      }
+      val missedIds =
+        when (proposal) {
+          is MissedSessionsProposal.MoveOne -> listOf(proposal.sessionId)
+          is MissedSessionsProposal.ShiftPlan -> proposal.missedSessionIds
+          MissedSessionsProposal.None -> return@withLock 0
+        }
+      var skipped = 0
+      for (id in missedIds) {
+        if (markNotHappening(id)) skipped++
+      }
+      rescheduleAlarmsUseCase?.execute()
+      skipped
+    }
+
   /** One session to COMPLETED, via PLANNED when the transition table demands it. */
   private suspend fun markDone(sessionId: String): Boolean {
     val session = repository.getSession(sessionId) ?: return false
@@ -252,6 +285,32 @@ class TrainingEngine(
       target = SessionStatus.COMPLETED,
       source = EventSource.USER,
       note = MARKED_DONE_NOTE,
+    ) == TransitionResult.Applied
+  }
+
+  /**
+   * One session to SKIPPED, or to INTERRUPTED if it was STARTED — the same split
+   * [AiAnalysisAvailability] reasons about — via PLANNED when the transition table demands it.
+   */
+  private suspend fun markNotHappening(sessionId: String): Boolean {
+    val session = repository.getSession(sessionId) ?: return false
+    val target =
+      if (session.status == SessionStatus.STARTED) SessionStatus.INTERRUPTED
+      else SessionStatus.SKIPPED
+    if (!session.status.canTransitionTo(target)) {
+      if (!session.status.canTransitionTo(SessionStatus.PLANNED)) return false
+      repository.transition(
+        sessionId = sessionId,
+        target = SessionStatus.PLANNED,
+        source = EventSource.USER,
+        note = SKIPPED_NOTE,
+      )
+    }
+    return repository.transition(
+      sessionId = sessionId,
+      target = target,
+      source = EventSource.USER,
+      note = SKIPPED_NOTE,
     ) == TransitionResult.Applied
   }
 
@@ -275,5 +334,8 @@ class TrainingEngine(
   private companion object {
     /** Says in the event log what the status alone cannot: nobody trained, the row was ticked. */
     const val MARKED_DONE_NOTE = "Merkitty tehdyksi jälkikäteen"
+
+    /** Says in the event log why this session closed with no move and no completion behind it. */
+    const val SKIPPED_NOTE = "Ohitettu jälkikäteen väliin jääneenä"
   }
 }

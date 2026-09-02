@@ -343,6 +343,91 @@ class TrainingEngineTest {
         assertEquals(SessionStatus.PLANNED, byId["s2"]?.status)
     }
 
+    /**
+     * The other honest close: a session nobody trained is closed as SKIPPED rather than recorded
+     * as done. Companion to [completeMissedSessions_marksThePastOnesDoneAndMovesNothing] — same
+     * shape, opposite fact about what happened.
+     */
+    @Test
+    fun skipMissedSessions_marksThePastOnesSkippedAndMovesNothing() = runBlocking {
+        val d1 = fixedToday.minusDays(3).toString()
+        val d2 = fixedToday.minusDays(1).toString()
+        val future = fixedToday.plusDays(1).toString()
+
+        insertSession("s1", d1, SessionStatus.PLANNED)
+        insertSession("s2", d2, SessionStatus.NOTIFIED)
+        insertSession("s3", future, SessionStatus.PLANNED)
+
+        val proposal = engine.proposeMissedSessions()
+        assertEquals(2, engine.skipMissedSessions(proposal))
+
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(SessionStatus.SKIPPED, byId["s1"]?.status)
+        assertEquals(SessionStatus.SKIPPED, byId["s2"]?.status)
+        assertEquals(d1, byId["s1"]?.scheduledDate)
+        assertEquals(d2, byId["s2"]?.scheduledDate)
+        assertEquals(SessionStatus.PLANNED, byId["s3"]?.status)
+
+        // Permanent, not a refusal that expires: nothing is left to ask about.
+        assertEquals(MissedSessionsProposal.None, engine.proposeMissedSessions())
+    }
+
+    /** Why the sessions reached SKIPPED is recorded, on the same reasoning as the COMPLETED note. */
+    @Test
+    fun skipMissedSessions_writesAnEventSayingItWasSkipped() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+
+        assertEquals(1, engine.skipMissedSessions(engine.proposeMissedSessions()))
+
+        val notes = repository.getEvents("s1").mapNotNull { it.note }
+        assertTrue(notes.any { it.contains("Ohitettu") })
+    }
+
+    /** A session paused by illness reaches SKIPPED the long way round, or not at all. */
+    @Test
+    fun skipMissedSessions_skipsASessionPausedByIllness() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(2).toString(), SessionStatus.PAUSED_DUE_TO_ILLNESS)
+        insertSession("s2", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+
+        assertEquals(2, engine.skipMissedSessions(engine.proposeMissedSessions()))
+
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(SessionStatus.SKIPPED, byId["s1"]?.status)
+        assertEquals(SessionStatus.SKIPPED, byId["s2"]?.status)
+    }
+
+    /**
+     * The one branch [completeMissedSessions] never needed: STARTED reaches COMPLETED directly, so
+     * marking a started-but-forgotten session done never had to ask what "done" meant for it. This
+     * one does — SKIPPED would claim it was never touched, which is false — so a missed session
+     * that was STARTED closes as INTERRUPTED instead, on the same split [SessionStatus] itself
+     * draws between the two.
+     */
+    @Test
+    fun skipMissedSessions_interruptsAStartedSessionInsteadOfSkippingIt() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(1).toString(), SessionStatus.STARTED)
+
+        assertEquals(1, engine.skipMissedSessions(engine.proposeMissedSessions()))
+
+        assertEquals(SessionStatus.INTERRUPTED, repository.getSessions().single().status)
+    }
+
+    /** The same staleness guard as completing: a preview the situation has outgrown writes nothing. */
+    @Test
+    fun skipMissedSessions_rejectsAStaleProposal() = runBlocking {
+        insertSession("s1", fixedToday.minusDays(1).toString(), SessionStatus.PLANNED)
+        val staleProposal = engine.proposeMissedSessions()
+
+        insertSession("s2", fixedToday.minusDays(2).toString(), SessionStatus.PLANNED)
+
+        assertEquals(0, engine.skipMissedSessions(staleProposal))
+        assertEquals(0, engine.skipMissedSessions(MissedSessionsProposal.None))
+
+        val byId = repository.getSessions().associateBy { it.id }
+        assertEquals(SessionStatus.PLANNED, byId["s1"]?.status)
+        assertEquals(SessionStatus.PLANNED, byId["s2"]?.status)
+    }
+
     /** `None` is not a proposal. Applying it must be a no-op rather than an empty write. */
     @Test
     fun applyMissedSessions_withNothingProposed_changesNothing() = runBlocking {

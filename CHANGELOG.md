@@ -28,6 +28,13 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   tila omistaa etenemisen, eikä samoja liikkeitä tarvitse kuitata kahdessa paikassa. Kortti näyttää
   liikkeet luettavana listana, liikeohjeineen. Lista jää niille sessioille, joiden liikkeet on
   jäsennetty kuvauksesta — ohjattu tila ei osaa ottaa niitä, joten se on niille ainoa tapa pitää lukua.
+- **"Väliin jääneet harjoitukset" -kortin "Hylkää" on nyt "Ohita", ja se lopettaa kysymisen
+  pysyvästi — ei enää seuraavaan puoleenyöhön asti.** Aiemmin hylkäys ei kirjoittanut mitään ja
+  unohtui joka yö, joten sama kortti kysyi saman treenin perään joka päivä, kunnes sen joko siirsi
+  tai (vaikkei sitä tehty) merkitsi tehdyksi. "Ohita" siirtää väliin jääneen treenin oikeasti tilaan
+  `Ohitettu` — tai `Keskeytetty`, jos treeni ehti olla `Aloitettu` — jolloin sillä ei ole enää mitään
+  kysyttävää: rehellinen ja pysyvä, samalla mekanismilla kuin "Merkitse tehdyiksi" jo käytti. Koko
+  erillinen "muista tältä päivältä" -tallennus (`missed_proposal_dismissed_for`) poistui tarpeettomana.
 
 ### Fixed
 - **Ohitettu treeni, jolle Oura oli silti sovittanut liikuntaa, ei tarjonnut "AI-analyysi: miten
