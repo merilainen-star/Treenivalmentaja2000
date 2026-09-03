@@ -71,7 +71,11 @@ fun SplashScreen(isInitializing: Boolean, onSplashFinished: () -> Unit) {
             Image(
                 painter = painterResource(id = R.drawable.splash_logo),
                 contentDescription = "App Logo",
-                modifier = Modifier.size(120.dp)
+                // 180dp, not the mark's old 120dp: splash_logo now carries the same 66% safe-zone
+                // margin as the launcher icon (see tools/generate_icons.py), so the mark itself is
+                // smaller inside its own canvas than it used to be. Scaling the box up keeps it the
+                // same size on screen as before that margin was added.
+                modifier = Modifier.size(180.dp)
             )
         }
 

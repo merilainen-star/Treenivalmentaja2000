@@ -49,7 +49,7 @@ SAFE_ZONE = 72 / 108
 
 DENSITIES = {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
 FOREGROUND_DP = 108
-SPLASH_DP = 200  # splash_icon_layer.xml draws the mark at 200dp; the composable uses 120dp.
+SPLASH_DP = 200  # splash_icon_layer.xml draws the mark at 200dp; the composable uses 180dp.
 
 # Alpha below this (out of 255) is noise from the key, not real edge softness.
 ALPHA_FLOOR = 12
@@ -143,7 +143,11 @@ def main() -> int:
     splash = key_out(MASTER_DIR / "splash_graphic.png", background=(41, 51, 60), threshold=26)
     print(f"splash mark: {splash.size[0]}x{splash.size[1]}")
     written += write_densities(
-        splash, SPLASH_DP, 1.0,
+        # SAFE_ZONE, not 1.0: the system SplashScreen API's windowSplashScreenAnimatedIcon
+        # treats this the same way a launcher icon does and can mask it into a circle on
+        # real devices (not reproduced on the emulator this was first built against) — a
+        # mark that fills its box edge to edge gets its head and feet clipped by that mask.
+        splash, SPLASH_DP, SAFE_ZONE,
         lambda d: RES_DIR / f"drawable-{d}" / "splash_logo.webp",
     )
 
