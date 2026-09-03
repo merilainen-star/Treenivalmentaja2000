@@ -227,6 +227,19 @@ class WorkoutViewModelTest {
     assertEquals(LocalDate.of(2026, 8, 11), vm.currentDate.value)
   }
 
+  // ------------------------------------------------------------------ startup
+
+  /** What the splash screen waits on — see `SplashScreen.kt`. */
+  @Test
+  fun `isInitializing flips to false once startup seeding finishes`() = runTest(dispatcher) {
+    val vm = viewModel()
+    assertTrue("nothing has run yet", vm.isInitializing.value)
+
+    advanceUntilIdle()
+
+    assertFalse(vm.isInitializing.value)
+  }
+
   // ------------------------------------------------------------------ the guide sheet
 
   @Test

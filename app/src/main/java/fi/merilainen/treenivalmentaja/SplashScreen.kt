@@ -23,11 +23,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import fi.merilainen.treenivalmentaja.R
 
+/**
+ * Shown only while [isInitializing] is true, and dismissed the moment it flips — never a fixed
+ * duration. On a returning user with a populated database that can be a single frame; the wait is
+ * real only on a fresh install, where startup actually has a plan to seed. See
+ * `WorkoutViewModel.isInitializing`.
+ */
 @Composable
-fun SplashScreen(onSplashFinished: () -> Unit) {
+fun SplashScreen(isInitializing: Boolean, onSplashFinished: () -> Unit) {
     var startAnimation by remember { mutableStateOf(false) }
     val alphaAnim by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
@@ -43,10 +48,12 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
         label = "scaleAnim"
     )
 
-    LaunchedEffect(key1 = true) {
+    LaunchedEffect(Unit) {
         startAnimation = true
-        delay(2000)
-        onSplashFinished()
+    }
+
+    LaunchedEffect(isInitializing) {
+        if (!isInitializing) onSplashFinished()
     }
 
     Box(
@@ -67,7 +74,7 @@ fun SplashScreen(onSplashFinished: () -> Unit) {
                 modifier = Modifier.size(120.dp)
             )
         }
-        
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier

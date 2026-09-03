@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
       val viewModel: WorkoutViewModel = viewModel(factory = WorkoutViewModel.Factory)
       val theme by viewModel.themePreference.collectAsStateWithLifecycle()
       val darkTheme = theme.resolveDarkTheme()
+      val isInitializing by viewModel.isInitializing.collectAsStateWithLifecycle()
 
       // The system bars have to be told too, or they keep drawing for the phone's dark-mode
       // setting: "Vaalea" chosen on a dark phone would put white status-bar icons on a white
@@ -51,7 +52,10 @@ class MainActivity : ComponentActivity() {
         var showSplash by remember { mutableStateOf(true) }
         Surface(modifier = Modifier.fillMaxSize()) {
             if (showSplash) {
-                SplashScreen(onSplashFinished = { showSplash = false })
+                SplashScreen(
+                    isInitializing = isInitializing,
+                    onSplashFinished = { showSplash = false },
+                )
             } else {
                 TreenivalmentajaApp(viewModel)
             }

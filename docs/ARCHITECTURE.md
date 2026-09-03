@@ -144,6 +144,20 @@ vocabulary offers it nothing better. A parse failure keeps the raw response so i
 5. Settings writes back through `WorkoutViewModel.setThemePreference`; the recolour follows the tap
    because step 3 is upstream of the card that produced it.
 
+### Splash screen flow
+Two splash mechanisms run in sequence, and only the second one is app-visible design:
+1. The system `SplashScreen` API (`installSplashScreen()` in `MainActivity.onCreate`) bridges
+   process start to the first Compose frame. No `setKeepOnScreenCondition` — it dismisses as soon
+   as that frame draws, which is already as dynamic as that layer gets.
+2. The custom `SplashScreen` composable then shows the brand mark and tagline. It waits on
+   `WorkoutViewModel.isInitializing`, not a fixed delay: that flag is true only until the startup
+   `seedIfEmpty()` / `deleteReplacedPlans()` launch in the ViewModel's `init` finishes. A returning
+   user with a populated database flips it back to `false` almost immediately; the wait is real
+   only on a fresh install, which actually has a plan to seed.
+3. `MainActivity` is locked to `android:screenOrientation="portrait"` in the manifest, so rotating
+   the device never recreates the activity — and never resets `showSplash` back to `true` on a
+   phone that was only turned sideways.
+
 ## Offline Behaviour
 The app is fully functional offline. The local deterministic engine reschedules workouts based on existing local data. Notifications rely on AlarmManager and do not require internet access.
 

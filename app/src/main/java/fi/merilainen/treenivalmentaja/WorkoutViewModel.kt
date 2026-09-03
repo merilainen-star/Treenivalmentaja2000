@@ -361,6 +361,17 @@ class WorkoutViewModel(
   /** The exercise the open sheet is about, so "Yritä uudelleen" knows what to retry. */
   private var guideExercise: Exercise? = null
 
+  /**
+   * True until the startup seeding/cleanup below has run once.
+   *
+   * What the splash screen waits on: it is the app's actual cold-start work (empty-database
+   * seeding is a full plan import on a fresh install, not just a query), so a returning user with
+   * a populated database flips this back to `false` almost immediately instead of the splash
+   * holding for a fixed duration regardless of whether there was anything to do.
+   */
+  private val _isInitializing = MutableStateFlow(true)
+  val isInitializing: StateFlow<Boolean> = _isInitializing.asStateFlow()
+
   init {
     viewModelScope.launch {
       repository.observeActivePlanTimeZone().collect { zone ->
@@ -375,6 +386,7 @@ class WorkoutViewModel(
       // It is here rather than only in the importer so that phones carrying plans from before
       // imports deleted them are cleaned up without having to import again.
       repository.deleteReplacedPlans()
+      _isInitializing.value = false
     }
   }
 
