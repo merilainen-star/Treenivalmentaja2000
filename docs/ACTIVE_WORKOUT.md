@@ -1,14 +1,13 @@
 # Active Workout Mode
 
-**Status: designed 2026-08-22, not built.** This page is the specification and the survey of what
-building it would cost. Nothing in §1–§8 is implemented; where the text says "already exists" it
-names the file that proves it.
+**Status: designed 2026-08-22, built 2026-08-24, timed 2026-09-05.** This page is the
+specification and the record of what it cost. The flow in §1–§8 is implemented; where the text says
+"already exists" it names the file that proves it, and where it says a thing was hard it says how
+that turned out.
 
-Surveyed against `0d274cc` and **re-checked against `2f79a9e`**, which is where one of its
-recommendations had already been built by the time this landed: §3 below proposed recording the
-outcome as a payload on the `COMPLETED` event, and `GuidedProgress`, `SessionPayloadJson` and
-`TrainingRepository.completeGuided` now do exactly that for the count of ticked movements. The
-sections concerned say so rather than still proposing it.
+Surveyed against `0d274cc`, re-checked against `2f79a9e` — where one of its recommendations had
+already been built by the time the page landed, so §3 records the outcome payload as settled rather
+than proposed — and extended with §9's clocks.
 
 ## Implementation status
 
@@ -17,6 +16,12 @@ for rest clocks, keeps the display awake, sounds and vibrates at zero, and store
 summary under `activeWorkout` on the immutable completion event. Plans without a structured
 `exercises` array stay on the original Today card. Optional `equipment` and `roundRestSec` are now
 part of Plan Schema v1; Room is schema v13 for the latter.
+
+Timed 2026-09-05. `ActiveWorkoutTiming` accumulates the stopwatch step by step in the domain, the
+header carries the three clocks of §9, and `netSec` and `movementSeconds` join the stored outcome.
+**No schema change and no migration**: the outcome is JSON on the completion event, so two new keys
+cost a column no more than the first ones did. Sessions finished before this carry neither key and
+read back as absent rather than as zero.
 
 ## What it is
 
@@ -97,6 +102,62 @@ exists.
 
 The app may start a rest timer, advance the round number, show what is next and announce that a time
 has run out. **It may not start the next movement.** That happens on "Olen valmis" and nothing else.
+
+### 9. The clocks
+
+Three numbers run in the header for the whole session, and a fourth was never needed.
+
+| Number | What it counts |
+| --- | --- |
+| **Netto** | The movements alone. Every second between "Olen valmis" and "Liike valmis", summed. |
+| **Brutto** | Everything, from "Aloita treeni" to "Tallenna treeni". Rests included. |
+| **Liike / Lepo / Tauko** | What is on screen right now: this movement, or this gap. |
+
+Both totals run live from the first movement, not assembled at the end.
+
+**Where a movement's own time starts and stops.** The specification asked for an "Aloita" button
+per movement; the flow already has one and it is called **Olen valmis** — the preparation screen is
+precisely the pause before the work, so the movement begins when it is dismissed. Adding a second
+start button would mean pressing twice to begin one movement, and would put a second definition of
+"started" in a screen that already has one. It ends on **Liike valmis**, or when a held movement's
+own clock reaches zero.
+
+**A gap is wider than its rest card, and this is what makes the warning work.** A rest counts down
+and hands over automatically at zero — to the *preparation* screen, where the person is still not
+training while they read what is next and fetch the kettlebell. Measured only on the rest card, an
+overrun would be almost unobservable: the card leaves the screen at the moment it would start being
+late. So the gap runs from the end of one movement to the start of the next, across every step in
+between, and it is measured against the rest that opened it.
+
+**The warning is one small red number.** Past the planned rest, the current-item clock turns
+`error`-coloured and nothing else changes — no banner, no icon, no sound. The person is mid-session
+with the phone on the floor; a rest that has run long is worth a glance, not an interruption. A gap
+nothing planned — the walk to the mat before the first movement — is never late, on the same
+discipline the rest of the app keeps: no measurement, no verdict.
+
+**The summary.** The finish screen, next to the RPE and the "miltä tuntui" chips, shows both totals
+and the time each movement took. All of it is stored on the completion event alongside the rest of
+the outcome.
+
+#### Does it all fit in one header?
+
+The open question when this was specified was whether a clock, a net time, a gross time and a
+current time could share one bar without it turning to noise. **They can, because there were only
+ever three.** The header already carried a clock labelled "Kesto", and that clock was the gross
+time all along — starting with the workout, never stopping. Naming it honestly costs no space.
+
+The counts and the clocks then split by the question they answer:
+
+```
+Kierros 2 / 3                            Liikkeet 2 / 6
+[███████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░]
+   Netto              Brutto                   Tauko
+   03:37              08:32                   01:14      ← red when late
+```
+
+"How far in am I" above, "how long has this taken" below. The run sits last, where a number turning
+red is at the end of the line the eye is already travelling, and it keeps the widest label
+(`Kierrostauko`) so the row is laid out for its worst case rather than its best.
 
 ## Not in V1
 

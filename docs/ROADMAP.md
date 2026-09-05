@@ -208,7 +208,8 @@ almost nothing to say about the sessions that matter most.
 
 ## Designed, not built
 
-- ~~**Active Workout Mode V1**~~ — specified 2026-08-22 and built 2026-08-24; see [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md). A
+- ~~**Active Workout Mode V1**~~ — specified 2026-08-22, built 2026-08-24, and given its clocks
+  2026-09-05; see [ACTIVE_WORKOUT.md](ACTIVE_WORKOUT.md). A
   guided session that shows one thing at a time and carries the workout from the first movement to
   the last: a start summary with the equipment needed, a **preparation step before every movement**,
   the movement itself, a rest that counts down and names what follows, automatic round tracking, and
@@ -228,6 +229,16 @@ almost nothing to say about the sessions that matter most.
   completion event, so the feel answers and the RPE extend a mechanism rather than inventing one.
   What is genuinely new is the full-screen mode, the preparation step, and recording a *skipped
   movement*.
+
+  *The clocks, added 2026-09-05.* Net time (the movements alone) and gross time (everything) run
+  live in the header beside whatever the current step is spending. The open question the feature was
+  specified with — whether four times fit in one bar — dissolved on inspection: the header's
+  existing "Kesto" **was** the gross time, so there were three numbers, not four. A gap is measured
+  from the end of one movement to the start of the next, across the rest *and* the preparation
+  after it, because a rest card hands over at zero and cannot visibly overrun; past its planned
+  length the small number turns red and nothing else changes. Both totals and each movement's own
+  time are stored on the completion event — two more keys in a payload that is already JSON, so no
+  column and no migration.
 
   *The hard part is the clock.* The existing countdown counts ticks inside a composable, which is
   fine for a plank being watched and wrong for a rest with the phone face-down and the process

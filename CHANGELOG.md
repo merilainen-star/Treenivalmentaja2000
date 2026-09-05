@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-09-05
+
+### Added
+- **Netto- ja bruttoaika ohjatussa treenissä.** Kolme kelloa kulkevat otsikkokortissa koko
+  harjoituksen ajan: *Netto* on pelkkien liikkeiden yhteenlaskettu aika, *Brutto* koko treeni
+  levot mukaan lukien, ja kolmas näyttää sen mitä juuri nyt tehdään — liikettä tai taukoa.
+  Lopussa molemmat summat ja jokaisen liikkeen oma aika näkyvät yhteenvedossa ja tallentuvat
+  suoritustapahtumaan.
+
+  **Avoin kysymys mahtuvatko kello, netto, brutto ja meneillään oleva aika samaan palkkiin
+  ratkesi laskemalla ne uudelleen: niitä oli kolme, ei neljä.** Otsikossa ollut "Kesto" *oli*
+  bruttoaika jo ennestään — se alkaa treenin alusta eikä pysähdy — joten sen nimeäminen todeksi ei
+  vienyt yhtään tilaa. Laskurit ja kellot jaettiin sen mukaan, kumpaan kysymykseen ne vastaavat:
+  "kuinka pitkällä olen" ylärivillä, "kauanko tässä on mennyt" palkin alla.
+
+- **Liian pitkäksi venyneen tauon varoitus.** Suunnitelman lepoajan ylityttyä meneillään olevan
+  ajan pieni numero muuttuu punaiseksi. Ei banneria, ei ääntä, ei ikonia — puhelin on lattialla ja
+  venynyt lepo ansaitsee vilkaisun, ei keskeytystä.
+
+### Notes
+- **Tauko on leveämpi kuin lepokortti, ja juuri siksi varoitus toimii.** Lepo laskee alaspäin ja
+  luovuttaa vuoron nollassa automaattisesti — seuraavan liikkeen *valmistautumisnäkymälle*, jossa
+  ihminen yhä hakee kahvakuulaa. Pelkästä lepokortista mitattuna ylitys olisi lähes näkymätön: kortti
+  poistuu ruudulta juuri silloin kun se alkaisi olla myöhässä. Niinpä tauko mitataan liikkeen lopusta
+  seuraavan liikkeen alkuun ja verrataan siihen lepoon joka sen avasi. Tauko jota mikään ei
+  suunnitellut — matka matolle ennen ensimmäistä liikettä — ei voi olla myöhässä.
+- **Liikkeen oma "Aloita"-nappi jätettiin lisäämättä**, koska sellainen on jo olemassa toisella
+  nimellä: valmistautumisnäkymän **Olen valmis** on täsmälleen se hetki jolloin työ alkaa. Toinen
+  nappi tarkoittaisi kahta painallusta yhden liikkeen aloittamiseen ja kahta määritelmää sanalle
+  "alkoi".
+- **Ei uutta saraketta eikä migraatiota.** Toteuma tallentuu JSON-payloadina suoritustapahtumaan, ja
+  kaksi uutta avainta maksaa siellä yhtä vähän kuin ensimmäisetkin. Ennen tätä tehdyt treenit eivät
+  kanna kumpaakaan avainta ja luetaan puuttuvina — eivät nollina, mikä väittäisi että liikkeet eivät
+  vieneet aikaa lainkaan.
+- Toistomäärän kirjaamista ei lisätty. `PROJECT_STATUS.md`:n ja tämän sivun mukaan per-sarja-toistot
+  ovat edelleen V1:n ulkopuolella; "toteutui 12" tarkoittaa tässä sitä, että liike kuitattiin
+  tehdyksi suunnitellulla määrällä, ja ohitettu liike erottuu omana tietonaan.
+
 ## [Unreleased] - 2026-08-24
 
 ### Added

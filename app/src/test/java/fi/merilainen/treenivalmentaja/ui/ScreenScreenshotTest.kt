@@ -10,6 +10,8 @@ import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.CompletedMetricsRow
 import fi.merilainen.treenivalmentaja.ActiveWorkoutContent
+import fi.merilainen.treenivalmentaja.FrozenClocks
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutTiming
 import fi.merilainen.treenivalmentaja.AiPlanAdvisorSection
 import fi.merilainen.treenivalmentaja.RunMetricsRow
 import fi.merilainen.treenivalmentaja.OuraCard
@@ -316,7 +318,7 @@ class ScreenScreenshotTest {
                 rounds = 3,
                 roundRestSec = 60,
             ),
-            trackElapsed = false,
+            frozenClocks = FrozenClocks(),
         )
     }
 
@@ -332,8 +334,48 @@ class ScreenScreenshotTest {
                 roundRestSec = 60,
             ),
             initialOverviewVisible = false,
-            initialStepIndex = 1,
-            trackElapsed = false,
+            // The second movement of the first round, so the counts and the clocks tell one
+            // story: one movement done, and its time is what the net clock is showing.
+            initialStepIndex = 3,
+            // Real readings rather than zeroes: the row of three clocks is the thing being
+            // checked, and three zeroes would prove nothing about whether it fits.
+            frozenClocks =
+                FrozenClocks(
+                    grossSec = 210,
+                    runSec = 42,
+                    timing = ActiveWorkoutTiming(movementSeconds = mapOf("1:1" to 96L)),
+                ),
+        )
+    }
+
+    /**
+     * A rest that has outstayed its welcome: the plan allowed 60 s between rounds and 74 have
+     * gone. Only the small number turns red — the check is that it is legible without being an
+     * interruption, and that the widest label of the three still leaves the row intact.
+     */
+    @Test
+    fun activeWorkout_restOverrun() = capture("screen_active_workout_rest_overrun") {
+        ActiveWorkoutContent(
+            workout = strength(0, "active-3").copy(
+                exercises = listOf(
+                    Exercise("Kahvakuulakyykky", reps = 10, weightKg = 16.0, restSec = 45),
+                    Exercise("Askelkyykky", reps = 8, perSide = true, restSec = 45),
+                ),
+                rounds = 3,
+                roundRestSec = 60,
+            ),
+            initialOverviewVisible = false,
+            // The round break between rounds one and two.
+            initialStepIndex = 6,
+            frozenClocks =
+                FrozenClocks(
+                    grossSec = 512,
+                    runSec = 74,
+                    timing =
+                        ActiveWorkoutTiming(
+                            movementSeconds = mapOf("1:1" to 96L, "1:2" to 121L),
+                        ),
+                ),
         )
     }
 

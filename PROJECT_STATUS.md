@@ -5,6 +5,31 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
+- Date: 2026-09-05
+- Base commit: `ec60197` plus the guided-session clocks, committed together
+- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
+  build-tools 36.1.0, on Linux
+- Emulator: none attached
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` (with `app/build/test-results` cleared first) | 717 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 67 comparisons, 0 changed, 67 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,482,483 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** The clocks are plain arithmetic and Compose, so nothing here needs one — but the instrumented suite has not been re-run since, and this line says so rather than implying it passed. |
+
+Three baselines moved, all deliberately: `screen_active_workout_perform` gained the clock row,
+`screen_active_workout_overview` was re-recorded unchanged in content, and
+`screen_active_workout_rest_overrun` is new — a round break at 1:14 against a planned 60 s, which
+is the only picture that shows the warning doing its job.
+
+The clocks cost **16,384 B (+0.076 %)**: 21,466,099 B for `ec60197` against 21,482,483 B with them,
+both from `./gradlew clean :app:assembleDebug` on one machine. One dex page again, which is what a
+data class, two pure functions and a row of `Text` comes to.
+
+## Previously verified build
+
 - Date: 2026-09-02
 - Base commit: working tree for the missed-session "Ohita" fix on top of `0fd2aaa` (branch
   `fix/missed-session-skip-is-permanent`, PR #18's merge commit — not yet its own PR)

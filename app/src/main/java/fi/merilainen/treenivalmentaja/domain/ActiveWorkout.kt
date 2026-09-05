@@ -25,13 +25,24 @@ sealed interface ActiveWorkoutStep {
 
 data class SkippedMovement(val round: Int, val position: Int, val name: String)
 
-/** Outcome stored on the immutable COMPLETED event. */
+/**
+ * Outcome stored on the immutable COMPLETED event.
+ *
+ * [durationSec] is the gross time — the whole session, rests included — and was here first, so it
+ * keeps its name. [netSec] and [movementSeconds] arrived with the stopwatch and are null on every
+ * session completed before it: absent, which is the truth, rather than zero, which would say the
+ * movements took no time at all.
+ */
 data class ActiveWorkoutOutcome(
   val guided: GuidedProgress,
   val skipped: List<SkippedMovement> = emptyList(),
   val sessionRpe: Int? = null,
   val feel: String? = null,
   val durationSec: Long? = null,
+  /** The movements alone, rests excluded. */
+  val netSec: Long? = null,
+  /** Seconds per movement, keyed by round and position — `"2:3"` is round two, third movement. */
+  val movementSeconds: Map<String, Long>? = null,
 )
 
 /**

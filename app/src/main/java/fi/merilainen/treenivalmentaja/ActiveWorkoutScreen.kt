@@ -44,8 +44,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +61,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutOutcome
 import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutStep
+import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutTiming
+import fi.merilainen.treenivalmentaja.domain.gapTargetSeconds
+import fi.merilainen.treenivalmentaja.domain.isGapOverrun
+import fi.merilainen.treenivalmentaja.domain.movementTimes
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SkippedMovement
@@ -146,7 +152,14 @@ fun ActiveWorkoutContent(
   initialSkippedKeys: List<String> = emptyList(),
   resumed: Boolean = false,
   onPositionChange: (Int, List<String>) -> Unit = { _, _ -> },
-  trackElapsed: Boolean = true,
+  /**
+   * Stops the clocks and puts given readings on them, for a screenshot.
+   *
+   * It replaces a `trackElapsed` boolean that only ever froze them at zero — which was enough
+   * while the header carried one clock and nothing turned red, and useless for a row of three
+   * where the question under test is whether real numbers fit and whether a late one is legible.
+   */
+  frozenClocks: FrozenClocks? = null,
 ) {
   val steps =
     remember(workout.exercises, workout.rounds, workout.roundRestSec) {
@@ -162,7 +175,27 @@ fun ActiveWorkoutContent(
     )
   }
   val startedAt = rememberSaveable(workout.id) { System.currentTimeMillis() }
-  val elapsedSec = if (trackElapsed) rememberElapsedSeconds(startedAt) else 0
+  val elapsedSec = frozenClocks?.grossSec ?: rememberElapsedSeconds(startedAt)
+
+  // The stopwatch. Banked per step as each one leaves the screen, so what survives a process death
+  // is every step that finished — the one in progress is lost, and gross still counts it.
+  var timing by
+    rememberSaveable(workout.id, stateSaver = ActiveWorkoutTimingSaver) {
+      mutableStateOf(frozenClocks?.timing ?: ActiveWorkoutTiming())
+    }
+  // When the thing now on screen began. A movement's run is its own step; a gap's run continues
+  // across the rest and the preparation that follows it, because that whole stretch is one gap.
+  var runStartedAt by rememberSaveable(workout.id) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+  var runSec by remember { mutableLongStateOf(frozenClocks?.runSec ?: 0) }
+  // Whether the run now on the clock is a gap. A gap survives the step boundary between the rest
+  // and the preparation after it; a movement never does.
+  var runIsGap by rememberSaveable(workout.id) { mutableStateOf(false) }
+  LaunchedEffect(runStartedAt, frozenClocks) {
+    while (frozenClocks == null) {
+      runSec = ((SystemClock.elapsedRealtime() - runStartedAt) / 1000).coerceAtLeast(0)
+      delay(1_000)
+    }
+  }
 
   // Mirrored upwards on every change so the position outlives this screen. `rememberSaveable`
   // alone only survives the process being killed — the back arrow pops the destination, and that
@@ -218,6 +251,27 @@ fun ActiveWorkoutContent(
     val step = steps[safeIndex]
     val completed = steps.completedMovements(safeIndex, skippedIds)
     val total = workout.rounds * workout.exercises.size
+
+    // Banking happens as a step leaves, not as the next one arrives: only the step being left
+    // knows what it was, and `onDispose` is the one place that still holds it.
+    DisposableEffect(safeIndex, steps) {
+      val enteredAt = SystemClock.elapsedRealtime()
+      val entered = steps.getOrNull(safeIndex)
+      // A movement restarts the visible run; a gap continues the one the rest before it began.
+      if (entered is ActiveWorkoutStep.Perform || !runIsGap) runStartedAt = enteredAt
+      runIsGap = entered !is ActiveWorkoutStep.Perform
+      onDispose {
+        val spent = ((SystemClock.elapsedRealtime() - enteredAt) / 1000).coerceAtLeast(0)
+        timing =
+          when (entered) {
+            is ActiveWorkoutStep.Perform -> timing.plusMovement(entered.key(), spent)
+            is ActiveWorkoutStep.Prepare,
+            is ActiveWorkoutStep.Rest,
+            is ActiveWorkoutStep.RoundBreak -> timing.plusBetween(spent)
+            else -> timing
+          }
+      }
+    }
     Column(
       modifier =
         Modifier
@@ -232,7 +286,18 @@ fun ActiveWorkoutContent(
         total = total,
         round = activeRound(step),
         rounds = workout.rounds,
-        elapsedSec = elapsedSec,
+        grossSec = elapsedSec,
+        netSec = timing.netSeconds(skippedIds),
+        runSec = runSec,
+        runLabel =
+          when (step) {
+            is ActiveWorkoutStep.Perform -> "Liike"
+            is ActiveWorkoutStep.Prepare -> "Tauko"
+            is ActiveWorkoutStep.Rest -> "Lepo"
+            is ActiveWorkoutStep.RoundBreak -> "Kierrostauko"
+            ActiveWorkoutStep.Finish -> null
+          },
+        runOverrun = isGapOverrun(runSec, steps.gapTargetSeconds(safeIndex)),
       )
 
       when (step) {
@@ -273,9 +338,13 @@ fun ActiveWorkoutContent(
           )
         ActiveWorkoutStep.Finish -> {
           val skipped = steps.skippedMovements(skippedIds)
+          val performed = timing.performed(skippedIds)
           FinishWorkoutCard(
             total = total,
             skipped = skipped,
+            netSec = timing.netSeconds(skippedIds),
+            grossSec = elapsedSec,
+            movements = steps.movementTimes(performed),
             onSave = { rpe, feel ->
               onComplete(
                 ActiveWorkoutOutcome(
@@ -289,6 +358,8 @@ fun ActiveWorkoutContent(
                   sessionRpe = rpe,
                   feel = feel,
                   durationSec = ((System.currentTimeMillis() - startedAt) / 1000).coerceAtLeast(0),
+                  netSec = timing.netSeconds(skippedIds),
+                  movementSeconds = performed.ifEmpty { null },
                 )
               )
             },
@@ -332,28 +403,45 @@ private fun ActiveWorkoutOverview(workout: Workout, modifier: Modifier, onStart:
   }
 }
 
+/**
+ * The counts and the clocks, in one card above whatever the session is doing.
+ *
+ * **The answer to "do four times fit here" is that there were never four.** The clock this card
+ * already carried — "Kesto" — was the gross time all along, so naming it honestly costs no room at
+ * all. What is added is the net time and the run now on the clock, which makes three numbers on
+ * one row: a total, the part of it that was training, and what the second one is growing by right
+ * now.
+ *
+ * They sit on their own row under the progress bar rather than beside the counts, because the two
+ * kinds of thing answer different questions — "how far in am I" above, "how long has this taken"
+ * below — and a row that mixes them is read twice. Labels stay short enough that the row survives
+ * a 360 dp screen at the largest font scale the app supports; the run keeps the widest label
+ * ("Kierrostauko") and sits last, where an overrun turning it red is at the end of the line the
+ * eye is already travelling.
+ */
 @Composable
 private fun WorkoutProgressHeader(
   completed: Int,
   total: Int,
   round: Int,
   rounds: Int,
-  elapsedSec: Long,
+  grossSec: Long,
+  netSec: Long = 0,
+  runSec: Long = 0,
+  runLabel: String? = null,
+  runOverrun: Boolean = false,
 ) {
   Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-      // The round on the left and the clock on the right, with the movement count under it.
-      // The mockup carried the clock twice and had the two counts' names the other way round;
-      // the labels here follow what the numbers actually count.
+      // The round on the left and the movement count on the right. The clock used to be here and
+      // has moved down to the row of clocks, where it can be told apart from the other two.
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("Kierros $round / $rounds", fontWeight = FontWeight.Bold)
-        Text("Kesto ${formatElapsed(elapsedSec)}", fontWeight = FontWeight.Bold)
+        Text(
+          text = "Liikkeet $completed / $total",
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
-      Text(
-        text = "Liikkeet $completed / $total",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
       Spacer(Modifier.height(4.dp))
       // The track is named explicitly. Material 3 defaults it to `secondaryContainer`, which in
       // this palette is the green that means "done" — so an empty bar was drawn full-width in the
@@ -364,7 +452,44 @@ private fun WorkoutProgressHeader(
         trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         strokeCap = StrokeCap.Round,
       )
+      Spacer(Modifier.height(2.dp))
+      Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        ClockReading(label = "Netto", seconds = netSec)
+        ClockReading(label = "Brutto", seconds = grossSec)
+        // Nothing is running on the finish screen, so the third slot is left empty rather than
+        // showing a clock for a step that is not being performed.
+        if (runLabel != null) ClockReading(label = runLabel, seconds = runSec, alert = runOverrun)
+      }
     }
+  }
+}
+
+/**
+ * One labelled clock: the label above, the number below, both small.
+ *
+ * [alert] is the only colour this row ever takes, and it is deliberately just the number. A rest
+ * that has run long is worth a glance, not an interruption — the person is mid-session with the
+ * phone on the floor, and a banner or an icon would be answering a question they did not ask.
+ */
+@Composable
+private fun ClockReading(label: String, seconds: Long, alert: Boolean = false) {
+  Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      text = formatElapsed(seconds),
+      style = MaterialTheme.typography.bodyMedium,
+      fontWeight = FontWeight.Bold,
+      color =
+        if (alert) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+    )
   }
 }
 
@@ -499,6 +624,9 @@ private fun CountdownStepCard(title: String, seconds: Int, next: String, onFinis
 private fun FinishWorkoutCard(
   total: Int,
   skipped: List<SkippedMovement>,
+  netSec: Long = 0,
+  grossSec: Long = 0,
+  movements: List<Pair<String, Long>> = emptyList(),
   onSave: (Int, String?) -> Unit,
 ) {
   var rpe by rememberSaveable { mutableIntStateOf(5) }
@@ -508,6 +636,24 @@ private fun FinishWorkoutCard(
       Text("Treeni valmis", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
       Text("Tehty ${total - skipped.size} / $total liikettä")
       if (skipped.isNotEmpty()) Text("Ohitettu: ${skipped.joinToString { it.name }}")
+      // The two totals, named the same way the header named them all session.
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        ClockReading(label = "Netto", seconds = netSec)
+        ClockReading(label = "Brutto", seconds = grossSec)
+      }
+      if (movements.isNotEmpty()) {
+        Text("Liikkeiden ajat", fontWeight = FontWeight.Bold)
+        movements.forEach { (name, seconds) ->
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+              text = name,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = formatElapsed(seconds), style = MaterialTheme.typography.bodyMedium)
+          }
+        }
+      }
       Text("Rasittavuus (RPE) $rpe / 10", fontWeight = FontWeight.Bold)
       Slider(
         value = rpe.toFloat(),
@@ -550,6 +696,38 @@ private fun rememberElapsedSeconds(startedAtMillis: Long): Long {
   }
   return elapsed
 }
+
+/** Fixed clock readings, so a screenshot of this screen is the same picture every time. */
+data class FrozenClocks(
+  val grossSec: Long = 0,
+  val runSec: Long = 0,
+  val timing: ActiveWorkoutTiming = ActiveWorkoutTiming(),
+)
+
+/**
+ * Keeps the stopwatch across a process death, in the flat form a `Bundle` can hold.
+ *
+ * The map is written out as alternating key and value rather than as a map, because what survives
+ * here has to be primitives — and a list of strings and longs is something every Android version
+ * stores the same way.
+ */
+private val ActiveWorkoutTimingSaver =
+  listSaver<ActiveWorkoutTiming, Any>(
+    save = { timing ->
+      listOf(timing.betweenSeconds) +
+        timing.movementSeconds.flatMap { (key, seconds) -> listOf(key, seconds) }
+    },
+    restore = { stored ->
+      val between = stored.firstOrNull() as? Long ?: 0L
+      val pairs =
+        stored.drop(1).chunked(2).mapNotNull { chunk ->
+          val key = chunk.getOrNull(0) as? String
+          val seconds = chunk.getOrNull(1) as? Long
+          if (key != null && seconds != null) key to seconds else null
+        }
+      ActiveWorkoutTiming(movementSeconds = pairs.toMap(), betweenSeconds = between)
+    },
+  )
 
 private fun formatElapsed(seconds: Long): String =
   "%02d:%02d".format(seconds / 60, seconds % 60)
