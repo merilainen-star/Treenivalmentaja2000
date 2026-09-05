@@ -1010,6 +1010,9 @@ class WorkoutViewModel(
             // Read from the completion event, not from this class's own map: the analysis can be
             // asked for days later, from a screen that never held the counter.
             guided = repository.guidedProgressFor(session.id),
+            // The clocks come from the same completion event, read the same way and for the same
+            // reason: days later, from a screen that never held them.
+            timing = repository.activeWorkoutOutcomeFor(session.id),
             oura = oura,
             run = run,
             recoveryByDay = recovery,

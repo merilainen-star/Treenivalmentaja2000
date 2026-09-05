@@ -20,6 +20,19 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   vienyt yhtään tilaa. Laskurit ja kellot jaettiin sen mukaan, kumpaan kysymykseen ne vastaavat:
   "kuinka pitkällä olen" ylärivillä, "kauanko tässä on mennyt" palkin alla.
 
+- **Ajankäyttö AI-analyysiin, liike liikkeeltä.** Valmiin treenin analyysipromptiin tulee oma
+  osionsa: nettoaika, bruttoaika ja jokaiselta liikkeeltä sekä suoritusaika että sen jälkeinen tauko
+  suunnitellun lepoajan rinnalla. Näin malli voi sanoa jotain *temposta* eikä vain siitä mitä tuli
+  tehtyä: kymmenen punnerrusta minuutissa ja kymmenen kahdessa ja puolessa minuutissa ovat sama
+  kuittaus ja eri treeni. Samoin tauoista — suunniteltuun nähden tuplaksi venynyt lepo kertoo
+  edellisestä sarjasta, ei aikataulusta.
+
+  Jokainen kierros on oma rivinsä, koska kolme kierrosta samaa liikettä ovat kolme eri suoritusta ja
+  keskiarvo piilottaisi sen kierroksen joka kesti puolitoista kertaa muut. Suunniteltu luku on
+  mittauksen vieressä, jotta vertailun tekee malli eikä sovellus sen puolesta. Jos suunnitelma ei
+  määrää lepoa, mitattu tauko esitetään ilman vertailulukua, ja ennen kellojen olemassaoloa tehdystä
+  treenistä osio jätetään kokonaan kirjoittamatta — puuttuva ei ole nolla.
+
 - **Liian pitkäksi venyneen tauon varoitus.** Suunnitelman lepoajan ylityttyä meneillään olevan
   ajan pieni numero muuttuu punaiseksi. Ei banneria, ei ääntä, ei ikonia — puhelin on lattialla ja
   venynyt lepo ansaitsee vilkaisun, ei keskeytystä.
@@ -36,9 +49,12 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
   nappi tarkoittaisi kahta painallusta yhden liikkeen aloittamiseen ja kahta määritelmää sanalle
   "alkoi".
 - **Ei uutta saraketta eikä migraatiota.** Toteuma tallentuu JSON-payloadina suoritustapahtumaan, ja
-  kaksi uutta avainta maksaa siellä yhtä vähän kuin ensimmäisetkin. Ennen tätä tehdyt treenit eivät
-  kanna kumpaakaan avainta ja luetaan puuttuvina — eivät nollina, mikä väittäisi että liikkeet eivät
-  vieneet aikaa lainkaan.
+  kolme uutta avainta — nettoaika, liikekohtaiset sekunnit ja liikkeen jälkeinen tauko — maksaa
+  siellä yhtä vähän kuin ensimmäisetkin. Ennen tätä tehdyt treenit eivät kanna niitä ja luetaan
+  puuttuvina — eivät nollina, mikä väittäisi että liikkeet eivät vieneet aikaa lainkaan.
+- **Sama tauko lasketaan kahdesti, tarkoituksella.** Liikkeen jälkeinen tauko on yhtä aikaa *sen
+  liikkeen* lepo ja osa treenin kokonaistaukoaikaa, ja näihin kahteen kysymykseen vastataan eri
+  paikoissa: edellinen menee analyysiin liikkeen riville, jälkimmäinen bruttoajan sisään.
 - Toistomäärän kirjaamista ei lisätty. `PROJECT_STATUS.md`:n ja tämän sivun mukaan per-sarja-toistot
   ovat edelleen V1:n ulkopuolella; "toteutui 12" tarkoittaa tässä sitä, että liike kuitattiin
   tehdyksi suunnitellulla määrällä, ja ohitettu liike erottuu omana tietonaan.

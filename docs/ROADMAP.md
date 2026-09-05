@@ -237,8 +237,14 @@ almost nothing to say about the sessions that matter most.
   from the end of one movement to the start of the next, across the rest *and* the preparation
   after it, because a rest card hands over at zero and cannot visibly overrun; past its planned
   length the small number turns red and nothing else changes. Both totals and each movement's own
-  time are stored on the completion event — two more keys in a payload that is already JSON, so no
+  time are stored on the completion event — three more keys in a payload that is already JSON, so no
   column and no migration.
+
+  *And the analysis reads them.* The completed-session prompt carries net time, gross time, and per
+  movement both its own seconds and the gap that followed, beside the rest the plan asked for. That
+  is the difference between "ten press-ups, done" and "ten press-ups in 1:02, then a 1:32 rest
+  against a planned 0:45" — the second is a session the model can say something about. Names are
+  dropped, seconds kept, when the movement list no longer has the shape that was timed.
 
   *The hard part is the clock.* The existing countdown counts ticks inside a composable, which is
   fine for a plank being watched and wrong for a rest with the phone face-down and the process

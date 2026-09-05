@@ -139,6 +139,27 @@ discipline the rest of the app keeps: no measurement, no verdict.
 and the time each movement took. All of it is stored on the completion event alongside the rest of
 the outcome.
 
+**The analysis is told the same thing, movement by movement.** The clocks were built for the header,
+but the reader who can do most with them is the model: a tick on a checklist says ten press-ups were
+done, and only the seconds say whether they were brisk or laboured. So the completed-session prompt
+carries a section of its own:
+
+```
+## Toteutunut ajankäyttö (ohjattu treeni)
+- nettoaika 4:10 (pelkät liikkeet)
+- bruttoaika 10:00 (levot mukaan lukien)
+- Kierros 1 · Punnerrus (10 toistoa): suoritus 1:02, tauko jälkeen 0:48 (suunniteltu 0:45)
+- Kierros 2 · Punnerrus (10 toistoa): suoritus 1:18, tauko jälkeen 1:32 (suunniteltu 0:45)
+```
+
+Each round is its own line, because three rounds of the same movement are three separate efforts and
+an average would hide the one that took half as long again. The plan sits beside the measurement so
+the comparison is the model's to make: a second round sixteen seconds slower on a rest half a minute
+past its plan is the shape of fatigue, and nothing in the app should be deciding that on the model's
+behalf. Where the plan states no rest, the measured gap stands alone rather than being judged against
+a number nobody wrote — and a session finished before the clocks existed renders no section at all,
+on the rule the Oura layer already keeps: absent is not zero.
+
 #### Does it all fit in one header?
 
 The open question when this was specified was whether a clock, a net time, a gross time and a

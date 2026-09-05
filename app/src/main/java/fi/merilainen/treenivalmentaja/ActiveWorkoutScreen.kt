@@ -65,6 +65,7 @@ import fi.merilainen.treenivalmentaja.domain.ActiveWorkoutTiming
 import fi.merilainen.treenivalmentaja.domain.gapTargetSeconds
 import fi.merilainen.treenivalmentaja.domain.isGapOverrun
 import fi.merilainen.treenivalmentaja.domain.movementTimes
+import fi.merilainen.treenivalmentaja.domain.precedingMovementKey
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SkippedMovement
@@ -267,7 +268,11 @@ fun ActiveWorkoutContent(
             is ActiveWorkoutStep.Perform -> timing.plusMovement(entered.key(), spent)
             is ActiveWorkoutStep.Prepare,
             is ActiveWorkoutStep.Rest,
-            is ActiveWorkoutStep.RoundBreak -> timing.plusBetween(spent)
+            is ActiveWorkoutStep.RoundBreak -> {
+              val after = steps.precedingMovementKey(safeIndex)
+              val banked = timing.plusBetween(spent)
+              if (after == null) banked else banked.plusRest(after, spent)
+            }
             else -> timing
           }
       }
@@ -360,6 +365,7 @@ fun ActiveWorkoutContent(
                   durationSec = ((System.currentTimeMillis() - startedAt) / 1000).coerceAtLeast(0),
                   netSec = timing.netSeconds(skippedIds),
                   movementSeconds = performed.ifEmpty { null },
+                  restSeconds = timing.rests(skippedIds).ifEmpty { null },
                 )
               )
             },
@@ -714,18 +720,31 @@ data class FrozenClocks(
 private val ActiveWorkoutTimingSaver =
   listSaver<ActiveWorkoutTiming, Any>(
     save = { timing ->
-      listOf(timing.betweenSeconds) +
-        timing.movementSeconds.flatMap { (key, seconds) -> listOf(key, seconds) }
+      // Two maps in one flat list, so the reader needs to know where the first ends.
+      listOf(timing.betweenSeconds, timing.movementSeconds.size) +
+        timing.movementSeconds.flatMap { (key, seconds) -> listOf(key, seconds) } +
+        timing.restSeconds.flatMap { (key, seconds) -> listOf(key, seconds) }
     },
     restore = { stored ->
+      fun List<Any>.asPairs(): Map<String, Long> =
+        chunked(2)
+          .mapNotNull { chunk ->
+            val key = chunk.getOrNull(0) as? String
+            val seconds = chunk.getOrNull(1) as? Long
+            if (key != null && seconds != null) key to seconds else null
+          }
+          .toMap()
+
       val between = stored.firstOrNull() as? Long ?: 0L
-      val pairs =
-        stored.drop(1).chunked(2).mapNotNull { chunk ->
-          val key = chunk.getOrNull(0) as? String
-          val seconds = chunk.getOrNull(1) as? Long
-          if (key != null && seconds != null) key to seconds else null
-        }
-      ActiveWorkoutTiming(movementSeconds = pairs.toMap(), betweenSeconds = between)
+      // Split by position rather than by counting decoded pairs: an entry that fails to decode
+      // would otherwise shift every rest into the movement map.
+      val entries = stored.drop(2)
+      val movementEntries = ((stored.getOrNull(1) as? Int) ?: 0) * 2
+      ActiveWorkoutTiming(
+        movementSeconds = entries.take(movementEntries).asPairs(),
+        restSeconds = entries.drop(movementEntries).asPairs(),
+        betweenSeconds = between,
+      )
     },
   )
 

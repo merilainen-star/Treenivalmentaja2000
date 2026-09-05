@@ -6,6 +6,33 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-09-05
+- Base commit: `0e9aeb2` plus the per-movement timing sent to the AI analysis, committed together
+- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
+  build-tools 36.1.0, on Linux
+- Emulator: none attached
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` (with `app/build/test-results` cleared first) | 730 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 67 comparisons, 0 changed, 67 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,498,867 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** This change is a prompt string and a map on a data class, so nothing here needs one — but the instrumented suite has not been re-run since, and this line says so rather than implying it passed. |
+
+No baseline moved: the header and the finish screen are untouched, and what changed is what the
+completion event carries and what the prompt says about it.
+
+`--rerun-tasks` is load-bearing on the screenshot line. Plain `verifyRoborazziDebug` fails when
+`testDebugUnitTest` is up to date, because nothing captures images for it to compare — a task-wiring
+artifact, not a regression, and worth knowing before it is read as one.
+
+The analysis timing costs **16,384 B (+0.076 %)**: 21,482,483 B for `0e9aeb2` against 21,498,867 B
+with it, both from `./gradlew clean :app:assembleDebug` on one machine. One dex page, which is what
+a nullable map and a `buildString` block comes to.
+
+## Previously verified build
+
+- Date: 2026-09-05
 - Base commit: `ec60197` plus the guided-session clocks, committed together
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
@@ -28,7 +55,7 @@ The clocks cost **16,384 B (+0.076 %)**: 21,466,099 B for `ec60197` against 21,4
 both from `./gradlew clean :app:assembleDebug` on one machine. One dex page again, which is what a
 data class, two pure functions and a row of `Text` comes to.
 
-## Previously verified build
+## Earlier verified builds
 
 - Date: 2026-09-02
 - Base commit: working tree for the missed-session "Ohita" fix on top of `0fd2aaa` (branch
