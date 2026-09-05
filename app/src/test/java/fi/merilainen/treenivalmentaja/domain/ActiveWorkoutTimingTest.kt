@@ -163,6 +163,58 @@ class ActiveWorkoutTimingTest {
     assertFalse(isGapOverrun(elapsedSeconds = 600, targetSeconds = 0))
   }
 
+  // ------------------------------------------------------------------ rests per movement
+
+  /** A gap belongs to the movement it followed, the way `restSec` belongs to the exercise. */
+  @Test
+  fun `a gap is recorded against the movement before it`() {
+    val restIndex = steps.indexOfFirst { it is ActiveWorkoutStep.Rest }
+
+    assertEquals("1:1", steps.precedingMovementKey(restIndex))
+    // And the preparation after it belongs to the same movement, because it is the same gap.
+    assertEquals("1:1", steps.precedingMovementKey(restIndex + 1))
+  }
+
+  /** Nothing precedes the walk to the mat, so it is nobody's rest. */
+  @Test
+  fun `the first preparation follows no movement`() {
+    assertNull(steps.precedingMovementKey(0))
+  }
+
+  /** A round break follows the last movement of the round it ends. */
+  @Test
+  fun `a round break belongs to the movement that closed the round`() {
+    val breakIndex = steps.indexOfFirst { it is ActiveWorkoutStep.RoundBreak }
+
+    assertEquals("1:2", steps.precedingMovementKey(breakIndex))
+  }
+
+  /** The rest card and the preparation after it add into one gap, not two. */
+  @Test
+  fun `the parts of one gap add together`() {
+    val timing = ActiveWorkoutTiming().plusRest("1:1", 45).plusRest("1:1", 20)
+
+    assertEquals(mapOf("1:1" to 65L), timing.restSeconds)
+  }
+
+  /** Gap seconds count twice on purpose: once as this movement's rest, once as session gap time. */
+  @Test
+  fun `a gap counts both against its movement and against the session`() {
+    val timing = ActiveWorkoutTiming().plusBetween(45).plusRest("1:1", 45)
+
+    assertEquals(45, timing.betweenSeconds)
+    assertEquals(mapOf("1:1" to 45L), timing.restSeconds)
+    assertEquals(0, timing.netSeconds())
+  }
+
+  /** A skipped movement's rest goes with it. */
+  @Test
+  fun `rests of skipped movements are left out`() {
+    val timing = ActiveWorkoutTiming().plusRest("1:1", 40).plusRest("1:2", 55)
+
+    assertEquals(mapOf("1:1" to 40L), timing.rests(skippedKeys = listOf("1:2")))
+  }
+
   // ------------------------------------------------------------------ the summary
 
   @Test

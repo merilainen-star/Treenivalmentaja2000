@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.domain
 
 import java.time.LocalDate
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -583,5 +584,198 @@ class AnalysisPromptBuilderTest {
       builder.completed(CompletedAnalysisInput(type = WorkoutType.STRENGTH, date = day))
 
     assertTrue(prompt.contains("Ohjatun treenin kuittaukset kertovat, mitkä liikkeet tehtiin"))
+  }
+
+  // ------------------------------------------------------------------ the clocks
+
+  private val timedProgramme =
+    listOf(
+      Exercise(name = "Punnerrus", reps = 10, restSec = 45),
+      Exercise(name = "Kahvakuulaheilautus", reps = 15, restSec = 60),
+    )
+
+  /**
+   * The question the section exists to make answerable: were ten press-ups in a minute brisk, or
+   * did they come slowly? The model can only ask that if it is handed the seconds, so the seconds
+   * are handed over per movement and per round, beside what the plan asked for.
+   */
+  @Test
+  fun `reports each movement's own time and the gap that followed it`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          plannedRounds = 2,
+          exercises = timedProgramme,
+          guided = GuidedProgress(done = 4, rounds = 2, perRound = 2),
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 4, rounds = 2, perRound = 2),
+              durationSec = 600,
+              netSec = 250,
+              movementSeconds = mapOf("1:1" to 62L, "1:2" to 55L, "2:1" to 78L, "2:2" to 55L),
+              restSeconds = mapOf("1:1" to 48L, "1:2" to 61L, "2:1" to 92L),
+            )
+        )
+      )
+
+    assertTrue(prompt.contains("## Toteutunut ajankäyttö (ohjattu treeni)"))
+    assertTrue(prompt.contains("- nettoaika 4:10 (pelkät liikkeet)"))
+    assertTrue(prompt.contains("- bruttoaika 10:00 (levot mukaan lukien)"))
+    assertTrue(
+      prompt.contains(
+        "- Kierros 1 · Punnerrus (10 toistoa): suoritus 1:02, tauko jälkeen 0:48 (suunniteltu 0:45)"
+      )
+    )
+    // The same movement one round later is its own line, because it was its own effort — and this
+    // one took sixteen seconds longer and rested half a minute past its plan.
+    assertTrue(
+      prompt.contains(
+        "- Kierros 2 · Punnerrus (10 toistoa): suoritus 1:18, tauko jälkeen 1:32 (suunniteltu 0:45)"
+      )
+    )
+  }
+
+  /** The lines are written in the order the session happened, not in whatever order a map holds. */
+  @Test
+  fun `orders the movements by round and then by position`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = timedProgramme,
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 4, rounds = 2, perRound = 2),
+              movementSeconds = mapOf("2:2" to 40L, "1:2" to 30L, "2:1" to 35L, "1:1" to 25L),
+            )
+        )
+      )
+
+    val order =
+      listOf("Kierros 1 · Punnerrus", "Kierros 1 · Kahvakuulaheilautus", "Kierros 2 · Punnerrus")
+        .map { prompt.indexOf(it) }
+
+    assertTrue(order.none { it < 0 })
+    assertEquals(order.sorted(), order)
+  }
+
+  /**
+   * The last movement of a session has no gap after it, and a plan may ask for no rest at all.
+   * Neither is written as a rest of zero seconds, which would read as a set run straight into the
+   * next one.
+   */
+  @Test
+  fun `writes no rest where none was measured and no plan where none was given`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = listOf(Exercise(name = "Leuanveto", reps = 5)),
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 1, rounds = 1, perRound = 1),
+              movementSeconds = mapOf("1:1" to 44L),
+              restSeconds = mapOf("1:1" to 70L),
+            )
+        )
+      )
+
+    assertTrue(
+      prompt.contains("- Kierros 1 · Leuanveto (5 toistoa): suoritus 0:44, tauko jälkeen 1:10")
+    )
+    // No plan to compare the gap against, so no comparison is written. (The closing sentence about
+    // reading the numbers says "suunniteltuun", hence the parenthesis in the match.)
+    assertFalse(prompt.contains("(suunniteltu"))
+    assertFalse(prompt.contains("0:00"))
+  }
+
+  /** Without this the model would compare tempo against nothing and call every set "hyvä". */
+  @Test
+  fun `tells the model what the seconds are evidence of`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = timedProgramme,
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 1, rounds = 1, perRound = 2),
+              movementSeconds = mapOf("1:1" to 62L),
+            )
+        )
+      )
+
+    assertTrue(prompt.contains("Suoritusaika kertoo tempon"))
+    assertTrue(prompt.contains("miten hyvin edellisestä sarjasta palauduttiin"))
+  }
+
+  /**
+   * The same guard the checklist keeps. "Kevyempi versio" can swap the movement list under a
+   * session after it was timed, and position 2 then points at an exercise that was never done.
+   * The seconds are still true, so they are kept; the names are not, so they are dropped.
+   */
+  @Test
+  fun `drops the names when the movement list no longer has the shape that was timed`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          // Three movements now; the session was counted against two.
+          exercises = timedProgramme + Exercise(name = "Etunojapunnerrus", reps = 20),
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 2, rounds = 1, perRound = 2),
+              movementSeconds = mapOf("1:1" to 62L),
+              restSeconds = mapOf("1:1" to 48L),
+            )
+        )
+      )
+
+    assertTrue(prompt.contains("- Kierros 1 · liike 1: suoritus 1:02, tauko jälkeen 0:48"))
+    // Neither the wrong name nor a planned rest borrowed from the wrong exercise.
+    assertFalse(prompt.contains("Kierros 1 · Punnerrus"))
+    assertFalse(prompt.contains("(suunniteltu"))
+  }
+
+  /**
+   * A session finished before the clocks existed has no measurements, and "0:00" is not the same
+   * fact as "unmeasured" — the same rule the Oura layer keeps about a night the ring was off.
+   */
+  @Test
+  fun `renders no timing section when nothing was measured`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = timedProgramme,
+          guided = GuidedProgress(done = 4, rounds = 2, perRound = 2),
+        )
+      )
+
+    assertFalse(prompt.contains("Toteutunut ajankäyttö"))
+    assertFalse(prompt.contains("nettoaika"))
+  }
+
+  /** An outcome that carries a checklist but no clock readings is the same absence of evidence. */
+  @Test
+  fun `renders no timing section for an outcome with no clock readings`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = timedProgramme,
+          timing = ActiveWorkoutOutcome(guided = GuidedProgress(done = 4, rounds = 2, perRound = 2))
+        )
+      )
+
+    assertFalse(prompt.contains("Toteutunut ajankäyttö"))
   }
 }

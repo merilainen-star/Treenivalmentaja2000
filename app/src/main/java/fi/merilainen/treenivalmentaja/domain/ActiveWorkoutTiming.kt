@@ -28,6 +28,18 @@ data class ActiveWorkoutTiming(
    * returned, which it cannot.
    */
   val movementSeconds: Map<String, Long> = emptyMap(),
+  /**
+   * Seconds of gap **after** each movement, keyed the same way.
+   *
+   * A gap belongs to the movement it follows, which is how the plan already talks about rests:
+   * `restSec` sits on the exercise and means "then rest this long". A gap is the whole stretch —
+   * the rest card and the preparation after it — so this is the honest answer to "how long was the
+   * break after the press-ups", not just how long one card was up.
+   *
+   * The walk to the mat before the first movement follows nothing, so it is counted only in
+   * [betweenSeconds].
+   */
+  val restSeconds: Map<String, Long> = emptyMap(),
   /** Seconds spent preparing, resting and between rounds — everything that is not a movement. */
   val betweenSeconds: Long = 0,
 ) {
@@ -53,6 +65,16 @@ data class ActiveWorkoutTiming(
     if (seconds <= 0) this else copy(betweenSeconds = betweenSeconds + seconds)
 
   /**
+   * Adds gap time to the movement it followed.
+   *
+   * Called alongside [plusBetween] rather than instead of it: the same seconds are one movement's
+   * rest *and* part of the session's total gap time, and the two are read for different questions.
+   */
+  fun plusRest(afterKey: String, seconds: Long): ActiveWorkoutTiming =
+    if (seconds <= 0) this
+    else copy(restSeconds = restSeconds + (afterKey to (restSeconds[afterKey] ?: 0) + seconds))
+
+  /**
    * What each movement cost, skipped ones left out.
    *
    * The seconds a skipped movement collected are real — someone stood in front of the card before
@@ -61,6 +83,23 @@ data class ActiveWorkoutTiming(
    */
   fun performed(skippedKeys: Collection<String> = emptyList()): Map<String, Long> =
     movementSeconds.filterKeys { it !in skippedKeys }
+
+  /** The rests, skipped movements' left out for the same reason their own seconds are. */
+  fun rests(skippedKeys: Collection<String> = emptyList()): Map<String, Long> =
+    restSeconds.filterKeys { it !in skippedKeys }
+}
+
+/**
+ * The movement a gap at [index] follows, or `null` before the first one.
+ *
+ * Walks back rather than assuming the step immediately before: a gap can span a rest and the
+ * preparation after it, and both belong to the movement that ended when the gap began.
+ */
+fun List<ActiveWorkoutStep>.precedingMovementKey(index: Int): String? {
+  for (i in (index - 1) downTo 0) {
+    (getOrNull(i) as? ActiveWorkoutStep.Perform)?.let { return it.key() }
+  }
+  return null
 }
 
 /**

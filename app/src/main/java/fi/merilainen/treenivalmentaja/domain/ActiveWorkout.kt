@@ -43,6 +43,8 @@ data class ActiveWorkoutOutcome(
   val netSec: Long? = null,
   /** Seconds per movement, keyed by round and position — `"2:3"` is round two, third movement. */
   val movementSeconds: Map<String, Long>? = null,
+  /** Seconds of gap after each movement, keyed the same way. See `ActiveWorkoutTiming`. */
+  val restSeconds: Map<String, Long>? = null,
 )
 
 /**

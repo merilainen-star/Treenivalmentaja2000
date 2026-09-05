@@ -27,6 +27,15 @@ data class CompletedAnalysisInput(
    * this at all. Both render no section rather than an empty one.
    */
   val guided: GuidedProgress? = null,
+  /**
+   * What the guided session's clocks recorded: net and gross time, each movement's own time, and
+   * the gap after it.
+   *
+   * `null` for a session finished before the clocks existed, or from a screen that has none. The
+   * section is then not written at all rather than written empty — a model handed "0:00" would
+   * reason about a workout that took no time.
+   */
+  val timing: ActiveWorkoutOutcome? = null,
   /** What Oura recorded for the session, when it recorded anything. */
   val oura: CompletedSessionMetrics? = null,
   /** What the watch recorded, via intervals.icu. Richer than Oura for a run, absent for most else. */
@@ -89,6 +98,7 @@ class AnalysisPromptBuilder {
 
     appendProgramme(input.exercises, input.plannedRounds)
     appendGuided(input.guided, input.exercises)
+    appendTiming(input.timing, input.exercises)
 
     val performed = buildList {
       input.oura?.let { o ->
@@ -205,6 +215,80 @@ class AnalysisPromptBuilder {
       val work = exercise.promptPrescription()
       appendLine(if (work.isEmpty()) "- ${exercise.name}" else "- ${exercise.name}: $work")
     }
+    appendLine()
+  }
+
+  /**
+   * What the session's clocks measured, movement by movement.
+   *
+   * This is the section that lets the model say something about *tempo* rather than only about
+   * completion: ten press-ups in fifty seconds and ten in two and a half minutes are the same tick
+   * on the checklist and a different training session. Same for the gaps — a rest that ran to
+   * double its plan is evidence about the last set, not a scheduling detail.
+   *
+   * Each line carries the plan beside the measurement so the comparison is the model's to make and
+   * not one this app made for it. The planned rest is written only where the plan states one;
+   * where it does not, the measured gap stands alone rather than being judged against a number
+   * nobody wrote. The naming is guarded exactly as [appendGuided] guards it: when [exercises] no
+   * longer has the shape the session was counted against, the seconds are still true and the names
+   * are not, so the positions are written unnamed.
+   */
+  private fun StringBuilder.appendTiming(
+    timing: ActiveWorkoutOutcome?,
+    exercises: List<Exercise>,
+  ) {
+    if (timing == null) return
+    val movements = timing.movementSeconds.orEmpty()
+    val rests = timing.restSeconds.orEmpty()
+    val totals =
+      buildList {
+        timing.netSec?.let { add("nettoaika ${it.formatDuration()} (pelkät liikkeet)") }
+        timing.durationSec?.let { add("bruttoaika ${it.formatDuration()} (levot mukaan lukien)") }
+      }
+    if (movements.isEmpty() && totals.isEmpty()) return
+
+    appendLine("## Toteutunut ajankäyttö (ohjattu treeni)")
+    totals.forEach { appendLine("- $it") }
+
+    // The same guard `appendGuided` keeps, for the same reason: "Kevyempi versio" can swap the
+    // movement list under a session after the fact, and a position then points at a different
+    // exercise than the one that was timed. The seconds stay true; only the naming is dropped.
+    val namesFit = exercises.size == timing.guided.perRound
+
+    // Sorted by round and then by position, so the list reads in the order the session happened
+    // rather than in whatever order a map iterates.
+    movements.keys
+      .mapNotNull { key ->
+        val parts = key.split(":")
+        val round = parts.getOrNull(0)?.toIntOrNull()
+        val position = parts.getOrNull(1)?.toIntOrNull()
+        if (round == null || position == null) null else Triple(key, round, position)
+      }
+      .sortedWith(compareBy({ it.second }, { it.third }))
+      .forEach { (key, round, position) ->
+        val exercise = if (namesFit) exercises.getOrNull(position - 1) else null
+        val name = exercise?.name ?: "liike $position"
+        val prescription = exercise?.promptPrescription().orEmpty()
+        val done = movements[key]?.formatDuration()
+        val rest = rests[key]
+        val plannedRest = exercise?.restSec?.takeIf { it > 0 }
+
+        val line = StringBuilder("- Kierros $round · $name")
+        if (prescription.isNotBlank()) line.append(" ($prescription)")
+        done?.let { line.append(": suoritus $it") }
+        if (rest != null) {
+          line.append(", tauko jälkeen ${rest.formatDuration()}")
+          plannedRest?.let { line.append(" (suunniteltu ${it.toLong().formatDuration()})") }
+        }
+        appendLine(line.toString())
+      }
+
+    // Said once, here, rather than in the standing task text: without these measurements the
+    // instruction would invite the model to speculate about a tempo nothing recorded.
+    appendLine(
+      "- Suoritusaika kertoo tempon ja tauon pituus siitä, miten hyvin edellisestä sarjasta " +
+        "palauduttiin. Tulkitse molempia suhteessa suunniteltuun."
+    )
     appendLine()
   }
 
