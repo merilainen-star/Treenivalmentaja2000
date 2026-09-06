@@ -6,6 +6,43 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-09-06
+- Base commit: `ad07760` — heart-rate zones and the app-computed kilometre splits
+- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
+  build-tools 36.1.0, on Linux
+- Emulator: none attached
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 875 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 73 comparisons, 0 changed, 0 added, 73 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,662,707 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** This is the line that matters most this time: schema v15 ships a new migration, and `MigrationTest.migrate14To15` is **written but unrun**. Room generated `15.json` and the auto-migration is declared, so the guard against a silent destructive fallback still holds — but nobody has watched a v14 database become a v15 one. |
+
+**No baseline moved, and none was added.** Nothing in this change draws anything: the zones and the
+splits reach the model through the prompt and appear on no screen. 73 comparisons, all unchanged,
+is the assertion that says so.
+
+The run detail costs **32,768 B (+0.15 %)**: 21,629,939 B for `2648dd9` against 21,662,707 B with
+it, both from `./gradlew clean :app:assembleDebug` on one machine. Two dex pages, which is what two
+pure domain functions, two Room entities and two prompt sections come to.
+
+**58 new unit tests**, and the ones worth naming are the refusals — `heartRateZones` returning
+`null` rather than an empty distribution when the times are all zero or the arrays cannot be paired;
+a run with no zone data being counted *out* of its programme group rather than folded in as zeros;
+a zone table that moved mid-programme losing its beat ranges. `kilometreSplits` is tested against
+generated channels rather than a recorded fixture, so "did the interpolation put the boundary in the
+right place" is an assertion (100 s, not 115) rather than an eyeball.
+
+Two things carried forward from the previous entry and still true: run the suite at least once in
+the evening (`AiAnalysisPromptSourcingTest` and `EasyRunDriftWiringTest` used to fail only between
+21:00 UTC and midnight), and never combine `testDebugUnitTest` with `verifyRoborazziDebug` in one
+invocation — they race on `app/build/test-results` and the loser dies with a `NoSuchFileException`
+that looks like a test failure.
+
+## Previously verified build
+
+- Date: 2026-09-06
 - Base commit: `aa31e9a` plus the next-programme flow and a test-clock fix, committed separately
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
@@ -22,41 +59,14 @@ other documentation.
 Three new baselines, and one that moved for a real reason: `card_program_report_loaded` now shows
 the "Luo seuraava ohjelma" button under a final report.
 
-**The unit-test run above was green only after a clock fix, and the fix is a separate commit.**
+**That unit-test run was green only after a clock fix, and the fix is a separate commit.**
 `AiAnalysisPromptSourcingTest` and `EasyRunDriftWiringTest` seeded sessions in the machine's zone
 while the ViewModel reads today in the *plan's* zone, so five tests failed every evening between
-21:00 UTC and midnight and passed again by morning. Reproduced on a clean `aa31e9a` before this
-branch's own changes. Two things worth carrying forward: run the suite at least once in the
-evening, and never combine `testDebugUnitTest` with `verifyRoborazziDebug` in one invocation —
-they race on `app/build/test-results` and the loser dies with a `NoSuchFileException` that looks
-like a test failure.
+21:00 UTC and midnight and passed again by morning. Reproduced on a clean `aa31e9a` before that
+branch's own changes.
 
-The next-programme flow costs **49,152 B (+0.23 %)**: 21,580,787 B for `aa31e9a` against
+The next-programme flow cost **49,152 B (+0.23 %)**: 21,580,787 B for `aa31e9a` against
 21,629,939 B with it, both from `./gradlew clean :app:assembleDebug` on one machine.
-
-## Previously verified build
-
-- Date: 2026-09-06
-- Base commit: `867e4ae` plus the whole-programme report, slices 1–4, committed together
-- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
-  build-tools 36.1.0, on Linux
-- Emulator: none attached
-
-| Check | Command | Measured result |
-| --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` (with `app/build/test-results` cleared first) | 792 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 70 comparisons, 0 changed, 70 unchanged |
-| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
-| Debug APK | `./gradlew clean :app:assembleDebug` | 21,580,787 bytes |
-| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** The new code is a pure aggregation, a prompt string and one Compose card; the repository method is a query and two maps. Nothing here needs a device — but the instrumented suite has not been re-run since, and this line says so rather than implying it passed. |
-
-Three baselines are new — `card_program_report_button`, `card_program_report_loaded` and
-`card_program_report_not_enough_data` — and none moved. The report card is the only new rendering,
-and it draws nothing at all until an API key is configured.
-
-The programme report costs **81,920 B (+0.38 %)**: 21,498,867 B for `867e4ae` against 21,580,787 B
-with it, both from `./gradlew clean :app:assembleDebug` on one machine. Five dex pages, which is
-what an aggregate of a dozen data classes, a prompt builder and a card comes to.
 
 ## Earlier verified builds
 
@@ -181,7 +191,7 @@ engine/ViewModel logic and the deleted DataStore code are not the same size.
 
 ## Current implementation
 
-- Room is the offline source of truth at schema version 13. Plans include an IANA timezone;
+- Room is the offline source of truth at schema version 15. Plans include an IANA timezone;
   exercises may name equipment and sessions may define a round rest.
 - The ViewModel's current date changes at plan-zone midnight and refreshes on screen resume; sync
   windows, workout matching and missed-session classification use the same plan timezone.
@@ -191,7 +201,11 @@ engine/ViewModel logic and the deleted DataStore code are not the same size.
   remembered for the rest of the plan-zone day, so the card does not return on the next resume of
   the screen the app opens on.
 - Oura OAuth, intervals.icu activity sync and optional Anthropic/OpenAI/Google workout analysis are
-  implemented. Read-only analysis never edits the plan. The separate Phase C advisor can return one
+  implemented. Read-only analysis never edits the plan. A synced run also carries its heart-rate
+  zone distribution and, computed on the device from the recording intervals.icu holds, its
+  kilometre splits — intervals.icu publishes no splits of its own, and one average pace cannot say
+  whether a run started calmly and finished calmly. Both reach the model through the prompt and
+  appear on no screen. The separate Phase C advisor can return one
   clarification or a strictly parsed MOVE/LIGHTEN preview; only explicit approval applies the whole
   validated list atomically and records `AI_ADVISOR` events.
 - Active Workout Mode guides structured strength sessions through equipment preparation, movement,
@@ -229,7 +243,8 @@ engine/ViewModel logic and the deleted DataStore code are not the same size.
 ## Open risks
 
 - Instrumented Keystore, migration and image-cache tests still need an attached Android device or
-  emulator before release.
+  emulator before release. **The v14 → v15 migration is the one to run first**: it is the newest,
+  it ships two new tables, and `MigrationTest.migrate14To15` has never executed.
 - The Oura flow is unit-tested against local HTTP fixtures but still depends on a real Oura account
   for end-to-end confirmation.
 - A rooted or unlocked device can bypass the Android application sandbox; no at-rest database
