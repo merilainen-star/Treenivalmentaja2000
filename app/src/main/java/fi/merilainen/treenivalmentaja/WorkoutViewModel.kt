@@ -60,6 +60,13 @@ import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.MINIMUM_SESSIONS_FOR_INTERIM
+import fi.merilainen.treenivalmentaja.domain.ProgramReportPromptBuilder
+import fi.merilainen.treenivalmentaja.domain.ProgramReportState
+import fi.merilainen.treenivalmentaja.domain.ProgramSessionRecord
+import fi.merilainen.treenivalmentaja.domain.TrainingProgramAnalysis
+import fi.merilainen.treenivalmentaja.domain.availableProgramReport
+import fi.merilainen.treenivalmentaja.domain.buildProgramAnalysis
 import fi.merilainen.treenivalmentaja.domain.EasyRunDrift
 import fi.merilainen.treenivalmentaja.domain.EasyRunDriftUseCase
 import fi.merilainen.treenivalmentaja.domain.ReadinessAdvice
@@ -175,6 +182,7 @@ class WorkoutViewModel(
   private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
+  private val programReportPromptBuilder: ProgramReportPromptBuilder = ProgramReportPromptBuilder(),
   private val advisorSettingsStore: AdvisorSettingsStore? = null,
   private val advisorPromptBuilder: AdvisorPromptBuilder = AdvisorPromptBuilder(),
   private val advisorResponseParser: AdvisorResponseParser = AdvisorResponseParser(),
@@ -872,6 +880,13 @@ class WorkoutViewModel(
   private val _aiAnalyses = MutableStateFlow<Map<String, AiAnalysisState>>(emptyMap())
   val aiAnalyses: StateFlow<Map<String, AiAnalysisState>> = _aiAnalyses.asStateFlow()
 
+  /**
+   * The whole-programme report, and there is only ever one — a plan has one report open at a time,
+   * where the week list can have a card open on several sessions at once.
+   */
+  private val _programReport = MutableStateFlow<ProgramReportState?>(null)
+  val programReport: StateFlow<ProgramReportState?> = _programReport.asStateFlow()
+
   private val _aiPlanProposals = MutableStateFlow<Map<String, AiPlanProposalState>>(emptyMap())
   val aiPlanProposals: StateFlow<Map<String, AiPlanProposalState>> = _aiPlanProposals.asStateFlow()
 
@@ -910,6 +925,84 @@ class WorkoutViewModel(
   /** Closes one card. The next tap asks again — nothing is cached to re-show. */
   fun dismissAiAnalysis(sessionId: String) {
     _aiAnalyses.update { it - sessionId }
+  }
+
+  fun dismissProgramReport() {
+    _programReport.value = null
+  }
+
+  /**
+   * Asks the selected provider for a report on the whole active programme.
+   *
+   * **The aggregate is built before the request and the request is built from the aggregate** —
+   * see `docs/PROGRAM_ANALYSIS.md`. Nothing here counts anything: `buildProgramAnalysis` is a pure
+   * function with its own tests, and this method's whole job is to fetch its inputs from the
+   * repositories and hand the rendered prompt to a client.
+   *
+   * Read from the repositories rather than from this class's StateFlows, for the reason
+   * [requestAiAnalysis] documents at length: those are `WhileSubscribed`, and which screen happens
+   * to be in front must not decide what the model is told.
+   */
+  fun requestProgramReport() {
+    val model = analysisModel.value
+    val client = analysisClients[model.provider] ?: return
+    if (_programReport.value is ProgramReportState.Loading) return
+
+    viewModelScope.launch {
+      val analysis = buildProgramAnalysisNow()
+      val kind = availableProgramReport(analysis)
+      if (analysis == null || kind == null) {
+        _programReport.value =
+          ProgramReportState.NotEnoughData(
+            "Raporttiin tarvitaan vähintään $MINIMUM_SESSIONS_FOR_INTERIM tehtyä harjoitusta " +
+              "aktiivisessa ohjelmassa."
+          )
+        return@launch
+      }
+
+      _programReport.value = ProgramReportState.Loading(kind)
+      val prompt = programReportPromptBuilder.build(analysis, kind)
+      _programReport.value =
+        try {
+          ProgramReportState.Loaded(kind, client.analyse(prompt, model), prompt)
+        } catch (e: AnalysisException) {
+          ProgramReportState.Failed(kind, e.message ?: "Raportin luonti epäonnistui.", e.canRetry)
+        }
+    }
+  }
+
+  /**
+   * The aggregate for the active plan, as of today.
+   *
+   * The recovery window is the programme's own span rather than a fixed number of days back: the
+   * report compares the first mornings of the plan against the last, and a seven-day window would
+   * have nothing to compare.
+   */
+  private suspend fun buildProgramAnalysisNow(): TrainingProgramAnalysis? {
+    val records = repository.activeProgramRecords() ?: return null
+    val ouraBySession = ouraRepository.observeMatchedMetrics().first()
+    val runsBySession = intervalsRepository?.observeMatchedRunMetrics()?.first().orEmpty()
+
+    val dates = records.sessions.mapNotNull { runCatching { LocalDate.parse(it.scheduledDate) }.getOrNull() }
+    val recovery =
+      if (dates.isEmpty()) emptyMap()
+      else ouraRepository.observeRecoveryRange(from = dates.min(), to = dates.max()).first()
+
+    return buildProgramAnalysis(
+      planName = records.planName,
+      planDescription = records.planDescription,
+      sessions =
+        records.sessions.map { session ->
+          ProgramSessionRecord(
+            session = session,
+            outcome = records.outcomes[session.id],
+            run = runsBySession[session.id],
+            oura = ouraBySession[session.id],
+          )
+        },
+      recoveryByDay = recovery,
+      today = currentDate.value,
+    )
   }
 
   /**

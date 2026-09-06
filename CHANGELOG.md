@@ -7,6 +7,46 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 
 ## [Unreleased] - 2026-09-06
 
+### Added
+- **Koko treeniohjelman AI-analyysi.** Kalenterin yläreunassa on nyt *Analysoi treeniohjelmani*.
+  Kesken olevasta ohjelmasta se tekee väliraportin ja päättyneestä loppuraportin. Raportti vastaa
+  siihen mihin yksittäisen treenin analyysi ei pysty: onko tästä harjoittelusta ollut hyötyä, ja
+  onko loppuohjelma yhä oikea.
+
+  **Sovellus laskee, malli tulkitsee.** Kaikki luvut — toteutumisprosentit, viikkokoosteet,
+  ensimmäisten ja viimeisten juoksujen vertailut — lasketaan sovelluksessa puhtaassa funktiossa
+  jolla on omat testinsä. Mallille menee rakenne, jossa numerot ovat jo ratkenneet ja vain merkitys
+  on auki. Sadan harjoituksen raakadatasta malli laskisi trendit huonosti, hiljaa ja eri tavalla
+  joka kerta.
+
+  **Juoksut säilyvät tarkkoina, voimaharjoittelu tiivistetään.** Jokainen tehty juoksu saa oman
+  rivinsä matkoineen, tahteineen, sykkeineen ja kuormituksineen: kaksi juoksua kahdeksan viikon
+  päässä toisistaan ovat koko todistusaineisto sille kehittyikö kunto, ja viikkokeskiarvo tuhoaisi
+  juuri sen vertailun. Voimatreeneistä riittää tyyppi, kesto, toteutuiko suunnitellusti, toistuvat
+  liikkeet ja koettu rasittavuus — liikekohtaisia sekunteja ja yksittäisiä tapahtumarivejä ei
+  lähetetä lainkaan.
+
+  **Kolme sääntöä estävät keksityn kehityksen.** Juoksuja verrataan vain saman suunnitellun tehon
+  sisällä; vertailuun tarvitaan vähintään kaksi juoksua kummallekin puolelle; ja jos vertailua ei
+  voitu tehdä, se kerrotaan mallille — hiljaisuus jonka malli joutuu selittämään on hiljaisuus jonka
+  se selittää väärin.
+
+  Raportti erottelee mitatun faktan, tulkinnan ja suosituksen omiin otsikoihinsa. Käyttäjän oma
+  palaute on mukana mittausten rinnalla, koska kiinnostavin tapaus on se jossa ne ovat ristiriidassa:
+  tahti ja syke paranevat, mutta treenit tuntuvat yhä raskailta.
+
+### Notes
+- **Toteutumisprosentti jättää siirretyt ja perutut ulkopuolelle** molemmilta puolilta suhdelukua.
+  Siirretty harjoitus ei kadonnut — sillä on seuraajarivi joka lasketaan sen sijasta — ja peruttu
+  poistettiin ohjelmasta eikä jäänyt tekemättä. Kumpikin virheeksi laskettuna jokainen uudelleen
+  suunniteltu viikko näyttäisi hylätyltä.
+- **Raporttia ei vielä tallenneta**, vaan se elää ViewModelin ajan kuten yksittäisen treenin
+  analyysikin. Tämä on rajoite eikä valinta: loppuraportti on dokumentti päättyneestä jaksosta joka
+  ei enää muutu. Tallennustaulu on suunniteltu, ks. `docs/PROGRAM_ANALYSIS.md`.
+- **Raportin promptti ei jaa yksittäisen treenin rajoitteita.** Ne kieltävät otsikot ja rajaavat
+  vastauksen 110 sanaan, mikä on oikein vilkaisulle treenin vieressä ja väärin dokumentille jonka
+  pitää erotella fakta tulkinnasta. Testi varmistaa ettei niitä vahingossa yhdistetä.
+
 ### Fixed
 - **Ajastetun liikkeen aika on nyt pitoaika, ei ruutuaika.** "Lankku 35 s" mittasi 0:38 ja
   "Sivulankku 30 s / puoli" mittasi 1:31, koska kello kävi siitä hetkestä kun kortti tuli ruudulle.

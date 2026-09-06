@@ -43,6 +43,20 @@ sealed interface TransitionResult {
   data class NotAllowed(val from: SessionStatus, val to: SessionStatus) : TransitionResult
 }
 
+/**
+ * One active plan and everything recorded against it, for the whole-programme report.
+ *
+ * A snapshot rather than a flow: a report is a claim about a moment, and a document assembled from
+ * a stream that moved underneath it would be a claim about no moment at all.
+ */
+data class ActiveProgramRecords(
+  val planName: String,
+  val planDescription: String?,
+  val sessions: List<TrainingSession>,
+  /** Keyed by session id, and present only where the guided workout recorded something. */
+  val outcomes: Map<String, ActiveWorkoutOutcome>,
+)
+
 sealed interface AdvisorApplyResult {
   data class Applied(val operationCount: Int) : AdvisorApplyResult
   data class Rejected(val message: String) : AdvisorApplyResult
@@ -89,6 +103,34 @@ class TrainingRepository(
   }
 
   suspend fun getSession(id: String): TrainingSession? = sessionDao.getById(id)?.toDomain()
+
+  /**
+   * Everything the whole-programme report needs out of this database, in one call.
+   *
+   * The plan's own name and description travel with the sessions because the report judges the
+   * training against the goals its author wrote, and those live nowhere else. Outcomes are read
+   * only for completed sessions — the payload of anything else has no RPE and no "miltä tuntui" to
+   * find, and a query per session of a long plan is worth avoiding where it buys nothing.
+   *
+   * `null` when there is no active plan: a report about no programme is a report about the
+   * defaults, which is the one thing it must never be.
+   */
+  suspend fun activeProgramRecords(): ActiveProgramRecords? {
+    val plan = planDao.getActivePlan() ?: return null
+    val sessions = sessionDao.getByPlan(plan.id).map { it.toDomain() }
+    if (sessions.isEmpty()) return null
+    val outcomes =
+      sessions
+        .filter { it.status == SessionStatus.COMPLETED }
+        .mapNotNull { session -> activeWorkoutOutcomeFor(session.id)?.let { session.id to it } }
+        .toMap()
+    return ActiveProgramRecords(
+      planName = plan.name,
+      planDescription = plan.description,
+      sessions = sessions,
+      outcomes = outcomes,
+    )
+  }
 
   /**
    * True when [session] belongs to the plan currently in use.

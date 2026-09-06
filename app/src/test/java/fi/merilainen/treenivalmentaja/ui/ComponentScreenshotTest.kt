@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.ProgramReportCard
 import fi.merilainen.treenivalmentaja.EasyRunDriftCard
 import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
 import fi.merilainen.treenivalmentaja.ImportConfirmDialog
@@ -48,6 +49,8 @@ import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.ThemePreference
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
+import fi.merilainen.treenivalmentaja.domain.ProgramReportKind
+import fi.merilainen.treenivalmentaja.domain.ProgramReportState
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
 import java.time.LocalDate
@@ -237,6 +240,66 @@ class ComponentScreenshotTest {
                 medianIntensityPercent = 73,
                 comparableSessions = 11,
             )
+        )
+    }
+
+    // ------------------------------------------------------------------ Programme report
+
+    /**
+     * The button, which is the whole card until it is pressed. Worth pinning because it is the one
+     * plan-level control on the calendar and it sits above a scrolling list of days — a card that
+     * grew here would push the whole week down.
+     */
+    @Test
+    fun programReportButton() = capture("card_program_report_button") {
+        ProgramReportCard(state = null, configured = true)
+    }
+
+    /**
+     * A finished report, headings and all.
+     *
+     * The structure is the feature: fact, then reading, then advice, kept apart so the reader can
+     * see which sentence is which. This baseline is what would catch a future change that flattened
+     * the model's headings into a wall of prose.
+     */
+    @Test
+    fun programReportLoaded() = capture("card_program_report_loaded") {
+        ProgramReportCard(
+            state = ProgramReportState.Loaded(
+                kind = ProgramReportKind.FINAL,
+                text = """
+                    ## Näin ohjelma toteutui
+                    Kahdeksasta viikosta toteutui 92 %. Yksi lihaskuntotreeni jäi väliin ja yksi
+                    juoksu siirtyi.
+
+                    ## Tulkinta
+                    Kevyet juoksut kulkivat lopussa 18 s/km nopeammin kahdeksan lyönnin matalammalla
+                    sykkeellä, mikä on aerobisen kunnon kehittymistä eikä päivän vaihtelua.
+
+                    ## Alussa → lopussa
+                    Kevyt tahti 6:05 /km → 5:47 /km
+                    Keskisyke kevyillä 149 → 141
+
+                    ## Suositus seuraavalle jaksolle
+                    Jatka samalla kevyellä painotuksella ja lisää pitkää lenkkiä varovasti.
+                """.trimIndent(),
+                prompt = "## Ohjelma\n- Nimi: Kesän peruskuntokausi",
+            ),
+            configured = true,
+        )
+    }
+
+    /**
+     * Not an error, and not styled as one. A plan two sessions old genuinely has no report in it,
+     * and the red treatment would say something went wrong when nothing did.
+     */
+    @Test
+    fun programReportNotEnoughData() = capture("card_program_report_not_enough_data") {
+        ProgramReportCard(
+            state = ProgramReportState.NotEnoughData(
+                "Raporttiin tarvitaan vähintään 3 tehtyä harjoitusta aktiivisessa ohjelmassa."
+            ),
+            configured = true,
         )
     }
 

@@ -158,14 +158,35 @@ the one the person read.
 | --- | --- | --- |
 | 1 | `TrainingProgramAnalysis` + the pure aggregation, unit-tested | **built** |
 | 2 | Both prompts, rendered from the aggregate | **built** |
-| 3 | Repository assembly and the ViewModel entry point | planned |
-| 4 | UI: request, read, show the prompt, regenerate | planned |
+| 3 | Repository assembly and the ViewModel entry point | **built** |
+| 4 | UI: the card on the calendar, request, read, show the prompt | **built** |
 | 5 | The report table and schema migration | planned |
 | 6 | Richer post-session feedback fields | planned |
 | 7 | "Mitä seuraavaksi", the goal picker and plan generation | planned |
 
 Slices 1 and 2 are the ones the principle at the top is about, and they are the ones the rest
 cannot be written without.
+
+### What slices 3 and 4 settled
+
+**Where the card lives.** On the calendar, above the day list, not on a workout card. It is about
+the plan and not about a day, and a card about the plan sitting between Tuesday and Wednesday would
+read as belonging to one of them. That position also earns it something `AiAnalysisSection` is
+forbidden: it may explain itself when it has nothing to offer. An explanation repeated across every
+session in a ten-day window is an advertisement; one card at the top of the calendar is an answer.
+
+**"Not enough data" is a state, not a failure.** A plan two sessions old genuinely has no report in
+it, and the error treatment would claim something went wrong when nothing did. The threshold is
+three completed sessions — enough for a shape, few enough that a plan is not silent for a month.
+
+**The report's headings are rendered as headings.** The first version printed the model's `##`
+markers literally, which turned the one thing the report is organised around into punctuation. The
+card now splits the text into headings and paragraphs — deliberately not with a Markdown parser,
+because the prompt asks for a fixed set of headings and prose between them, and no other syntax can
+appear.
+
+**Nothing is stored yet.** A report lives as long as the ViewModel, exactly as a session analysis
+does. That is a limitation here rather than a design — see § 6 — and slice 5 is what fixes it.
 
 ### Where the data comes from today
 

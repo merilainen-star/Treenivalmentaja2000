@@ -65,6 +65,7 @@ import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
+import fi.merilainen.treenivalmentaja.domain.ProgramReportState
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
@@ -91,6 +92,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val planProposals by viewModel.aiPlanProposals.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
+    val programReport by viewModel.programReport.collectAsState()
     val today by viewModel.currentDate.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
@@ -119,6 +121,9 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         analysisConfigured = analysisModel.provider in analysisConfigured,
         onRequestAnalysis = viewModel::requestAiAnalysis,
         onDismissAnalysis = viewModel::dismissAiAnalysis,
+        programReport = programReport,
+        onRequestProgramReport = viewModel::requestProgramReport,
+        onDismissProgramReport = viewModel::dismissProgramReport,
         onRequestPlanProposal = viewModel::requestAiPlanProposal,
         onApplyPlanProposal = viewModel::applyAiPlanProposal,
         onDismissPlanProposal = viewModel::dismissAiPlanProposal,
@@ -220,6 +225,9 @@ fun WeekScreenContent(
     onRequestPlanProposal: (String, String?) -> Unit = { _, _ -> },
     onApplyPlanProposal: (String) -> Unit = {},
     onDismissPlanProposal: (String) -> Unit = {},
+    programReport: ProgramReportState? = null,
+    onRequestProgramReport: () -> Unit = {},
+    onDismissProgramReport: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -280,6 +288,16 @@ fun WeekScreenContent(
                 },
             )
         }
+
+        // Above the days rather than among them: this is about the plan, and a card about the plan
+        // buried between Tuesday and Wednesday would read as belonging to one of them.
+        ProgramReportCard(
+            state = programReport,
+            configured = analysisConfigured,
+            onRequest = onRequestProgramReport,
+            onDismiss = onDismissProgramReport,
+            modifier = Modifier.padding(bottom = 16.dp),
+        )
 
         // Recomputed when either the plan or Oura's own record changes, so a day that holds only a
         // walk still gets a row.

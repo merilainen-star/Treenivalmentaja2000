@@ -6,6 +6,30 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-09-06
+- Base commit: `867e4ae` plus the whole-programme report, slices 1–4, committed together
+- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
+  build-tools 36.1.0, on Linux
+- Emulator: none attached
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` (with `app/build/test-results` cleared first) | 792 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 70 comparisons, 0 changed, 70 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,580,787 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** The new code is a pure aggregation, a prompt string and one Compose card; the repository method is a query and two maps. Nothing here needs a device — but the instrumented suite has not been re-run since, and this line says so rather than implying it passed. |
+
+Three baselines are new — `card_program_report_button`, `card_program_report_loaded` and
+`card_program_report_not_enough_data` — and none moved. The report card is the only new rendering,
+and it draws nothing at all until an API key is configured.
+
+The programme report costs **81,920 B (+0.38 %)**: 21,498,867 B for `867e4ae` against 21,580,787 B
+with it, both from `./gradlew clean :app:assembleDebug` on one machine. Five dex pages, which is
+what an aggregate of a dozen data classes, a prompt builder and a card comes to.
+
+## Previously verified build
+
+- Date: 2026-09-06
 - Base commit: `08e54de` plus the held-movement time fix, committed together
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
@@ -27,7 +51,7 @@ comparison is byte-identical.
 each from `./gradlew clean :app:assembleDebug` on this machine. The change is one nullable map, one
 callback parameter and two small pure functions — the dex pages it lands on had the room.
 
-## Previously verified build
+## Earlier verified builds
 
 - Date: 2026-09-05
 - Base commit: `0e9aeb2` plus the per-movement timing sent to the AI analysis, committed together
@@ -54,7 +78,6 @@ The analysis timing costs **16,384 B (+0.076 %)**: 21,482,483 B for `0e9aeb2` ag
 with it, both from `./gradlew clean :app:assembleDebug` on one machine. One dex page, which is what
 a nullable map and a `buildString` block comes to.
 
-## Earlier verified builds
 
 - Date: 2026-09-05
 - Base commit: `ec60197` plus the guided-session clocks, committed together
