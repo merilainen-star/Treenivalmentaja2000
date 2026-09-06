@@ -109,10 +109,20 @@ terminal status, and available after that from the plan itself. It gets the same
   measured.
 - **Suositus seuraavalle jaksolle**, a paragraph of emphasis — not a programme.
 
-## 5. What next
+## 5. What next — built
 
 The final report ends with a recommendation for the next block. The person is then offered
-`[ Luo seuraava ohjelma ]`, which asks first what to emphasise:
+`[ Luo seuraava ohjelma ]`, which asks first how the finished block felt and then what to
+emphasise. Three separate consents, deliberately: asking for a programme is not agreeing to one.
+
+**How did it feel** — liian kevyt · hieman liian kevyt · sopiva · hieman liian raskas · liian
+raskas. Skippable, and a skip is recorded as *absent* rather than as "sopiva". This is the one
+piece of evidence the measurements cannot supply: a programme can look successful in every figure
+and still have been more than the person wanted to carry. Each answer carries its own instruction
+into the prompt — "liian raskas" says *kevennä kokonaiskuormaa, vaikka mittarit näyttäisivät
+kehitystä*.
+
+**What to emphasise:**
 
 Jatka nykyisellä tasapainolla · Parempi juoksukunto · Nopeampi juoksuvauhti · Pidemmät
 juoksumatkat · Voima ja lihaskunto · Painonhallinta · Palautuminen ja kevyempi harjoittelu · Oma
@@ -136,6 +146,21 @@ Before anything is saved, the plan is shown as a summary — main goal, sessions
 of the running and the strength work, the direction of progression, what changed from the previous
 plan — with `[ Aloita uusi ohjelma ]` and `[ Muokkaa tavoitteita ]`. Import happens on the first
 button and not before.
+
+**The summary is computed from the plan, not asked from the model.** `summariseProgramPlan` counts
+the generated sessions: how many, per week, by type, weekly kilometres from the first week to the
+last, the longest run, which movements recur, which way the volume moves. Asking the model to
+describe what it just wrote invites a description that flatters the plan or quietly disagrees with
+it; counting the sessions cannot. The one thing quoted from the model is the plan's own
+`description`, which is its statement of intent and belongs to it.
+
+Two comparisons are made against the **previous programme as it was actually run**, not as it was
+planned: sessions per week, and weekly kilometres. The old plan's intentions are not the level the
+person reached, and a next block anchored to them would be anchored to a wish.
+
+A plan that fails validation is shown with the validator's own Finnish messages — the same ones a
+hand-written import produces, naming the field and the rule — and a retry, because that is the
+failure a second attempt actually fixes.
 
 ## 6. Storage, and a reversal
 
@@ -161,11 +186,18 @@ the one the person read.
 | 3 | Repository assembly and the ViewModel entry point | **built** |
 | 4 | UI: the card on the calendar, request, read, show the prompt | **built** |
 | 5 | The report table and schema migration | planned |
-| 6 | Richer post-session feedback fields | planned |
-| 7 | "Mitä seuraavaksi", the goal picker and plan generation | planned |
+| 6 | ~~Richer post-session feedback fields~~ — dropped, see below | **not doing** |
+| 7 | "Mitä seuraavaksi", the goal picker and plan generation | **built** |
 
 Slices 1 and 2 are the ones the principle at the top is about, and they are the ones the rest
 cannot be written without.
+
+**Slice 6 was dropped on the owner's reading, and the reading was better than the design.** More
+fields at the end of every session is friction on every session, for a question that is really
+about the *block*. What replaced it is one question asked once, when the programme ends: **miltä
+päättynyt ohjelma kokonaisuutena tuntui** — liian kevyt · hieman liian kevyt · sopiva · hieman
+liian raskas · liian raskas. It is not stored yet (nor is the report), and it exists for exactly one
+consumer: the next programme's prompt. See § 5.
 
 ### What slices 3 and 4 settled
 

@@ -65,6 +65,8 @@ import fi.merilainen.treenivalmentaja.domain.AiAnalysisState
 import fi.merilainen.treenivalmentaja.domain.AiPlanProposalState
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
+import fi.merilainen.treenivalmentaja.domain.NextProgramRequest
+import fi.merilainen.treenivalmentaja.domain.NextProgramState
 import fi.merilainen.treenivalmentaja.domain.ProgramReportState
 import fi.merilainen.treenivalmentaja.domain.Exercise
 import fi.merilainen.treenivalmentaja.domain.ExerciseGuideState
@@ -93,6 +95,7 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
     val programReport by viewModel.programReport.collectAsState()
+    val nextProgram by viewModel.nextProgram.collectAsState()
     val today by viewModel.currentDate.collectAsState()
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
@@ -124,6 +127,11 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
         programReport = programReport,
         onRequestProgramReport = viewModel::requestProgramReport,
         onDismissProgramReport = viewModel::dismissProgramReport,
+        nextProgram = nextProgram,
+        onStartNextProgram = viewModel::startNextProgram,
+        onGenerateNextProgram = viewModel::requestNextProgram,
+        onImportNextProgram = viewModel::importNextProgram,
+        onDismissNextProgram = viewModel::dismissNextProgram,
         onRequestPlanProposal = viewModel::requestAiPlanProposal,
         onApplyPlanProposal = viewModel::applyAiPlanProposal,
         onDismissPlanProposal = viewModel::dismissAiPlanProposal,
@@ -228,6 +236,11 @@ fun WeekScreenContent(
     programReport: ProgramReportState? = null,
     onRequestProgramReport: () -> Unit = {},
     onDismissProgramReport: () -> Unit = {},
+    nextProgram: NextProgramState? = null,
+    onStartNextProgram: () -> Unit = {},
+    onGenerateNextProgram: (NextProgramRequest) -> Unit = {},
+    onImportNextProgram: () -> Unit = {},
+    onDismissNextProgram: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -296,6 +309,11 @@ fun WeekScreenContent(
             configured = analysisConfigured,
             onRequest = onRequestProgramReport,
             onDismiss = onDismissProgramReport,
+            nextProgram = nextProgram,
+            onStartNextProgram = onStartNextProgram,
+            onGenerateNextProgram = onGenerateNextProgram,
+            onImportNextProgram = onImportNextProgram,
+            onDismissNextProgram = onDismissNextProgram,
             modifier = Modifier.padding(bottom = 16.dp),
         )
 

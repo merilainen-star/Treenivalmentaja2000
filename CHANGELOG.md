@@ -8,6 +8,39 @@ rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md]
 ## [Unreleased] - 2026-09-06
 
 ### Added
+- **Seuraavan treeniohjelman luonti loppuraportin päätteeksi.** Loppuraportin alla on nyt *Luo
+  seuraava ohjelma*. Se kysyy kaksi asiaa, luo 8 viikon ohjelman, näyttää mitä se sisältää, ja
+  tallentaa sen vasta kun hyväksyt. Kolme erillistä suostumusta tarkoituksella: ohjelman pyytäminen
+  ei ole sen hyväksymistä.
+
+  **Kysymys 1: miltä päättynyt ohjelma kokonaisuutena tuntui** — liian kevyt · hieman liian kevyt ·
+  sopiva · hieman liian raskas · liian raskas. Tämän voi ohittaa, ja ohitus kirjataan *puuttuvana*
+  eikä "sopivana". Se on ainoa todiste jota mittarit eivät voi antaa: ohjelma voi näyttää joka
+  luvulla onnistuneelta ja olla silti enemmän kuin ihminen halusi kantaa. Jokainen vastaus vie
+  mukanaan oman ohjeensa — "liian raskas" sanoo mallille *kevennä kokonaiskuormaa, vaikka mittarit
+  näyttäisivät kehitystä*.
+
+  **Kysymys 2: mitä painottaa** — kahdeksan vaihtoehtoa ja vapaa tekstikenttä omalle tavoitteelle.
+
+  **Ei rinnakkaista järjestelmää.** Malli tuottaa plan JSONia schema v1:ssä, ja se kulkee saman
+  `PlanJson.parse` → `PlanValidator.validate` → `importPlan` -polun kuin käsin kirjoitettu
+  suunnitelma. Mallin virheellisen ohjelman hylkää sama validoija joka hylkää ihmisen virheellisen
+  ohjelman, ja virheet näytetään sen omilla suomenkielisillä viesteillä — ne nimeävät kentän ja
+  säännön, mikä on hyödyllisempää kuin "jokin meni pieleen".
+
+  **Esikatselu lasketaan ohjelmasta, ei kysytä mallilta.** Sovellus laskee luodut harjoitukset:
+  montako, viikossa, lajeittain, juoksukilometrit ensimmäisestä viikosta viimeiseen, pisin lenkki,
+  toistuvat liikkeet, mihin suuntaan määrä liikkuu. Mallin pyytäminen kuvailemaan omaa ohjelmaansa
+  houkuttelee kuvauksen joka imartelee sitä; harjoitusten laskeminen ei. Ainoa mallilta lainattu
+  asia on ohjelman oma kuvaus, joka on sen tahdonilmaus.
+
+  Kaksi vertailua tehdään edelliseen ohjelmaan **sellaisena kuin se toteutui**, ei sellaisena kuin
+  se suunniteltiin: harjoituksia viikossa ja juoksua viikossa. Vanhan ohjelman aikeet eivät ole se
+  taso johon ihminen pääsi.
+
+  Kaksi sääntöä ohittavat promptissa kaiken muun: uusi jakso jatkuu siitä tasosta johon edellinen
+  päättyi, eikä edellisen jakson päättyminen ole peruste vaikeuttaa.
+
 - **Koko treeniohjelman AI-analyysi.** Kalenterin yläreunassa on nyt *Analysoi treeniohjelmani*.
   Kesken olevasta ohjelmasta se tekee väliraportin ja päättyneestä loppuraportin. Raportti vastaa
   siihen mihin yksittäisen treenin analyysi ei pysty: onko tästä harjoittelusta ollut hyötyä, ja

@@ -57,6 +57,18 @@ data class ActiveProgramRecords(
   val outcomes: Map<String, ActiveWorkoutOutcome>,
 )
 
+/** What [TrainingRepository.previewPlan] found, with the importer's own types left behind. */
+sealed interface PlanPreviewResult {
+  data class Valid(
+    val name: String,
+    val description: String?,
+    val sessions: List<TrainingSession>,
+  ) : PlanPreviewResult
+
+  /** The validator's own Finnish messages, which say exactly what is wrong and where. */
+  data class Invalid(val errors: List<String>) : PlanPreviewResult
+}
+
 sealed interface AdvisorApplyResult {
   data class Applied(val operationCount: Int) : AdvisorApplyResult
   data class Rejected(val message: String) : AdvisorApplyResult
@@ -434,6 +446,34 @@ class TrainingRepository(
    *   said yes. Without it, anything that would change or discard stored rows returns
    *   [ImportResult.NeedsConfirmation] and writes nothing.
    */
+  /**
+   * Checks a plan document and describes it, **without writing anything**.
+   *
+   * The same parse and the same validator the import uses, run early so a generated plan can be
+   * shown to the person before it touches the database. Nothing is imported here: the preview is
+   * what the person agrees to, and [importPlan] is what acts on that agreement.
+   *
+   * Lives on the repository rather than in the ViewModel so the importer's types stay inside the
+   * data layer — what comes back is domain sessions and Finnish error strings.
+   */
+  fun previewPlan(rawJson: String): PlanPreviewResult {
+    val document =
+      PlanJson.parse(rawJson).getOrElse { error ->
+        return PlanPreviewResult.Invalid(
+          listOf("Vastausta ei voitu lukea JSON-dokumenttina: ${error.message ?: "tuntematon virhe"}")
+        )
+      }
+    return when (val outcome = PlanValidator.validate(document)) {
+      is ValidationOutcome.Errors -> PlanPreviewResult.Invalid(outcome.errors.map { it.toString() })
+      is ValidationOutcome.Valid ->
+        PlanPreviewResult.Valid(
+          name = outcome.plan.name,
+          description = outcome.plan.description,
+          sessions = outcome.plan.sessions,
+        )
+    }
+  }
+
   suspend fun importPlan(
     rawJson: String,
     activate: Boolean = true,

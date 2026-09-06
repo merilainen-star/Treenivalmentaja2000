@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
+import fi.merilainen.treenivalmentaja.NextProgramSection
 import fi.merilainen.treenivalmentaja.ProgramReportCard
 import fi.merilainen.treenivalmentaja.EasyRunDriftCard
 import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
@@ -49,6 +50,14 @@ import fi.merilainen.treenivalmentaja.domain.GuideRef
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.ThemePreference
 import fi.merilainen.treenivalmentaja.domain.UpdateStatus
+import fi.merilainen.treenivalmentaja.domain.Intensity
+import fi.merilainen.treenivalmentaja.domain.NextProgramGoal
+import fi.merilainen.treenivalmentaja.domain.NextProgramProgression
+import fi.merilainen.treenivalmentaja.domain.NextProgramRequest
+import fi.merilainen.treenivalmentaja.domain.NextProgramRunShape
+import fi.merilainen.treenivalmentaja.domain.NextProgramState
+import fi.merilainen.treenivalmentaja.domain.NextProgramStrengthShape
+import fi.merilainen.treenivalmentaja.domain.NextProgramSummary
 import fi.merilainen.treenivalmentaja.domain.ProgramReportKind
 import fi.merilainen.treenivalmentaja.domain.ProgramReportState
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -300,6 +309,84 @@ class ComponentScreenshotTest {
                 "Raporttiin tarvitaan vähintään 3 tehtyä harjoitusta aktiivisessa ohjelmassa."
             ),
             configured = true,
+        )
+    }
+
+    // ------------------------------------------------------------------ Next programme
+
+    /**
+     * The two questions asked before anything is generated. Worth pinning because the chips wrap:
+     * eight goals and five ratings on a phone is the layout most likely to break silently.
+     */
+    @Test
+    fun nextProgramGoalPicker() = capture("card_next_program_goals") {
+        NextProgramSection(
+            state = NextProgramState.Choosing,
+            onStart = {}, onGenerate = {}, onImport = {}, onDismiss = {},
+        )
+    }
+
+    /**
+     * The plan preview, and every figure on it was counted by the app from the plan's own sessions.
+     * The only thing quoted from the model is the one-line stated goal.
+     */
+    @Test
+    fun nextProgramPreview() = capture("card_next_program_preview") {
+        NextProgramSection(
+            state = NextProgramState.Ready(
+                summary = NextProgramSummary(
+                    name = "Syksyn vauhtijakso",
+                    statedGoal = "Kevyt pohja säilyy, mukaan hallittua vauhtia. Kokonaiskuorma ei nouse.",
+                    startDate = LocalDate.of(2026, 9, 14),
+                    endDate = LocalDate.of(2026, 11, 8),
+                    weeks = 8,
+                    sessions = 24,
+                    sessionsPerWeek = 3.0,
+                    byType = mapOf(WorkoutType.RUNNING to 16, WorkoutType.STRENGTH to 8),
+                    runShape = NextProgramRunShape(
+                        sessions = 16,
+                        weeklyKmFirstWeek = 18.0,
+                        weeklyKmLastWeek = 24.0,
+                        longestRunKm = 12.0,
+                        byIntensity = mapOf(Intensity.EASY to 12, Intensity.MODERATE to 4),
+                    ),
+                    strengthShape = NextProgramStrengthShape(
+                        sessions = 8,
+                        perWeek = 1.0,
+                        recurringMovements = listOf("Lankku", "Sivulankku", "Kyykky"),
+                    ),
+                    progression = NextProgramProgression.RISING,
+                    changesFromPrevious = listOf(
+                        "Harjoituksia viikossa 1.4 (toteutunut) → 3.0 (suunniteltu)",
+                        "Juoksua viikossa 9.2 km (toteutunut) → 21.0 km (suunniteltu)",
+                    ),
+                ),
+                rawJson = "{}",
+                prompt = "",
+                request = NextProgramRequest(goal = NextProgramGoal.RUNNING_SPEED),
+            ),
+            onStart = {}, onGenerate = {}, onImport = {}, onDismiss = {},
+        )
+    }
+
+    /**
+     * The validator's own messages, shown as written.
+     *
+     * They name the field and the rule, which is more use than "jokin meni pieleen" — and they are
+     * the same messages a hand-written import produces, so nothing was invented for the model.
+     */
+    @Test
+    fun nextProgramInvalid() = capture("card_next_program_invalid") {
+        NextProgramSection(
+            state = NextProgramState.Invalid(
+                errors = listOf(
+                    "weeks[3].sessions[1].id: sama tunniste esiintyy jo dokumentissa",
+                    "weeks[5].sessions[0]: harjoituksella on oltava durationMin, distanceKm tai exercises",
+                ),
+                prompt = "",
+                request = NextProgramRequest(goal = NextProgramGoal.BALANCED),
+            ),
+            onStart = {}, onGenerate = {}, onImport = {}, onDismiss = {},
         )
     }
 

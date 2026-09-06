@@ -6,6 +6,37 @@ Every number here was measured from the current working tree; test counts are no
 other documentation.
 
 - Date: 2026-09-06
+- Base commit: `aa31e9a` plus the next-programme flow and a test-clock fix, committed separately
+- Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
+  build-tools 36.1.0, on Linux
+- Emulator: none attached
+
+| Check | Command | Measured result |
+| --- | --- | --- |
+| Unit tests | `./gradlew :app:testDebugUnitTest --rerun` (with `app/build/test-results` cleared first) | 817 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug --rerun-tasks` | 73 comparisons, 0 changed, 73 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,629,939 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** The new code is pure domain, one repository query and Compose. Nothing here needs a device — but the instrumented suite has not been re-run since, and this line says so rather than implying it passed. |
+
+Three new baselines, and one that moved for a real reason: `card_program_report_loaded` now shows
+the "Luo seuraava ohjelma" button under a final report.
+
+**The unit-test run above was green only after a clock fix, and the fix is a separate commit.**
+`AiAnalysisPromptSourcingTest` and `EasyRunDriftWiringTest` seeded sessions in the machine's zone
+while the ViewModel reads today in the *plan's* zone, so five tests failed every evening between
+21:00 UTC and midnight and passed again by morning. Reproduced on a clean `aa31e9a` before this
+branch's own changes. Two things worth carrying forward: run the suite at least once in the
+evening, and never combine `testDebugUnitTest` with `verifyRoborazziDebug` in one invocation —
+they race on `app/build/test-results` and the loser dies with a `NoSuchFileException` that looks
+like a test failure.
+
+The next-programme flow costs **49,152 B (+0.23 %)**: 21,580,787 B for `aa31e9a` against
+21,629,939 B with it, both from `./gradlew clean :app:assembleDebug` on one machine.
+
+## Previously verified build
+
+- Date: 2026-09-06
 - Base commit: `867e4ae` plus the whole-programme report, slices 1–4, committed together
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
@@ -27,7 +58,7 @@ The programme report costs **81,920 B (+0.38 %)**: 21,498,867 B for `867e4ae` ag
 with it, both from `./gradlew clean :app:assembleDebug` on one machine. Five dex pages, which is
 what an aggregate of a dozen data classes, a prompt builder and a card comes to.
 
-## Previously verified build
+## Earlier verified builds
 
 - Date: 2026-09-06
 - Base commit: `08e54de` plus the held-movement time fix, committed together
@@ -51,7 +82,6 @@ comparison is byte-identical.
 each from `./gradlew clean :app:assembleDebug` on this machine. The change is one nullable map, one
 callback parameter and two small pure functions — the dex pages it lands on had the room.
 
-## Earlier verified builds
 
 - Date: 2026-09-05
 - Base commit: `0e9aeb2` plus the per-movement timing sent to the AI analysis, committed together

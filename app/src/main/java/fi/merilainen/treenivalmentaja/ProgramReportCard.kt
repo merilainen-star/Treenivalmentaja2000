@@ -28,6 +28,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fi.merilainen.treenivalmentaja.domain.NextProgramRequest
+import fi.merilainen.treenivalmentaja.domain.NextProgramState
 import fi.merilainen.treenivalmentaja.domain.ProgramReportBlock
 import fi.merilainen.treenivalmentaja.domain.ProgramReportKind
 import fi.merilainen.treenivalmentaja.domain.ProgramReportState
@@ -51,6 +53,11 @@ fun ProgramReportCard(
   configured: Boolean,
   onRequest: () -> Unit = {},
   onDismiss: () -> Unit = {},
+  nextProgram: NextProgramState? = null,
+  onStartNextProgram: () -> Unit = {},
+  onGenerateNextProgram: (NextProgramRequest) -> Unit = {},
+  onImportNextProgram: () -> Unit = {},
+  onDismissNextProgram: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   if (!configured) return
@@ -74,7 +81,20 @@ fun ProgramReportCard(
           )
         }
 
-      is ProgramReportState.Loaded -> ReportResult(state, onDismiss)
+      is ProgramReportState.Loaded -> {
+        ReportResult(state, onDismiss)
+        // Offered under a final report only: a programme still running does not need a successor,
+        // and the recommendation this flow acts on is written in that report's last section.
+        if (state.kind == ProgramReportKind.FINAL) {
+          NextProgramSection(
+            state = nextProgram,
+            onStart = onStartNextProgram,
+            onGenerate = onGenerateNextProgram,
+            onImport = onImportNextProgram,
+            onDismiss = onDismissNextProgram,
+          )
+        }
+      }
 
       is ProgramReportState.Failed ->
         Card(

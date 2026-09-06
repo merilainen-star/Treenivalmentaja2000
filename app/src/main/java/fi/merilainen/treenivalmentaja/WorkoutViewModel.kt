@@ -60,6 +60,12 @@ import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
 import fi.merilainen.treenivalmentaja.domain.DailyRecovery
 import fi.merilainen.treenivalmentaja.domain.OuraDiagnostics
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.NextProgramPromptBuilder
+import fi.merilainen.treenivalmentaja.domain.ProgramReportKind
+import fi.merilainen.treenivalmentaja.domain.NextProgramRequest
+import fi.merilainen.treenivalmentaja.domain.NextProgramState
+import fi.merilainen.treenivalmentaja.domain.summariseProgramPlan
+import fi.merilainen.treenivalmentaja.data.repository.PlanPreviewResult
 import fi.merilainen.treenivalmentaja.domain.MINIMUM_SESSIONS_FOR_INTERIM
 import fi.merilainen.treenivalmentaja.domain.ProgramReportPromptBuilder
 import fi.merilainen.treenivalmentaja.domain.ProgramReportState
@@ -183,6 +189,7 @@ class WorkoutViewModel(
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
   private val programReportPromptBuilder: ProgramReportPromptBuilder = ProgramReportPromptBuilder(),
+  private val nextProgramPromptBuilder: NextProgramPromptBuilder = NextProgramPromptBuilder(),
   private val advisorSettingsStore: AdvisorSettingsStore? = null,
   private val advisorPromptBuilder: AdvisorPromptBuilder = AdvisorPromptBuilder(),
   private val advisorResponseParser: AdvisorResponseParser = AdvisorResponseParser(),
@@ -887,6 +894,10 @@ class WorkoutViewModel(
   private val _programReport = MutableStateFlow<ProgramReportState?>(null)
   val programReport: StateFlow<ProgramReportState?> = _programReport.asStateFlow()
 
+  /** The next-programme flow. `null` until the person opens it from a finished report. */
+  private val _nextProgram = MutableStateFlow<NextProgramState?>(null)
+  val nextProgram: StateFlow<NextProgramState?> = _nextProgram.asStateFlow()
+
   private val _aiPlanProposals = MutableStateFlow<Map<String, AiPlanProposalState>>(emptyMap())
   val aiPlanProposals: StateFlow<Map<String, AiPlanProposalState>> = _aiPlanProposals.asStateFlow()
 
@@ -929,6 +940,115 @@ class WorkoutViewModel(
 
   fun dismissProgramReport() {
     _programReport.value = null
+    _nextProgram.value = null
+  }
+
+  /** Opens the goal picker. Nothing is sent until the person has chosen. */
+  fun startNextProgram() {
+    _nextProgram.value = NextProgramState.Choosing
+  }
+
+  fun dismissNextProgram() {
+    _nextProgram.value = null
+  }
+
+  /**
+   * Asks the model for the next block, as plan JSON, and checks it before showing anything.
+   *
+   * **The plan is validated here and imported later.** What comes back is run through the same
+   * parser and validator a hand-written import uses; only a plan that passes becomes a preview, and
+   * only a preview the person accepts is written. A plan the model gets wrong is therefore rejected
+   * by the rules that already exist rather than by a second set written for the model.
+   */
+  fun requestNextProgram(request: NextProgramRequest) {
+    val model = analysisModel.value
+    val client = analysisClients[model.provider] ?: return
+    if (_nextProgram.value is NextProgramState.Loading) return
+
+    viewModelScope.launch {
+      val analysis = buildProgramAnalysisNow()
+      if (analysis == null) {
+        _nextProgram.value =
+          NextProgramState.Failed("Aktiivisesta ohjelmasta ei ole tarpeeksi tietoa.", false, request)
+        return@launch
+      }
+
+      _nextProgram.value = NextProgramState.Loading(request)
+      // The day after the previous programme's last session, or tomorrow if it already ended —
+      // never today, because a plan that starts this morning has already missed its first session.
+      val startDate = maxOf(analysis.identity.endDate, currentDate.value).plusDays(1)
+      val prompt =
+        nextProgramPromptBuilder.build(
+          analysis = analysis,
+          request = request,
+          startDate = startDate,
+          timeZone = repository.activePlanTimeZone().id,
+          finalReport =
+            (_programReport.value as? ProgramReportState.Loaded)
+              ?.takeIf { it.kind == ProgramReportKind.FINAL }
+              ?.text,
+        )
+
+      _nextProgram.value =
+        try {
+          val raw = client.analyse(prompt, model)
+          when (val preview = repository.previewPlan(raw)) {
+            is PlanPreviewResult.Invalid ->
+              NextProgramState.Invalid(preview.errors, prompt, request)
+            is PlanPreviewResult.Valid -> {
+              val summary =
+                summariseProgramPlan(
+                  name = preview.name,
+                  description = preview.description,
+                  sessions = preview.sessions,
+                  previous = analysis,
+                )
+              if (summary == null) {
+                NextProgramState.Invalid(listOf("Ohjelmassa ei ollut yhtään harjoitusta."), prompt, request)
+              } else {
+                NextProgramState.Ready(summary, raw, prompt, request)
+              }
+            }
+          }
+        } catch (e: AnalysisException) {
+          NextProgramState.Failed(e.message ?: "Ohjelman luonti epäonnistui.", e.canRetry, request)
+        }
+    }
+  }
+
+  /**
+   * Writes the previewed plan and makes it the active one.
+   *
+   * `confirmed = true` because the preview **is** the confirmation: the person has just read what
+   * the plan contains and how it differs from the last one, which is more than the ordinary import
+   * dialog shows them.
+   */
+  fun importNextProgram() {
+    val ready = _nextProgram.value as? NextProgramState.Ready ?: return
+
+    viewModelScope.launch {
+      _nextProgram.value = NextProgramState.Importing
+      _nextProgram.value =
+        when (val result = repository.importPlan(ready.rawJson, activate = true, confirmed = true)) {
+          is ImportResult.Success ->
+            NextProgramState.Imported(result.planName, result.sessionCount)
+          is ImportResult.Invalid ->
+            NextProgramState.Invalid(result.errors.map { it.toString() }, ready.prompt, ready.request)
+          is ImportResult.Unreadable ->
+            NextProgramState.Invalid(listOf(result.message), ready.prompt, ready.request)
+          is ImportResult.AlreadyImported ->
+            NextProgramState.Imported(result.planName, ready.summary.sessions)
+          else ->
+            NextProgramState.Failed(
+              "Ohjelmaa ei voitu tallentaa: ${result::class.simpleName}",
+              canRetry = false,
+              request = ready.request,
+            )
+        }
+      // The calendar is driven by the active plan, so a successful import has already changed what
+      // is behind this card. The alarms have not moved themselves.
+      if (_nextProgram.value is NextProgramState.Imported) rescheduleAlarmsUseCase.execute()
+    }
   }
 
   /**
