@@ -27,6 +27,7 @@ import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import java.time.LocalDate
+import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.launch
@@ -95,7 +96,7 @@ class EasyRunDriftWiringTest {
   @Test
   fun `a drifting history raises the finding on the Today flow`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       seed(today, intensities = listOf(70.0, 71.0, 72.0, 80.0, 81.0, 82.0))
 
       val vm = viewModel()
@@ -114,7 +115,7 @@ class EasyRunDriftWiringTest {
   @Test
   fun `dismissing it clears the card for the day`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       seed(today, intensities = listOf(70.0, 71.0, 72.0, 80.0, 81.0, 82.0))
 
       val vm = viewModel()
@@ -132,7 +133,7 @@ class EasyRunDriftWiringTest {
   @Test
   fun `a steady history produces nothing`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       seed(today, intensities = listOf(70.0, 73.0, 71.0, 72.0, 70.0, 74.0))
 
       val vm = viewModel()
@@ -149,7 +150,7 @@ class EasyRunDriftWiringTest {
   @Test
   fun `no watch data at all produces nothing`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(plan(today, pastRuns = 6))
       completePastRuns(6)
       advanceUntilIdle()
@@ -296,3 +297,16 @@ class EasyRunDriftWiringTest {
     }
   }
 }
+
+/**
+ * "Today" in the zone the app uses, which is the plan's and not this machine's.
+ *
+ * These tests seed sessions dated today and then assert on rules whose windows are measured from
+ * the ViewModel's own `currentDate` — and that is `LocalDate.now(clock.withZone(planZone))`. With a
+ * bare `LocalDate.now()` the two agree only while the container's zone and Europe/Helsinki are on
+ * the same date, so the whole file failed every evening between 21:00 UTC and midnight and passed
+ * again by morning. A test that depends on the hour it is run is worse than no test.
+ */
+private fun todayInPlanZone(): LocalDate = LocalDate.now(ZoneId.of(PLAN_ZONE))
+
+private const val PLAN_ZONE = "Europe/Helsinki"

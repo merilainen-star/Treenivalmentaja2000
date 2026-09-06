@@ -28,6 +28,7 @@ import fi.merilainen.treenivalmentaja.domain.RescheduleAlarmsUseCase
 import fi.merilainen.treenivalmentaja.domain.ResolveReminderUseCase
 import fi.merilainen.treenivalmentaja.domain.TrainingEngine
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
@@ -110,7 +111,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `an upcoming analysis carries recovery even though no screen is observing it`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(planWithSessionOn(today))
       seedRecovery(today)
       advanceUntilIdle()
@@ -138,7 +139,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `the shown request is the request that was sent`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(planWithSessionOn(today))
       seedRecovery(today)
       advanceUntilIdle()
@@ -157,7 +158,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `a day with no measurements produces no line`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(planWithSessionOn(today))
       db.ouraDao()
         .upsertDailySummaries(
@@ -197,7 +198,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `a fully ticked guided workout reaches the prompt as carried out`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(guidedPlanOn(today))
       advanceUntilIdle()
 
@@ -231,7 +232,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `an abandoned guided workout reaches the prompt as unfinished`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(guidedPlanOn(today))
       advanceUntilIdle()
 
@@ -257,7 +258,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `a completion with no guided progress sends no guided section`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(guidedPlanOn(today))
       advanceUntilIdle()
 
@@ -287,7 +288,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `a skipped session Oura matched something to can still be analysed`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(planWithSessionOn(today))
       seedRecovery(today)
       val startUtc = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() + 9 * 3_600_000L
@@ -324,7 +325,7 @@ class AiAnalysisPromptSourcingTest {
   @Test
   fun `a skipped session with no match offers nothing to analyse`() =
     runTest(dispatcher) {
-      val today = LocalDate.now()
+      val today = todayInPlanZone()
       repository.importPlan(planWithSessionOn(today))
       advanceUntilIdle()
 
@@ -485,3 +486,16 @@ class AiAnalysisPromptSourcingTest {
       """
   }
 }
+
+/**
+ * "Today" in the zone the app uses, which is the plan's and not this machine's.
+ *
+ * These tests seed sessions dated today and then assert on rules whose windows are measured from
+ * the ViewModel's own `currentDate` — and that is `LocalDate.now(clock.withZone(planZone))`. With a
+ * bare `LocalDate.now()` the two agree only while the container's zone and Europe/Helsinki are on
+ * the same date, so the whole file failed every evening between 21:00 UTC and midnight and passed
+ * again by morning. A test that depends on the hour it is run is worse than no test.
+ */
+private fun todayInPlanZone(): LocalDate = LocalDate.now(ZoneId.of(PLAN_ZONE))
+
+private const val PLAN_ZONE = "Europe/Helsinki"
