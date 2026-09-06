@@ -215,6 +215,96 @@ class ActiveWorkoutTimingTest {
     assertEquals(mapOf("1:1" to 40L), timing.rests(skippedKeys = listOf("1:2")))
   }
 
+  // ------------------------------------------------------------------ held movements
+
+  /**
+   * The case this split exists for. A side plank held 30 s a side is one minute of work; the
+   * screen was up for 1:31 because the person sat up between the sides, and reporting the whole
+   * 1:31 as effort would say they planked half again as long as they did.
+   */
+  @Test
+  fun `a held movement is worth its clock, not its card`() {
+    val timing =
+      ActiveWorkoutTiming().plusMovement("1:5", 91).plusHold("1:5", 30).plusHold("1:5", 30)
+
+    assertEquals(mapOf("1:5" to 60L), timing.performed())
+    assertEquals(mapOf("1:5" to 31L), timing.setup())
+    assertEquals(60, timing.netSeconds())
+  }
+
+  /** A movement counted in repetitions never starts a clock, so its card time is its work. */
+  @Test
+  fun `a movement with no clock is worth the time its card was up`() {
+    val timing = ActiveWorkoutTiming().plusMovement("1:1", 58)
+
+    assertEquals(mapOf("1:1" to 58L), timing.performed())
+    assertTrue(timing.setup().isEmpty())
+    assertEquals(58, timing.netSeconds())
+  }
+
+  /**
+   * The other half of the complaint: a 35-second plank measured 0:38 because the clock only starts
+   * when the button is pressed. Those three seconds were not planking.
+   */
+  @Test
+  fun `the seconds before the clock starts are setup, not work`() {
+    val timing = ActiveWorkoutTiming().plusMovement("1:4", 38).plusHold("1:4", 35)
+
+    assertEquals(mapOf("1:4" to 35L), timing.performed())
+    assertEquals(mapOf("1:4" to 3L), timing.setup())
+  }
+
+  /** No dithering at all is no setup time, rather than a measured zero. */
+  @Test
+  fun `a hold started at once records no setup`() {
+    val timing = ActiveWorkoutTiming().plusMovement("1:4", 35).plusHold("1:4", 35)
+
+    assertTrue(timing.setup().isEmpty())
+  }
+
+  /** A cancelled countdown was not the hold the plan asked for; its seconds are setup. */
+  @Test
+  fun `only completed holds count as work`() {
+    val timing = ActiveWorkoutTiming().plusMovement("1:4", 50).plusHold("1:4", 35)
+
+    assertEquals(mapOf("1:4" to 35L), timing.performed())
+    assertEquals(mapOf("1:4" to 15L), timing.setup())
+  }
+
+  /** Net time is the work of the whole session, so a held movement contributes only its holds. */
+  @Test
+  fun `net time counts holds for held movements and card time for the rest`() {
+    val timing =
+      ActiveWorkoutTiming()
+        .plusMovement("1:1", 58)
+        .plusMovement("1:5", 91)
+        .plusHold("1:5", 30)
+        .plusHold("1:5", 30)
+
+    assertEquals(118, timing.netSeconds())
+  }
+
+  /** A skipped held movement takes its holds and its setup with it. */
+  @Test
+  fun `a skipped held movement is left out of both`() {
+    val timing = ActiveWorkoutTiming().plusMovement("1:5", 91).plusHold("1:5", 60)
+
+    assertEquals(0, timing.netSeconds(skippedKeys = listOf("1:5")))
+    assertTrue(timing.setup(skippedKeys = listOf("1:5")).isEmpty())
+  }
+
+  /**
+   * A card that somehow banked less than its holds cannot have negative setup. Clocks that keep
+   * running while a step is being left can round the two apart by a second.
+   */
+  @Test
+  fun `setup is never negative`() {
+    val timing = ActiveWorkoutTiming().plusMovement("1:4", 34).plusHold("1:4", 35)
+
+    assertTrue(timing.setup().isEmpty())
+    assertEquals(mapOf("1:4" to 35L), timing.performed())
+  }
+
   // ------------------------------------------------------------------ the summary
 
   @Test

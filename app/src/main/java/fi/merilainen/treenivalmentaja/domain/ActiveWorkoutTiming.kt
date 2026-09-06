@@ -40,12 +40,30 @@ data class ActiveWorkoutTiming(
    * [betweenSeconds].
    */
   val restSeconds: Map<String, Long> = emptyMap(),
+  /**
+   * Seconds a held movement's clock actually ran to completion, keyed the same way.
+   *
+   * **A held movement's work is its clock, not its screen.** "Lankku 35 s" takes 35 seconds of
+   * work however long the screen was up: the rest of that time was finding the phone, getting
+   * down on the mat, and — for a movement done per side — sitting up between the left side and
+   * the right. A side plank held 30 s a side is a minute of work and whatever the changeover took
+   * of rest, and reporting the whole 1:31 as effort would say the person planked for half again
+   * as long as they did.
+   *
+   * Only completed runs are counted. A countdown cancelled halfway was not the hold the plan
+   * asked for, and its seconds fall into the setup time along with everything else on that screen
+   * that was not holding.
+   */
+  val holdSeconds: Map<String, Long> = emptyMap(),
   /** Seconds spent preparing, resting and between rounds — everything that is not a movement. */
   val betweenSeconds: Long = 0,
 ) {
 
   /**
-   * The movements alone, leaving out anything in [skippedKeys].
+   * The work alone, leaving out anything in [skippedKeys].
+   *
+   * Work, not screen time: a held movement contributes its completed holds and a movement counted
+   * in repetitions contributes the time its card was up. See [workSeconds].
    *
    * Skipped time is subtracted here rather than deleted when the movement is skipped, because the
    * two happen in the wrong order to delete: the skip changes the step, and the step's own seconds
@@ -53,7 +71,7 @@ data class ActiveWorkoutTiming(
    * that order — and to a movement being skipped, walked back to, and done after all.
    */
   fun netSeconds(skippedKeys: Collection<String> = emptyList()): Long =
-    movementSeconds.entries.filter { it.key !in skippedKeys }.sumOf { it.value }
+    performed(skippedKeys).values.sum()
 
   /** Adds time to the movement [key] owns. */
   fun plusMovement(key: String, seconds: Long): ActiveWorkoutTiming =
@@ -74,6 +92,11 @@ data class ActiveWorkoutTiming(
     if (seconds <= 0) this
     else copy(restSeconds = restSeconds + (afterKey to (restSeconds[afterKey] ?: 0) + seconds))
 
+  /** Adds a completed hold to the movement it belongs to. */
+  fun plusHold(key: String, seconds: Long): ActiveWorkoutTiming =
+    if (seconds <= 0) this
+    else copy(holdSeconds = holdSeconds + (key to (holdSeconds[key] ?: 0) + seconds))
+
   /**
    * What each movement cost, skipped ones left out.
    *
@@ -82,7 +105,11 @@ data class ActiveWorkoutTiming(
    * summary. Gross keeps them, as gross keeps everything.
    */
   fun performed(skippedKeys: Collection<String> = emptyList()): Map<String, Long> =
-    movementSeconds.filterKeys { it !in skippedKeys }
+    workSeconds(movementSeconds, holdSeconds).filterKeys { it !in skippedKeys }
+
+  /** What each movement spent on its own card without working. See [setupSeconds]. */
+  fun setup(skippedKeys: Collection<String> = emptyList()): Map<String, Long> =
+    setupSeconds(movementSeconds, holdSeconds).filterKeys { it !in skippedKeys }
 
   /** The rests, skipped movements' left out for the same reason their own seconds are. */
   fun rests(skippedKeys: Collection<String> = emptyList()): Map<String, Long> =
@@ -147,3 +174,38 @@ fun List<ActiveWorkoutStep>.movementTimes(seconds: Map<String, Long>): List<Pair
   filterIsInstance<ActiveWorkoutStep.Perform>().mapNotNull { step ->
     seconds[step.key()]?.let { step.exercise.name to it }
   }
+
+/**
+ * The work each movement did, from the time its card was up and the holds its clock completed.
+ *
+ * **A hold entry is what marks a movement as held**, and no list of exercises is consulted to
+ * decide it. A movement whose clock ran has that clock as its work; a movement counted in
+ * repetitions never starts a clock, has no entry, and its card time *is* its work — nobody stands
+ * on a cat-cow card doing nothing, and there is no measurement that could separate it if they did.
+ *
+ * The one case this reads wrongly is a held movement abandoned before a single completed hold, and
+ * that movement was skipped, so it is filtered out before anyone reads it.
+ */
+fun workSeconds(
+  screenSeconds: Map<String, Long>,
+  holdSeconds: Map<String, Long>,
+): Map<String, Long> = screenSeconds.mapValues { (key, onScreen) -> holdSeconds[key] ?: onScreen }
+
+/**
+ * The seconds a held movement's card was up without its clock running: getting into position,
+ * reaching for the phone, and the breather between the left side and the right.
+ *
+ * This is rest, and it is reported apart from the gap that follows the movement because it is a
+ * different fact about the session. Thirty-one seconds between the two sides of a side plank says
+ * something about that set; thirty-one seconds after it says something about the next one.
+ *
+ * Absent for a movement with no clock — there the card time is the work, and a difference of zero
+ * would be a measurement rather than the nothing it actually is.
+ */
+fun setupSeconds(
+  screenSeconds: Map<String, Long>,
+  holdSeconds: Map<String, Long>,
+): Map<String, Long> =
+  holdSeconds
+    .mapValues { (key, held) -> ((screenSeconds[key] ?: held) - held).coerceAtLeast(0) }
+    .filterValues { it > 0 }

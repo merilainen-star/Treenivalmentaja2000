@@ -139,6 +139,24 @@ discipline the rest of the app keeps: no measurement, no verdict.
 and the time each movement took. All of it is stored on the completion event alongside the rest of
 the outcome.
 
+**A held movement's own time is its clock, not its screen.** This was got wrong first: "Lankku
+35 s" measured 0:38 and "Sivulankku 30 s / puoli" measured 1:31. The extra seconds were real but
+they were not planking — three of them were finding the phone and pressing *Käynnistä*, and
+thirty-one of them were sitting up between the left side and the right. So the work a movement did
+is what its countdown completed (35 s; 2 × 30 s), and the difference between that and the time its
+card was up is recorded separately as **valmistautuminen ja puolen vaihto** — rest, and outside the
+net time.
+
+Nothing consults a list of exercises to decide which movements are held: a movement whose clock ran
+has a hold recorded against it, and one counted in repetitions never starts a clock and so has
+none. There, the card time *is* the work — nobody stands on a cat-cow card doing nothing, and no
+measurement could separate it if they did. A cancelled countdown counts as setup, not work: it was
+not the hold the plan asked for.
+
+The two rests are kept apart rather than added together because they are different facts. Half a
+minute between the two sides of a side plank says something about that set; half a minute after it
+says something about the next one.
+
 **The analysis is told the same thing, movement by movement.** The clocks were built for the header,
 but the reader who can do most with them is the model: a tick on a checklist says ten press-ups were
 done, and only the seconds say whether they were brisk or laboured. So the completed-session prompt
@@ -146,19 +164,28 @@ carries a section of its own:
 
 ```
 ## Toteutunut ajankäyttö (ohjattu treeni)
-- nettoaika 4:10 (pelkät liikkeet)
-- bruttoaika 10:00 (levot mukaan lukien)
-- Kierros 1 · Punnerrus (10 toistoa): suoritus 1:02, tauko jälkeen 0:48 (suunniteltu 0:45)
-- Kierros 2 · Punnerrus (10 toistoa): suoritus 1:18, tauko jälkeen 1:32 (suunniteltu 0:45)
+- nettoaika 9:49 (pelkät liikkeet)
+- bruttoaika 13:52 (levot mukaan lukien)
+- Kierros 1 · Kissanlehmä (12 toistoa): suoritus 0:58, tauko jälkeen 0:01
+- Kierros 1 · Lankku (35 s): suoritus 0:35, valmistautuminen 0:03, tauko jälkeen 0:37
+- Kierros 1 · Sivulankku (30 s / puoli): suoritus 1:00, valmistautuminen ja puolen vaihto 0:31, tauko jälkeen 0:05
 ```
 
 Each round is its own line, because three rounds of the same movement are three separate efforts and
-an average would hide the one that took half as long again. The plan sits beside the measurement so
+an average would hide the one that took half as long again. The label follows the plan's own shape:
+a movement done per side gets "ja puolen vaihto", one done in several sets gets "ja sarjojen välit",
+and a single hold gets neither — a plank has no sides, and naming a changeover it never made would
+invite the model to reason about a pause that did not happen. The plan sits beside the measurement so
 the comparison is the model's to make: a second round sixteen seconds slower on a rest half a minute
 past its plan is the shape of fatigue, and nothing in the app should be deciding that on the model's
 behalf. Where the plan states no rest, the measured gap stands alone rather than being judged against
 a number nobody wrote — and a session finished before the clocks existed renders no section at all,
 on the rule the Oura layer already keeps: absent is not zero.
+
+The prompt also says which numbers can carry a tempo. A repetition count's seconds can: ten
+press-ups in fifty seconds and ten in two and a half minutes are different sessions. A hold's
+seconds cannot — they are the countdown, so they always equal the plan, and reading them as
+well-judged pacing would be reading the app's own timer back as an achievement.
 
 #### Does it all fit in one header?
 

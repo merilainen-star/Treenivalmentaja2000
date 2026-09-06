@@ -161,6 +161,7 @@ internal fun vibrateTimerFinished(context: Context) {
 fun ExerciseTimer(
     exercise: Exercise,
     modifier: Modifier = Modifier,
+    onHoldCompleted: (Int) -> Unit = {},
     onAllRoundsCompleted: () -> Unit,
 ) {
     val seconds = exercise.durationSec ?: return
@@ -215,6 +216,9 @@ fun ExerciseTimer(
                 vibrateTimerFinished(context)
                 running = false
                 completed++
+                // Reported per run rather than once at the end, because a movement done per side
+                // can be skipped after the left side and the left side still happened.
+                onHoldCompleted(seconds)
                 if (completed >= rounds.size) onAllRoundsCompleted()
             },
         )

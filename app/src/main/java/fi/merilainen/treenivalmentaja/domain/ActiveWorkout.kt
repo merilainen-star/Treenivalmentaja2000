@@ -32,6 +32,10 @@ data class SkippedMovement(val round: Int, val position: Int, val name: String)
  * keeps its name. [netSec] and [movementSeconds] arrived with the stopwatch and are null on every
  * session completed before it: absent, which is the truth, rather than zero, which would say the
  * movements took no time at all.
+ *
+ * [movementSeconds] is how long each movement's card was up; [holdSeconds] is how much of that was
+ * a clock actually running. Both are stored because neither can be recovered from the other, and
+ * the reader wants each for a different question — see `ActiveWorkoutTiming`.
  */
 data class ActiveWorkoutOutcome(
   val guided: GuidedProgress,
@@ -45,6 +49,14 @@ data class ActiveWorkoutOutcome(
   val movementSeconds: Map<String, Long>? = null,
   /** Seconds of gap after each movement, keyed the same way. See `ActiveWorkoutTiming`. */
   val restSeconds: Map<String, Long>? = null,
+  /**
+   * Seconds a held movement's clock ran to completion, keyed the same way.
+   *
+   * Present only for movements with a clock, and that absence is what says a movement was counted
+   * in repetitions: for those, [movementSeconds] is the work. For a held one, this is the work and
+   * the difference between the two is the setting up and the changing of sides.
+   */
+  val holdSeconds: Map<String, Long>? = null,
 )
 
 /**

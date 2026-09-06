@@ -246,6 +246,12 @@ almost nothing to say about the sessions that matter most.
   against a planned 0:45" — the second is a session the model can say something about. Names are
   dropped, seconds kept, when the movement list no longer has the shape that was timed.
 
+  *And a held movement is worth its clock, not its screen.* The first version measured "Lankku
+  35 s" as 0:38 and "Sivulankku 30 s / puoli" as 1:31, counting the walk to the mat and the sit-up
+  between the two sides as effort. A movement's work is now what its countdown completed, and the
+  remainder of its card time is recorded as valmistautuminen — rest, and outside the net time. What
+  marks a movement as held is that a clock ran on it, not a lookup in the plan.
+
   *The hard part is the clock.* The existing countdown counts ticks inside a composable, which is
   fine for a plank being watched and wrong for a rest with the phone face-down and the process
   frozen. It has to be computed from a wall-clock deadline, and the alarm and notification machinery

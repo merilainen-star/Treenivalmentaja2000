@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-09-06
+
+### Fixed
+- **Ajastetun liikkeen aika on nyt pitoaika, ei ruutuaika.** "Lankku 35 s" mittasi 0:38 ja
+  "Sivulankku 30 s / puoli" mittasi 1:31, koska kello kävi siitä hetkestä kun kortti tuli ruudulle.
+  Ne ylimääräiset sekunnit olivat totta mutta eivät lankutusta: kolme niistä oli puhelimen
+  hakemista ja *Käynnistä*-napin painamista, ja kolmekymmentäyksi oli istumista pystyssä vasemman ja
+  oikean puolen välissä. Nyt liikkeen suoritusaika on se mitä ajastin ehti laskea loppuun (35 s;
+  2 × 30 s), ja erotus kirjataan erikseen **valmistautumisena ja puolen vaihtona** — lepoa, ei
+  nettoaikaa. Esimerkkitreenin nettoaika putosi 10:54:stä 9:49:ään; bruttoaika ei muutu.
+
+  **Mikään ei katso liikelistaa päättääkseen mikä liike on ajastettu.** Liikkeellä jonka kello kävi
+  on pito kirjattuna; toistoihin perustuva liike ei koskaan käynnistä kelloa eikä siis kanna pitoa,
+  ja siellä korttiaika *on* suoritusaika — kukaan ei seiso kissanlehmä-kortilla tekemättä mitään,
+  eikä mikään mittaus erottaisi sitä jos seisoisi. Kesken keskeytetty ajastus lasketaan
+  valmistautumiseksi: se ei ollut se pito jota suunnitelma pyysi.
+
+### Changed
+- **AI-analyysille kerrotaan nyt kumpi luku voi kertoa temposta.** Toistoihin perustuvan liikkeen
+  suoritusaika voi; ajastetun ei voi, koska se on aina suunnitelman mukainen. Ilman tätä malli lukisi
+  sovelluksen oman ajastimen takaisin ansiona. Liikkeen sisäinen tauko ja liikkeen jälkeinen tauko
+  esitetään erikseen eikä yhteenlaskettuna: puoli minuuttia sivulankun puolien välissä kertoo siitä
+  sarjasta, puoli minuuttia sen jälkeen kertoo seuraavasta.
+
 ## [Unreleased] - 2026-09-05
 
 ### Added

@@ -316,6 +316,9 @@ fun ActiveWorkoutContent(
           PerformStepCard(
             step = step,
             onExerciseClick = onExerciseClick,
+            // Banked as each hold finishes rather than when the step is left, because the step's
+            // own seconds say how long the card was up and this says how much of that was work.
+            onHoldCompleted = { held -> timing = timing.plusHold(step.key(), held.toLong()) },
             onDone = { stepIndex = steps.nextStep(safeIndex, skippedIds) },
             onSkip = {
               // The new list has to exist before the jump is computed: the movement being skipped
@@ -364,7 +367,11 @@ fun ActiveWorkoutContent(
                   feel = feel,
                   durationSec = ((System.currentTimeMillis() - startedAt) / 1000).coerceAtLeast(0),
                   netSec = timing.netSeconds(skippedIds),
-                  movementSeconds = performed.ifEmpty { null },
+                  // The card time is stored raw and the holds beside it, because neither can be
+                  // recovered from the other and the reader wants each for a different question.
+                  movementSeconds =
+                    timing.movementSeconds.filterKeys { it !in skippedIds }.ifEmpty { null },
+                  holdSeconds = timing.holdSeconds.filterKeys { it !in skippedIds }.ifEmpty { null },
                   restSeconds = timing.rests(skippedIds).ifEmpty { null },
                 )
               )
@@ -523,6 +530,7 @@ private fun PrepareStepCard(
 private fun PerformStepCard(
   step: ActiveWorkoutStep.Perform,
   onExerciseClick: (Exercise) -> Unit,
+  onHoldCompleted: (Int) -> Unit,
   onDone: () -> Unit,
   onSkip: () -> Unit,
 ) {
@@ -559,7 +567,11 @@ private fun PerformStepCard(
       if (step.exercise.durationSec != null) {
         // A held movement finishes when its clock does, so there is no "Liike valmis" to place
         // beside the skip — the timer is the action.
-        ExerciseTimer(exercise = step.exercise, onAllRoundsCompleted = onDone)
+        ExerciseTimer(
+          exercise = step.exercise,
+          onHoldCompleted = onHoldCompleted,
+          onAllRoundsCompleted = onDone,
+        )
         OutlinedButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Ohita liike") }
       } else {
         Row(
@@ -720,10 +732,12 @@ data class FrozenClocks(
 private val ActiveWorkoutTimingSaver =
   listSaver<ActiveWorkoutTiming, Any>(
     save = { timing ->
-      // Two maps in one flat list, so the reader needs to know where the first ends.
-      listOf(timing.betweenSeconds, timing.movementSeconds.size) +
+      // Three maps in one flat list, so their sizes are written first and the reader splits by
+      // position. The last map needs no size: it is whatever is left.
+      listOf(timing.betweenSeconds, timing.movementSeconds.size, timing.restSeconds.size) +
         timing.movementSeconds.flatMap { (key, seconds) -> listOf(key, seconds) } +
-        timing.restSeconds.flatMap { (key, seconds) -> listOf(key, seconds) }
+        timing.restSeconds.flatMap { (key, seconds) -> listOf(key, seconds) } +
+        timing.holdSeconds.flatMap { (key, seconds) -> listOf(key, seconds) }
     },
     restore = { stored ->
       fun List<Any>.asPairs(): Map<String, Long> =
@@ -737,12 +751,14 @@ private val ActiveWorkoutTimingSaver =
 
       val between = stored.firstOrNull() as? Long ?: 0L
       // Split by position rather than by counting decoded pairs: an entry that fails to decode
-      // would otherwise shift every rest into the movement map.
-      val entries = stored.drop(2)
+      // would otherwise shift every later map's entries into the one before it.
+      val entries = stored.drop(3)
       val movementEntries = ((stored.getOrNull(1) as? Int) ?: 0) * 2
+      val restEntries = ((stored.getOrNull(2) as? Int) ?: 0) * 2
       ActiveWorkoutTiming(
         movementSeconds = entries.take(movementEntries).asPairs(),
-        restSeconds = entries.drop(movementEntries).asPairs(),
+        restSeconds = entries.drop(movementEntries).take(restEntries).asPairs(),
+        holdSeconds = entries.drop(movementEntries + restEntries).asPairs(),
         betweenSeconds = between,
       )
     },

@@ -693,7 +693,12 @@ class AnalysisPromptBuilderTest {
     assertFalse(prompt.contains("0:00"))
   }
 
-  /** Without this the model would compare tempo against nothing and call every set "hyvä". */
+  /**
+   * Without this the model would compare tempo against nothing and call every set "hyvä".
+   *
+   * The sentence distinguishes the two kinds of movement, because the numbers mean different
+   * things: a repetition count's seconds are a tempo, a hold's seconds are a countdown.
+   */
   @Test
   fun `tells the model what the seconds are evidence of`() {
     val prompt =
@@ -710,8 +715,8 @@ class AnalysisPromptBuilderTest {
         )
       )
 
-    assertTrue(prompt.contains("Suoritusaika kertoo tempon"))
-    assertTrue(prompt.contains("miten hyvin edellisestä sarjasta palauduttiin"))
+    assertTrue(prompt.contains("Toistoihin perustuvan liikkeen suoritusaika kertoo tempon"))
+    assertTrue(prompt.contains("Tulkitse niitä suhteessa suunniteltuun lepoon"))
   }
 
   /**
@@ -741,6 +746,90 @@ class AnalysisPromptBuilderTest {
     // Neither the wrong name nor a planned rest borrowed from the wrong exercise.
     assertFalse(prompt.contains("Kierros 1 · Punnerrus"))
     assertFalse(prompt.contains("(suunniteltu"))
+  }
+
+  /**
+   * What the owner asked for after reading a real session: a side plank prescribed 30 s a side
+   * measured 1:31, and the extra half minute was sitting up between the sides. The model must be
+   * told a minute of planking and half a minute of rest, not ninety seconds of planking.
+   */
+  @Test
+  fun `a held movement reports its clock as work and the rest of its card as setup`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = listOf(Exercise(name = "Sivulankku", durationSec = 30, perSide = true)),
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 1, rounds = 1, perRound = 1),
+              netSec = 60,
+              movementSeconds = mapOf("1:1" to 91L),
+              holdSeconds = mapOf("1:1" to 60L),
+              restSeconds = mapOf("1:1" to 5L),
+            )
+        )
+      )
+
+    assertTrue(
+      prompt.contains(
+        "- Kierros 1 · Sivulankku (30 s / puoli): suoritus 1:00, " +
+          "valmistautuminen ja puolen vaihto 0:31, tauko jälkeen 0:05"
+      )
+    )
+    // The card time is never the claim: 1:31 of side plank is exactly the reading being corrected.
+    assertFalse(prompt.contains("suoritus 1:31"))
+  }
+
+  /** A movement counted in repetitions has no clock, so its card time is its work and no more. */
+  @Test
+  fun `a movement with no clock reports no setup time`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = listOf(Exercise(name = "Kissanlehmä", reps = 12)),
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 1, rounds = 1, perRound = 1),
+              movementSeconds = mapOf("1:1" to 58L),
+            )
+        )
+      )
+
+    assertTrue(prompt.contains("- Kierros 1 · Kissanlehmä (12 toistoa): suoritus 0:58"))
+    assertFalse(prompt.contains("valmistautuminen"))
+  }
+
+  /**
+   * Without this the model reads a plank that took exactly its prescribed seconds as evidence of
+   * a well-judged tempo, when it is evidence of a countdown having run.
+   */
+  @Test
+  fun `tells the model that a held movement's time cannot show tempo`() {
+    val prompt =
+      builder.completed(
+        CompletedAnalysisInput(
+          type = WorkoutType.STRENGTH,
+          date = day,
+          exercises = listOf(Exercise(name = "Lankku", durationSec = 35)),
+          timing =
+            ActiveWorkoutOutcome(
+              guided = GuidedProgress(done = 1, rounds = 1, perRound = 1),
+              movementSeconds = mapOf("1:1" to 38L),
+              holdSeconds = mapOf("1:1" to 35L),
+            )
+        )
+      )
+
+    assertTrue(prompt.contains("on aina suunnitelman mukainen eikä kerro temposta mitään"))
+    assertTrue(prompt.contains("ovat molemmat lepoa eivätkä sisälly nettoaikaan"))
+    // A plank has no sides, so its three stopped-clock seconds are not called a changeover.
+    // (The standing instruction below the list names both, hence matching the movement's line.)
+    assertTrue(prompt.contains("suoritus 0:35, valmistautuminen 0:03"))
+    assertFalse(prompt.contains("Lankku (35 s): suoritus 0:35, valmistautuminen ja puolen vaihto"))
   }
 
   /**

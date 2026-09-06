@@ -232,13 +232,21 @@ class AnalysisPromptBuilder {
    * nobody wrote. The naming is guarded exactly as [appendGuided] guards it: when [exercises] no
    * longer has the shape the session was counted against, the seconds are still true and the names
    * are not, so the positions are written unnamed.
+   *
+   * A held movement's own time is its clock, never how long its card was up — see `workSeconds`.
+   * The difference between the two is written as its own figure rather than folded into the rest
+   * that follows, because the pause between the left side and the right is a fact about that set
+   * and the gap afterwards is a fact about the next one.
    */
   private fun StringBuilder.appendTiming(
     timing: ActiveWorkoutOutcome?,
     exercises: List<Exercise>,
   ) {
     if (timing == null) return
-    val movements = timing.movementSeconds.orEmpty()
+    val onScreen = timing.movementSeconds.orEmpty()
+    val holds = timing.holdSeconds.orEmpty()
+    val movements = workSeconds(onScreen, holds)
+    val setups = setupSeconds(onScreen, holds)
     val rests = timing.restSeconds.orEmpty()
     val totals =
       buildList {
@@ -270,12 +278,18 @@ class AnalysisPromptBuilder {
         val name = exercise?.name ?: "liike $position"
         val prescription = exercise?.promptPrescription().orEmpty()
         val done = movements[key]?.formatDuration()
+        val setup = setups[key]
         val rest = rests[key]
         val plannedRest = exercise?.restSec?.takeIf { it > 0 }
 
         val line = StringBuilder("- Kierros $round · $name")
         if (prescription.isNotBlank()) line.append(" ($prescription)")
         done?.let { line.append(": suoritus $it") }
+        // Written before the rest that follows, because it happened before it: this is time on the
+        // movement's own card with the clock stopped. Named for what it actually contains — a
+        // plank has no sides to change between, and calling its three seconds a changeover would
+        // invite the model to reason about a pause that never existed.
+        setup?.let { line.append(", ${setupLabel(exercise)} ${it.formatDuration()}") }
         if (rest != null) {
           line.append(", tauko jälkeen ${rest.formatDuration()}")
           plannedRest?.let { line.append(" (suunniteltu ${it.toLong().formatDuration()})") }
@@ -286,8 +300,14 @@ class AnalysisPromptBuilder {
     // Said once, here, rather than in the standing task text: without these measurements the
     // instruction would invite the model to speculate about a tempo nothing recorded.
     appendLine(
-      "- Suoritusaika kertoo tempon ja tauon pituus siitä, miten hyvin edellisestä sarjasta " +
-        "palauduttiin. Tulkitse molempia suhteessa suunniteltuun."
+      "- Toistoihin perustuvan liikkeen suoritusaika kertoo tempon. Ajastetun liikkeen (esim. " +
+        "lankku tai venytys) suoritusaika on ajastimen mittaama pitoaika, joten se on aina " +
+        "suunnitelman mukainen eikä kerro temposta mitään — siinä liikkeessä lue sen sijaan " +
+        "valmistautumis- ja puolenvaihtoaikaa."
+    )
+    appendLine(
+      "- Valmistautuminen ja puolen vaihto sekä tauko jälkeen ovat molemmat lepoa eivätkä sisälly " +
+        "nettoaikaan. Tulkitse niitä suhteessa suunniteltuun lepoon."
     )
     appendLine()
   }
@@ -348,6 +368,21 @@ class AnalysisPromptBuilder {
    * one is read at a glance between sets, where the units are obvious from context; here rule 2
    * above applies, and every number carries its own.
    */
+  /**
+   * What a held movement's stopped-clock seconds were spent on, as far as the plan can say.
+   *
+   * Only the plan's own shape is read: two sides means a changeover, several sets means gaps
+   * between them, and a single hold means the person was getting into position. An unnamed
+   * position — the plan changed under the session — gets the one word that is true regardless.
+   */
+  private fun setupLabel(exercise: Exercise?): String =
+    when {
+      exercise == null -> "valmistautuminen"
+      exercise.perSide == true -> "valmistautuminen ja puolen vaihto"
+      (exercise.sets ?: 1) > 1 -> "valmistautuminen ja sarjojen välit"
+      else -> "valmistautuminen"
+    }
+
   private fun Exercise.promptPrescription(): String {
     // Appended only to a prescription that says something. An exercise the plan named and left
     // otherwise blank must render as its name alone, not as a stray "/ puoli".
