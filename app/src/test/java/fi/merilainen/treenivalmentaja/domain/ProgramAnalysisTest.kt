@@ -591,4 +591,102 @@ class ProgramAnalysisTest {
     assertNotNull(analysis)
     assertEquals(1, analysis!!.adherence.planned)
   }
+
+  // --------------------------------------------------------------- heart-rate zone distribution
+
+  private fun runWithZones(
+    upper: List<Int>?,
+    seconds: List<Int>,
+    distanceKm: Double = 8.0,
+    durationSec: Long = 2700,
+  ): CompletedRunMetrics =
+    run(distanceKm, durationSec).copy(heartRateZones = heartRateZones(upper, seconds))
+
+  @Test
+  fun `zone times are added up within each planned intensity`() {
+    val bounds = listOf(120, 145, 160, 172, 190)
+    val analysis =
+      analyse(
+        listOf(
+          ProgramSessionRecord(
+            session("s1", "2026-08-03", week = 1),
+            run = runWithZones(bounds, listOf(300, 1800, 120, 0, 0)),
+          ),
+          ProgramSessionRecord(
+            session("s2", "2026-08-10", week = 2),
+            run = runWithZones(bounds, listOf(200, 1500, 400, 0, 0)),
+          ),
+          ProgramSessionRecord(
+            session("s3", "2026-08-17", week = 3, intensity = Intensity.HARD),
+            run = runWithZones(bounds, listOf(120, 300, 600, 900, 180)),
+          ),
+        )
+      )!!
+
+    val easy = analysis.zoneSplits.single { it.intensity == Intensity.EASY }
+    assertEquals(2, easy.runs)
+    assertEquals(500L, easy.zones[0].seconds)
+    assertEquals(3300L, easy.zones[1].seconds)
+    assertEquals("Z2 (121–145)", easy.zones[1].label)
+    assertEquals(76, easy.percentOf(easy.zones[1]))
+
+    val hard = analysis.zoneSplits.single { it.intensity == Intensity.HARD }
+    assertEquals(1, hard.runs)
+    assertEquals(900L, hard.zones[3].seconds)
+  }
+
+  /**
+   * A run the strap recorded nothing for is not a run spent in Z1 — folding it in as zeros would
+   * make every group look easier than it was.
+   */
+  @Test
+  fun `runs without zone data are counted out rather than counted as zero`() {
+    val analysis =
+      analyse(
+        listOf(
+          ProgramSessionRecord(
+            session("s1", "2026-08-03", week = 1),
+            run = runWithZones(listOf(120, 145), listOf(300, 900)),
+          ),
+          ProgramSessionRecord(session("s2", "2026-08-10", week = 2), run = run(8.0, 2700)),
+        )
+      )!!
+
+    val easy = analysis.zoneSplits.single()
+    assertEquals(1, easy.runs)
+    assertEquals(1200L, easy.totalSeconds)
+  }
+
+  /** Zones move when the threshold is recomputed; quoting one week's bounds for both would be false. */
+  @Test
+  fun `a zone table that moved during the programme loses its beat ranges`() {
+    val analysis =
+      analyse(
+        listOf(
+          ProgramSessionRecord(
+            session("s1", "2026-08-03", week = 1),
+            run = runWithZones(listOf(120, 145, 160), listOf(300, 900, 60)),
+          ),
+          ProgramSessionRecord(
+            session("s2", "2026-08-10", week = 2),
+            run = runWithZones(listOf(124, 149, 163), listOf(200, 800, 90)),
+          ),
+        )
+      )!!
+
+    val easy = analysis.zoneSplits.single()
+    assertEquals("Z2", easy.zones[1].label)
+    assertNull(easy.zones[1].bpmRange)
+    assertEquals(1700L, easy.zones[1].seconds)
+  }
+
+  @Test
+  fun `a programme whose runs carried no zones has no zone section at all`() {
+    val analysis =
+      analyse(
+        listOf(ProgramSessionRecord(session("s1", "2026-08-03", week = 1), run = run(8.0, 2700)))
+      )!!
+
+    assertTrue(analysis.zoneSplits.isEmpty())
+  }
 }

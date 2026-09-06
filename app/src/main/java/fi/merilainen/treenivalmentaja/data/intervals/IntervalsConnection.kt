@@ -120,14 +120,18 @@ class IntervalsConnection internal constructor(
 }
 
 /**
- * Clearing the key drops everything fetched with it — the activities and the daily load series —
- * and nothing else. The training plan is untouched.
+ * Clearing the key drops everything fetched with it — the activities, the daily load series and the
+ * kilometre splits — and nothing else. The training plan is untouched.
  *
  * The wellness rows have to go too, and that is not obvious from the class's name: `PRIVACY.md`
  * tells the owner that removing the key deletes "every cached activity", and a table of their
- * fitness and fatigue left behind would make that sentence false.
+ * fitness and fatigue left behind would make that sentence false. The splits and the record of
+ * having fetched them are the same case: a run's kilometre-by-kilometre pace and heart rate is
+ * *more* of that run than the summary row is, not less.
  */
 internal suspend fun IntervalsDao.clearCachedIntervalsData() {
   clearActivities()
   clearWellness()
+  clearSplits()
+  clearSplitFetches()
 }

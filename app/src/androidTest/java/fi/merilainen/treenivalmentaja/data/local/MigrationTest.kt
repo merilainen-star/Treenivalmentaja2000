@@ -510,4 +510,50 @@ class MigrationTest {
     assertTrue(summaries.isNull(summaries.getColumnIndex("readinessBodyTemperature")))
     summaries.close()
   }
+
+  /**
+   * Version 15 adds the run detail: two nullable columns on `intervals_activities` for the
+   * heart-rate zone table and its times, and the two new tables the kilometre splits live in.
+   *
+   * Additive, so the familiar assertion applies once more — an activity synced before v15 keeps
+   * every figure it had and gets nulls for the zones, which is indistinguishable from a run
+   * recorded without a strap and correct in both cases. The splits tables arrive empty, which is
+   * also correct: the splits are computed from a second request the app has not made yet, and the
+   * absence of a fetch marker is exactly what tells the next sync to go and make it.
+   */
+  @Test
+  fun migrate14To15() {
+    var db = helper.createDatabase(TEST_DB, 14)
+
+    db.execSQL(
+      """
+      INSERT INTO `intervals_activities` (`id`, `name`, `sportType`, `startTimeUtc`, `movingTimeSec`, `elapsedTimeSec`, `recordingTimeSec`, `distanceMeters`, `avgSpeedMps`, `maxSpeedMps`, `avgHeartRate`, `maxHeartRate`, `avgCadence`, `elevationGainMeters`, `calories`, `trainingLoad`, `intensity`, `hrLoad`, `trimp`, `atl`, `ctl`, `source`, `deviceName`, `matchedSessionId`, `fetchedAtUtc`)
+      VALUES ('i176422661', 'Afternoon Run', 'Run', 1786889278000, 2117, 2117, 2117, 6029.0, 2.892, 3.62, 149, 167, 79, 68.4, 481, 35, 77.14803, 35, 60.31146, 17.650415, 11.711897, 'SUUNTO', 'SUUNTO Suunto 5', 'session1', 1786889278000)
+      """
+    )
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 15, true)
+
+    val activities = db.query("SELECT * FROM intervals_activities")
+    assertTrue(activities.moveToFirst())
+    // What was there survives.
+    assertEquals("i176422661", activities.getString(activities.getColumnIndex("id")))
+    assertEquals(149, activities.getInt(activities.getColumnIndex("avgHeartRate")))
+    assertEquals("session1", activities.getString(activities.getColumnIndex("matchedSessionId")))
+    // The zone columns are absent, not empty: a run with no zone table is not a run that spent no
+    // time in any zone.
+    assertTrue(activities.isNull(activities.getColumnIndex("hrZoneUpperBpm")))
+    assertTrue(activities.isNull(activities.getColumnIndex("hrZoneSeconds")))
+    activities.close()
+
+    val splits = db.query("SELECT * FROM intervals_run_splits")
+    assertEquals(0, splits.count)
+    splits.close()
+
+    // No fetch marker either, which is what makes the next sync go and get the splits.
+    val fetches = db.query("SELECT * FROM intervals_split_fetches")
+    assertEquals(0, fetches.count)
+    fetches.close()
+  }
 }

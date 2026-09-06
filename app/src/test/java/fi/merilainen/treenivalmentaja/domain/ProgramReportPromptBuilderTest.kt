@@ -280,4 +280,47 @@ class ProgramReportPromptBuilderTest {
     assertFalse(prompt.contains("ilman otsikoita"))
     assertTrue(prompt.contains("Käytä yllä pyydettyjä otsikoita."))
   }
+
+  // --------------------------------------------------------------- heart-rate zone distribution
+
+  @Test
+  fun `the zone section says how the planned intensity was actually run`() {
+    val bounds = listOf(120, 145, 160, 172, 190)
+    val analysis =
+      analysisOf(
+        listOf(
+          ProgramSessionRecord(
+            session("s1", "2026-08-03", week = 1),
+            run =
+              run(8.0, 2700).copy(heartRateZones = heartRateZones(bounds, listOf(300, 1800, 600, 0, 0))),
+          ),
+          ProgramSessionRecord(
+            session("s2", "2026-08-10", week = 2),
+            run =
+              run(8.0, 2700).copy(heartRateZones = heartRateZones(bounds, listOf(300, 1800, 600, 0, 0))),
+          ),
+        )
+      )!!
+
+    val prompt = builder.build(analysis, ProgramReportKind.FINAL)
+
+    assertTrue(prompt.contains("## Sykealueiden jakauma suunnitellun tehon mukaan"))
+    assertTrue(prompt.contains("(2 juoksua, joissa sykealuetiedot)"))
+    assertTrue(prompt.contains("Z2 (121–145): 1:00:00 (67 %)"))
+    // The caveat is written whenever the section is, so a group missing half its runs cannot read
+    // as the whole group.
+    assertTrue(prompt.contains("Mukana ovat vain ne juoksut, joista sykealuetiedot löytyivät"))
+  }
+
+  @Test
+  fun `a programme with no zone data anywhere writes no zone section`() {
+    val analysis =
+      analysisOf(
+        listOf(ProgramSessionRecord(session("s1", "2026-08-03", week = 1), run = run(8.0, 2700)))
+      )!!
+
+    val prompt = builder.build(analysis, ProgramReportKind.FINAL)
+
+    assertFalse(prompt.contains("Sykealueiden jakauma"))
+  }
 }

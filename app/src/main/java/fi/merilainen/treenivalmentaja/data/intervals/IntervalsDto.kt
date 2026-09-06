@@ -64,6 +64,24 @@ internal data class IntervalsActivityDto(
   @Json(name = "average_heartrate") val averageHeartrate: Int? = null,
   @Json(name = "max_heartrate") val maxHeartrate: Int? = null,
   /**
+   * The athlete's heart-rate zone **boundaries** at the time of the activity — the upper beat count
+   * of each zone, ascending, e.g. `[123, 145, 160, 172, 190]`.
+   *
+   * Fetched alongside [icuHrZoneTimes] rather than read from a setting, because a zone table is not
+   * a constant: it is recomputed whenever the athlete's threshold or maximum changes, and a run from
+   * March has to be read against March's zones. The lower bound of a zone is the previous entry plus
+   * one; the first zone starts at zero. `null` when intervals.icu has no zone table for the sport.
+   */
+  @Json(name = "icu_hr_zones") val icuHrZones: List<Int>? = null,
+  /**
+   * Seconds spent in each zone, in the same order as [icuHrZones].
+   *
+   * This is what turns "keskisyke 148" into an answer about whether an easy run stayed easy. An
+   * average hides its own composition: thirty minutes at 130 with ten at 175 averages to the same
+   * number as forty minutes at 141, and only one of those was the session that was planned.
+   */
+  @Json(name = "icu_hr_zone_times") val icuHrZoneTimes: List<Int>? = null,
+  /**
    * **Cycles** per minute, not steps — one leg.
    *
    * Measured: 81.228 for a run whose `average_stride` is 1.0899 m, and
@@ -153,4 +171,24 @@ internal data class IntervalsWellnessDto(
   val atl: Double? = null,
   /** How fast fitness is changing, in CTL per week. Stored because it costs one column. */
   val rampRate: Double? = null,
+)
+
+/**
+ * One recorded channel of an activity — `GET /api/v1/activity/{id}/streams`, the `ActivityStream`
+ * schema.
+ *
+ * **The specification types `data` as a bare `object`** and says nothing more about it; the real
+ * responses send an array of numbers, one per sample, aligned across channels by position. That
+ * gap is why [data] is declared as a list of nullable doubles here and why the caller treats a
+ * parse failure as "no splits" rather than as a failed sync: this is the one shape in the
+ * integration that was read off the wire instead of out of the schema, and it must not be able to
+ * take the activities fetch down with it.
+ *
+ * Samples can be null in the middle of a channel — a heart-rate strap that dropped out for a
+ * minute leaves a hole rather than a zero — so nothing here fills one in.
+ */
+internal data class IntervalsStreamDto(
+  /** `time`, `distance`, `heartrate`, `altitude`, … */
+  val type: String? = null,
+  val data: List<Double?>? = null,
 )

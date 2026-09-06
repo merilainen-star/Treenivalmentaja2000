@@ -17,6 +17,8 @@ import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
 import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsSplitFetchEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
@@ -34,8 +36,10 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       OuraWorkoutEntity::class,
       IntervalsActivityEntity::class,
       IntervalsWellnessEntity::class,
+      IntervalsRunSplitEntity::class,
+      IntervalsSplitFetchEntity::class,
     ],
-  version = 14,
+  version = 15,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -64,6 +68,17 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
   // old columns stay, because the load immediately after a session is a true and different fact;
   // nothing reads them for the analysis any more.
   //
+  // 14→15 is the run detail every per-session analysis has so far had to apologise for the absence
+  // of. Two nullable columns on `intervals_activities` — the heart-rate zone table and the seconds
+  // spent in each — and two new tables, `intervals_run_splits` for a run's kilometres and
+  // `intervals_split_fetches` for the fact that they were asked for. All additive, so Room writes
+  // it. The splits live in their own table rather than as columns because `intervals_activities` is
+  // rewritten wholesale by every sync and they cost a second request each; the fetch marker is what
+  // keeps a treadmill run with no distance channel from being re-requested forever. Activities
+  // synced before v15 keep everything they had and get nulls and no splits, which the prompts omit
+  // rather than guess at; the ordinary sync window re-fetches the recent past, and the existing
+  // backfill fills the zone columns for older activities on request.
+  //
   // 13→14 is additive again: ten nullable columns on `oura_daily_summaries` for the score
   // contributors — `daily_activity.contributors.recovery_time` and the nine fields of
   // `daily_readiness.contributors` (ADR-014). Rows written before v14 keep their scores and get
@@ -81,6 +96,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 11, to = 12),
       AutoMigration(from = 12, to = 13),
       AutoMigration(from = 13, to = 14),
+      AutoMigration(from = 14, to = 15),
     ],
 )
 @TypeConverters(Converters::class)

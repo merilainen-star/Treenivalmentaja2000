@@ -216,6 +216,15 @@ The order of priority is:
   - `elapsedTimeSec` (Long?)
   - `distanceMeters` (Double?)
   - `avgHeartRate` (Int?), `maxHeartRate` (Int?) — absent without a sensor
+  - `hrZoneUpperBpm` (List<Int>?), `hrZoneSeconds` (List<Int>?) — the athlete's heart-rate zone
+    table **as it stood when this activity was recorded**, and the seconds spent in each zone. Per
+    activity rather than per athlete because a zone table is not a constant: it moves whenever the
+    threshold or maximum is recomputed, and a run from March has to be read against March's zones.
+    Stored through the `Converters` list converter as `123,145,160`, which is the one place in this
+    database a column holds more than one value — five small integers always read and written
+    together, against a child table and a join for the same five numbers. Kept only as a **pair**:
+    a zone table with no times is a setting rather than a measurement, and times that are all zero
+    are a session the strap recorded nothing for
   - `elevationGainMeters` (Double?)
   - `recordingTimeSec` (Long?) — `icu_recording_time`, the total that matches the watch
   - `avgSpeedMps` (Double?) — the watch's own average speed. `distanceMeters / avgSpeedMps` gives
@@ -242,6 +251,33 @@ The order of priority is:
   screen.
 - **Lifecycle:** Synced when Tänään or Viikko opens, over a window that overlaps the previous one
   because an activity can arrive late. Cleared when the API key is removed.
+
+### `intervals_run_splits` — one kilometre of one run
+
+- **Purpose:** What the app computed from a run's recorded streams, so the analysis can say whether
+  a run that averaged 5:35 started calmly and finished calmly or started at 5:00 and fell apart.
+  intervals.icu publishes **no** split endpoint — an activity has one average pace and one average
+  heart rate — so this is the app doing the arithmetic rather than the model guessing at it.
+- **Key:** `activityId` + `splitIndex` (1-based; the first kilometre is 1).
+- **Fields:** `distanceMeters` (Int) — usually 1000, less for a run that did not end on a whole
+  kilometre, and the tail keeps its real length so a fast 600 m is never read as a fast kilometre;
+  `durationSec` (Long); `avgHeartRate` (Int?); `elevationGainMeters` (Int?).
+- **Why its own table:** `intervals_activities` is rewritten wholesale by every sync, and the
+  splits cost a second request each. Anything expensive kept there would be thrown away and
+  re-fetched a fortnight at a time.
+- **No foreign key**, for the reason the Oura tables have none: nothing here cascades, and an
+  orphan row costs a few bytes where a constraint would cost an ordering rule in every writer.
+
+### `intervals_split_fetches` — that the splits were asked for
+
+- **Purpose:** To record the *attempt*, whatever came back. Without it, an activity the streams
+  endpoint has nothing useful for — a treadmill run with no distance channel — would be
+  re-requested on every sync forever and would crowd real runs out of the per-sync budget.
+- **Key:** `activityId`. **Fields:** `splitCount` (Int, zero is a complete and final answer),
+  `fetchedAtUtc` (Long).
+- **Lifecycle:** Written in the same transaction as the splits themselves; a marker without its
+  splits would hide a run's detail permanently, since the marker is exactly what stops the app
+  asking again. Both tables are cleared when the API key is removed.
 
 ## Rescheduling and the session chain
 Moving a session never edits `scheduledDate` in place:

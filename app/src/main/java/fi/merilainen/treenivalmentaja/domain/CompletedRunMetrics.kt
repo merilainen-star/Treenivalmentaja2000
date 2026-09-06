@@ -65,6 +65,21 @@ data class CompletedRunMetrics(
   val ctl: Double? = null,
   /** The recording device, when the source named one. */
   val deviceName: String? = null,
+  /**
+   * How the session's heart rate was distributed, when intervals.icu had a zone table for it.
+   *
+   * `null` rather than an empty distribution when there is nothing to say. See [HeartRateZones]
+   * for why the average alone was never enough.
+   */
+  val heartRateZones: HeartRateZones? = null,
+  /**
+   * The run's kilometres, in order, computed by the app from the recorded streams.
+   *
+   * Empty for anything that is not a recorded outdoor run, and for runs synced before the app
+   * started asking for streams. Empty is not "the run had no splits" so much as "none were
+   * computed", and every reader treats it as an absence rather than as a flat run.
+   */
+  val splits: List<RunSplit> = emptyList(),
 ) {
 
   /**

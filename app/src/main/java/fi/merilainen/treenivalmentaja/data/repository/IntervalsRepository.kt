@@ -5,6 +5,7 @@ import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsMappers
 import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
 import fi.merilainen.treenivalmentaja.domain.DailyTrainingLoad
@@ -12,11 +13,14 @@ import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
 import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.RunSplit
+import fi.merilainen.treenivalmentaja.domain.heartRateZones
+import fi.merilainen.treenivalmentaja.domain.kilometreSplits
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 
 /** What an intervals.icu sync did, in the terms the screen that asked for it needs. */
 sealed interface IntervalsSyncResult {
@@ -72,6 +76,7 @@ class IntervalsRepository internal constructor(
       val rows = IntervalsMappers.toActivities(activities, clock(), zone)
       if (rows.isNotEmpty()) dao.upsertActivities(rows)
       syncWellness(from, to)
+      syncSplits(rows)
       IntervalsSyncResult.Success(activities = rows.size)
     } catch (e: IntervalsException) {
       IntervalsSyncResult.Failure(
@@ -104,6 +109,67 @@ class IntervalsRepository internal constructor(
     val rows = IntervalsMappers.toWellness(days, clock())
     if (rows.isNotEmpty()) dao.upsertWellness(rows)
   }
+
+  /**
+   * Kilometre splits for the runs that do not have them yet — **and, like the wellness series, a
+   * failure here is not a failure of the sync**.
+   *
+   * This is the app doing the arithmetic the model should not have to guess at. intervals.icu
+   * publishes no split endpoint: an activity has one average pace and one average heart rate, so
+   * every analysis this app has produced has had to say it could not tell a run that started calmly
+   * and finished calmly from one that started fast and fell apart. The recorded streams contain the
+   * answer, and [kilometreSplits] turns them into it.
+   *
+   * **One request per run, and a budget.** Streams are the only part of this integration that costs
+   * a request per activity rather than per window, so the work is rationed: only runs, only ones
+   * long enough to have a split, newest first, and at most [MAX_SPLIT_FETCHES_PER_SYNC] of them.
+   * A fortnight rarely contains more; a first sync after a long absence catches up over the next
+   * few. Every attempt is recorded whether or not it produced anything, so a treadmill run with no
+   * distance channel is asked about once and then left alone.
+   *
+   * A failure stops the walk rather than the sync — the connection is probably gone, and the
+   * remaining runs will be picked up next time.
+   */
+  private suspend fun syncSplits(activities: List<IntervalsActivityEntity>) {
+    val already = dao.splitFetchedActivityIds().toSet()
+    val candidates =
+      activities
+        .filter { it.id !in already && it.looksLikeARunWithSplits() }
+        .sortedByDescending { it.startTimeUtc }
+        .take(MAX_SPLIT_FETCHES_PER_SYNC)
+    for (activity in candidates) {
+      val streams =
+        try {
+          IntervalsMappers.toStreams(client.streams(activity.id))
+        } catch (e: IntervalsException) {
+          return
+        }
+      val splits =
+        kilometreSplits(
+          timeSec = streams[STREAM_TIME].orEmpty(),
+          distanceMeters = streams[STREAM_DISTANCE].orEmpty(),
+          heartRate = streams[STREAM_HEART_RATE],
+          altitude = streams[STREAM_ALTITUDE],
+        )
+      dao.replaceSplits(
+        activityId = activity.id,
+        splits = IntervalsMappers.toSplitRows(activity.id, splits),
+        fetchedAtUtc = clock(),
+      )
+    }
+  }
+
+  /**
+   * Whether asking for this activity's streams could produce splits at all.
+   *
+   * A kilometre of distance and a sport whose name contains `run`: `Run`, `TrailRun`,
+   * `VirtualRun`. Walks and rides are excluded not because their streams are worse but because
+   * nothing in this app reads a walk kilometre by kilometre, and every excluded activity is a
+   * request not made.
+   */
+  private fun IntervalsActivityEntity.looksLikeARunWithSplits(): Boolean =
+    sportType.contains("run", ignoreCase = true) &&
+      (distanceMeters ?: 0.0) >= MINIMUM_METRES_FOR_SPLITS
 
   /**
    * The athlete's training load as it stands on a date — fitness, fatigue, and the gap between them.
@@ -250,13 +316,18 @@ class IntervalsRepository internal constructor(
    * the gym.
    */
   fun observeMatchedRunMetrics(): Flow<Map<String, CompletedRunMetrics>> =
-    dao.observeMatchedActivities().map { rows ->
+    combine(dao.observeMatchedActivities(), dao.observeMatchedSplits()) { rows, splitRows ->
+      val splitsByActivity = splitRows.groupBy { it.activityId }
       rows
         .groupBy { it.matchedSessionId!! }
-        .mapValues { (_, forSession) -> forSession.maxBy { it.movingTimeSec }.toMetrics() }
+        .mapValues { (_, forSession) ->
+          val activity = forSession.maxBy { it.movingTimeSec }
+          activity.toMetrics(splitsByActivity[activity.id].orEmpty())
+        }
     }
 
-  private companion object {
+  /** `internal` rather than private so the sync budget is a constant the tests can name. */
+  internal companion object {
     /**
      * Far past any real training history, and low enough that a service answering oddly ends the
      * walk rather than looping. Twenty years of requests is twenty requests.
@@ -265,10 +336,29 @@ class IntervalsRepository internal constructor(
 
     /** One empty year is a season off; two is the end of the history. */
     const val EMPTY_YEARS_BEFORE_STOPPING = 2
+
+    /**
+     * How many stream requests one sync may make.
+     *
+     * Six covers a fortnight of running for anyone this app is for, and bounds the cost of a first
+     * sync: the rest arrive over the following syncs rather than in one long stall on a phone
+     * connection.
+     */
+    const val MAX_SPLIT_FETCHES_PER_SYNC = 6
+
+    /** Below a kilometre there is no split to compute, only a tail. */
+    const val MINIMUM_METRES_FOR_SPLITS = 1000.0
+
+    const val STREAM_TIME = "time"
+    const val STREAM_DISTANCE = "distance"
+    const val STREAM_HEART_RATE = "heartrate"
+    const val STREAM_ALTITUDE = "altitude"
   }
 }
 
-private fun IntervalsActivityEntity.toMetrics(): CompletedRunMetrics =
+private fun IntervalsActivityEntity.toMetrics(
+  splitRows: List<IntervalsRunSplitEntity> = emptyList()
+): CompletedRunMetrics =
   CompletedRunMetrics(
     activityId = id,
     sportType = sportType,
@@ -290,4 +380,19 @@ private fun IntervalsActivityEntity.toMetrics(): CompletedRunMetrics =
     atl = atl,
     ctl = ctl,
     deviceName = deviceName,
+    heartRateZones = heartRateZones(hrZoneUpperBpm, hrZoneSeconds),
+    // Sorted here rather than trusted from the query, because the order is the meaning: split 3
+    // read as split 1 would turn a run that started calmly into one that did not.
+    splits =
+      splitRows
+        .sortedBy { it.splitIndex }
+        .map {
+          RunSplit(
+            index = it.splitIndex,
+            distanceMeters = it.distanceMeters,
+            durationSec = it.durationSec,
+            avgHeartRate = it.avgHeartRate,
+            elevationGainMeters = it.elevationGainMeters,
+          )
+        },
   )

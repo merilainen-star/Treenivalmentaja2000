@@ -1,6 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
+import fi.merilainen.treenivalmentaja.domain.RunSplit
 import fi.merilainen.treenivalmentaja.domain.formatDuration
 import kotlin.math.roundToInt
 import java.time.ZoneId
@@ -415,6 +416,93 @@ class IntervalsMappersTest {
 
     assertEquals(339, movingOnly.paceSecPerKm)
     assertEquals("5:39 /km", movingOnly.paceText)
+  }
+
+  // --------------------------------------------------------- zones, streams and splits
+
+  private fun zoneRow(zones: List<Int>?, times: List<Int>?) =
+    IntervalsMappers.toActivities(
+        listOf(
+          IntervalsActivityDto(
+            id = "i9",
+            type = "Run",
+            startDate = "2026-08-15T05:12:03Z",
+            movingTime = 2700,
+            icuHrZones = zones,
+            icuHrZoneTimes = times,
+          )
+        ),
+        fetchedAtUtc = 0,
+        zone = helsinki,
+      )
+      .single()
+
+  @Test
+  fun `the zone table and its times are stored together`() {
+    val row = zoneRow(listOf(123, 145, 160), listOf(240, 1800, 660))
+
+    assertEquals(listOf(123, 145, 160), row.hrZoneUpperBpm)
+    assertEquals(listOf(240, 1800, 660), row.hrZoneSeconds)
+  }
+
+  /** A zone table with no times is a setting, not a measurement of this session. */
+  @Test
+  fun `a zone table with no times is not stored`() {
+    val row = zoneRow(listOf(123, 145, 160), null)
+
+    assertNull(row.hrZoneUpperBpm)
+    assertNull(row.hrZoneSeconds)
+  }
+
+  @Test
+  fun `all-zero times are a session the strap recorded nothing for`() {
+    val row = zoneRow(listOf(123, 145, 160), listOf(0, 0, 0))
+
+    assertNull(row.hrZoneUpperBpm)
+    assertNull(row.hrZoneSeconds)
+  }
+
+  @Test
+  fun `times without a zone table are still stored, because they still say something`() {
+    val row = zoneRow(null, listOf(240, 1800, 660))
+
+    assertNull(row.hrZoneUpperBpm)
+    assertEquals(listOf(240, 1800, 660), row.hrZoneSeconds)
+  }
+
+  @Test
+  fun `streams are addressed by name, and an empty channel is the same as an absent one`() {
+    val streams =
+      IntervalsMappers.toStreams(
+        listOf(
+          IntervalsStreamDto(type = "distance", data = listOf(0.0, 1.0)),
+          IntervalsStreamDto(type = "time", data = listOf(0.0, 1.0)),
+          IntervalsStreamDto(type = "heartrate", data = emptyList()),
+          IntervalsStreamDto(type = null, data = listOf(0.0)),
+        )
+      )
+
+    assertEquals(setOf("distance", "time"), streams.keys)
+    assertNull(streams["heartrate"])
+  }
+
+  @Test
+  fun `splits become rows keyed on the activity`() {
+    val rows =
+      IntervalsMappers.toSplitRows(
+        "i9",
+        listOf(
+          RunSplit(1, 1000, 350, avgHeartRate = 132, elevationGainMeters = 8),
+          RunSplit(2, 620, 200),
+        ),
+      )
+
+    assertEquals(2, rows.size)
+    assertEquals("i9", rows[0].activityId)
+    assertEquals(1, rows[0].splitIndex)
+    assertEquals(132, rows[0].avgHeartRate)
+    assertEquals(620, rows[1].distanceMeters)
+    assertNull(rows[1].elevationGainMeters)
   }
 
   private fun metrics(movingTimeSec: Long, distanceKm: Double?) =

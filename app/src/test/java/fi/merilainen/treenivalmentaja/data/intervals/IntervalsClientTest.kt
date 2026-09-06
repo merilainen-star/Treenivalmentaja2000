@@ -96,6 +96,60 @@ class IntervalsClientTest {
     assertTrue(query, query.contains("fields="))
     assertTrue(query, query.contains("icu_training_load"))
     assertTrue(query, query.contains("moving_time"))
+    assertTrue(query, query.contains("icu_hr_zone_times"))
+    assertTrue(query, query.contains("icu_hr_zones"))
+  }
+
+  @Test
+  fun `the streams request names the activity and only the four channels the splits need`() =
+    runTest {
+      body = "[]"
+
+      client().streams("i84461234")
+
+      assertEquals("/api/v1/activity/i84461234/streams", lastPath)
+      val query = lastQuery!!
+      assertTrue(query, query.contains("types=time,distance,heartrate,altitude"))
+      // Left off deliberately: nothing should arrive that was not named.
+      assertFalse(query, query.contains("includeDefaults"))
+    }
+
+  /**
+   * The one shape in this integration read off the wire rather than out of the specification, which
+   * types a stream's `data` as a bare `object`. This is the fixture that says what was seen.
+   */
+  @Test
+  fun `streams are parsed as parallel arrays of samples`() = runTest {
+    body =
+      """
+      [
+        {"type":"time","data":[0,1,2]},
+        {"type":"distance","data":[0.0,3.1,6.2]},
+        {"type":"heartrate","data":[128,null,131]}
+      ]
+      """
+        .trimIndent()
+
+    val streams = client().streams("i1")
+
+    assertEquals(3, streams.size)
+    assertEquals(listOf(0.0, 3.1, 6.2), streams.single { it.type == "distance" }.data)
+    // A strap that dropped out leaves a hole, and it has to survive as one.
+    assertEquals(listOf(128.0, null, 131.0), streams.single { it.type == "heartrate" }.data)
+  }
+
+  /**
+   * A `data` that is not an array — the shape the specification actually declares — must fail as an
+   * unreadable body, so the caller can treat it as "no splits" instead of crashing a sync.
+   */
+  @Test
+  fun `a streams body of an unexpected shape is an unreadable response`() = runTest {
+    body = """[{"type":"time","data":{"0":1}}]"""
+
+    val thrown = runCatching { client().streams("i1") }.exceptionOrNull()
+
+    assertTrue(thrown.toString(), thrown is IntervalsUnavailableException)
+    assertTrue((thrown as IntervalsException).canRetry)
   }
 
   // ------------------------------------------------------------------ the response

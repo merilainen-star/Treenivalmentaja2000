@@ -130,6 +130,8 @@ class AnalysisPromptBuilder {
       appendLine("## Toteutunut (kello, Intervals.icu)")
       watch.forEach { appendLine("- $it") }
       appendLine()
+      appendZones(r.heartRateZones)
+      appendSplits(r.splits)
     }
 
     appendRecovery(
@@ -500,6 +502,62 @@ class AnalysisPromptBuilder {
     appendLine(heading)
     appendLine("- $day: ${parts.joinToString(", ")}")
     if (recovery.activityRecoveryTime != null) appendLine(RECOVERY_TIME_NOTE)
+    appendLine()
+  }
+
+  /**
+   * How the session's heart rate was distributed, zone by zone.
+   *
+   * **The section every analysis so far has asked for and not had.** An average hides its own
+   * composition: thirty minutes at 130 with ten at 175 averages to the same number as forty at 141,
+   * and only one of those is the easy run that was planned. The answers that used to read "en voi
+   * arvioida tehon jakautumista" are answerable from these five lines.
+   *
+   * The zones' beat ranges are written out beside the times, because the model is being asked to
+   * judge whether an easy run stayed easy and cannot do that against zone numbers alone — this
+   * athlete's Z2 is not a constant, and intervals.icu recomputes it whenever the threshold moves.
+   * Rule 2 in the class doc, applied to a unit that happens to be a range.
+   *
+   * Zones with no time in them are written as `0:00 (0 %)` rather than omitted: an empty Z4 on a
+   * run that was supposed to have one is a finding, and a missing line is not.
+   */
+  private fun StringBuilder.appendZones(zones: HeartRateZones?) {
+    if (zones == null || zones.zones.isEmpty()) return
+    appendLine("## Sykealueet (aika kullakin alueella)")
+    zones.zones.forEach { zone ->
+      val share = zones.percentOf(zone)?.let { " ($it %)" }.orEmpty()
+      appendLine("- ${zones.label(zone)}: ${zone.seconds.formatDuration()}$share")
+    }
+    appendLine()
+  }
+
+  /**
+   * The run kilometre by kilometre.
+   *
+   * This is the other half of the same gap. A pasted analysis said it in as many words —
+   * "Kierrosjakojen puuttuessa rauhallisen alun ja lopun toteutumista ei voi varmistaa" — and it was
+   * right: one average pace cannot distinguish a run that started calmly and finished calmly from
+   * one that started fast and fell apart. intervals.icu publishes no split endpoint, so the app
+   * computes these from the recorded streams; see [kilometreSplits].
+   *
+   * The last split is usually short, and it says so on its own line. A 600-metre tail run at 5:12
+   * is a real pace over a real distance, but presented as a kilometre it would be a faster finish
+   * than actually happened.
+   */
+  private fun StringBuilder.appendSplits(splits: List<RunSplit>) {
+    if (splits.isEmpty()) return
+    appendLine("## Kilometrijaot (sovelluksen laskemat)")
+    splits.forEach { split ->
+      val parts = buildList {
+        split.paceText?.let { add("$it /km") }
+        split.avgHeartRate?.let { add("syke $it") }
+        split.elevationGainMeters?.let { add("nousu $it m") }
+      }
+      val label =
+        if (split.isPartial) "${split.index}. osuus (${split.distanceMeters} m)"
+        else "${split.index} km"
+      appendLine("- $label: ${parts.joinToString(", ")}")
+    }
     appendLine()
   }
 

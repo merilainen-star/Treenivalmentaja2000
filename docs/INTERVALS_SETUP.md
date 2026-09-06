@@ -47,9 +47,17 @@ whether a key is stored.
 ## What the app reads, and what happens next
 
 Opening the Tänään or Viikko screen fetches the last two weeks of activities. For each one the app
-keeps eighteen fields — sport, start, moving and elapsed time, distance, heart rate, cadence,
-elevation, calories, and intervals.icu's own training load and intensity — out of the 183 the API
-offers, named explicitly in the request so the rest are never sent.
+keeps twenty-seven fields — sport, start, moving and elapsed time, distance, heart rate, the
+heart-rate zone table and the time spent in each zone, cadence, elevation, calories, and
+intervals.icu's own training load and intensity — out of the 183 the API offers, named explicitly
+in the request so the rest are never sent.
+
+For each **run** of a kilometre or more it then makes one further request, for the recording itself,
+and reduces it on the device to a line per kilometre: pace, average heart rate, metres climbed.
+intervals.icu publishes no splits of its own, and one average pace cannot say whether a run started
+calmly and finished calmly. The recording is not kept — it is read once and discarded. At most six
+runs per sync are fetched this way, and a run that yields nothing is asked about once and then left
+alone.
 
 An activity lands under the planned session nearest it in time on the same day, through the **same**
 matcher Oura's workouts go through: the sport has to fit, so a `Run` can claim a running session and
@@ -91,7 +99,7 @@ how to find out what intervals.icu actually returned.
 
 Two things it does differently from the ordinary sync:
 
-- **No `fields` parameter.** The sync names eighteen fields and gets eighteen back; this asks for
+- **No `fields` parameter.** The sync names twenty-seven fields and gets twenty-seven back; this asks for
   none and gets all 183 per activity. A week is used rather than a fortnight, because that is
   already a long document.
 - **Nothing is stored.** The response is held in memory for as long as the sheet is open and
@@ -112,12 +120,15 @@ or logged.
   activity can reach intervals.icu late. Rows are keyed on intervals.icu's own activity id, so a
   re-fetched activity rewrites its own row instead of appearing twice. Nothing compares start times
   or distances to guess whether two records are the same activity.
-- **Rate limits.** The app spends one request per sync. If intervals.icu ever answers `429` with a
-  `Retry-After`, the app carries that number rather than inventing one.
+- **Rate limits.** The app spends one request per sync, plus the wellness series, plus at most six
+  stream requests for runs whose kilometres it has not computed yet. If intervals.icu ever answers
+  `429` with a `Retry-After`, the app carries that number rather than inventing one.
 - **Täydennä koko historia** re-reads everything, a year at a time, stopping after two empty years.
   Worth pressing after an app update that adds new fields: the ordinary sync only reaches back a
   fortnight, so older activities would otherwise keep a blank where the new field should be. Safe to
-  press repeatedly — activities are keyed on their intervals.icu id, so nothing duplicates.
+  press repeatedly — activities are keyed on their intervals.icu id, so nothing duplicates. It does
+  **not** fetch the per-kilometre recordings: that is a request per run, and twenty years of them is
+  not something to start by pressing a button. Those arrive six at a time through the ordinary sync.
 - **Removing the key** (*Poista avain*) deletes it and the cached activities from the phone. Your
   training plan is untouched.
 - Activities uploaded by hand are read too — the app records where each came from (`SUUNTO`,

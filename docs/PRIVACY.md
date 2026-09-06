@@ -39,10 +39,15 @@ of them, and a key stored for a provider you are not using is never sent anywher
   variability, lowest heart rate and average heart rate; and completed workouts, for the days the
   app has fetched. Stored so the app works offline.
 - **Activity data from intervals.icu, cached** — your activities for the days the app has fetched: sport, start time,
-  moving and elapsed time, distance, heart rate, elevation gain, calories and training load; plus
+  moving and elapsed time, distance, heart rate, elevation gain, calories and training load; your
+  **heart-rate zone table and the time you spent in each zone** on those activities; **each run
+  broken into kilometres** — pace, average heart rate and climb per kilometre, computed on the
+  device from the recording intervals.icu holds; plus
   your **daily fitness and fatigue figures** (CTL, ATL) for those days. Stored so the app works
   offline. The app does **not** read the heart-rate, resting-heart-rate or sleep fields that
-  intervals.icu also holds — Oura is the source for those.
+  intervals.icu also holds — Oura is the source for those. The second-by-second recording a run's
+  kilometres are computed from is **not** kept: it is read once, reduced to those few lines per
+  run, and discarded.
 - **Your Oura tokens and Oura application's Client ID and Secret, your intervals.icu API key, and
   any AI provider API keys you have entered (Anthropic, OpenAI, Google)** — encrypted with
   AES-256-GCM under keys held in the Android Keystore, which cannot be extracted from the device.

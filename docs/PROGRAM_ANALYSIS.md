@@ -188,6 +188,7 @@ the one the person read.
 | 5 | The report table and schema migration | planned |
 | 6 | ~~Richer post-session feedback fields~~ — dropped, see below | **not doing** |
 | 7 | "Mitä seuraavaksi", the goal picker and plan generation | **built** |
+| 8 | Heart-rate zones and app-computed kilometre splits | **built** |
 
 Slices 1 and 2 are the ones the principle at the top is about, and they are the ones the rest
 cannot be written without.
@@ -230,9 +231,44 @@ Everything the aggregate needs already exists in the data layer, with one gap:
 - Run measurements → `IntervalsRepository`, matched to sessions by `matchedSessionId`
 - Recovery → `OuraRepository`
 
-**The gap is heart-rate zones.** The owner asked for them; intervals.icu publishes
-`icu_hr_zone_times` on an activity, and this app has never fetched it, so no stored session has
-them. Adding them means a DTO field, a column, a migration and a mapper — worth doing, and out of
-the first slices rather than smuggled into them. Until then the aggregate carries average and
-maximum heart rate, which supports the pace-against-heart-rate comparison the owner actually
-described; a zone distribution would add the shape of a session, not its trend.
+**The gap was heart-rate zones and lap splits, and slice 8 closed it.** The owner asked for both,
+twice: the per-session analyses kept saying they could not judge the effort properly, one of them
+in as many words — *"Kierrosjakojen puuttuessa rauhallisen alun ja lopun toteutumista ei voi
+varmistaa."*
+
+- **Zones** come free with the activities request. intervals.icu publishes `icu_hr_zones` (the
+  upper beat bound of each zone) and `icu_hr_zone_times` (the seconds in each) on the activity
+  itself, so it costs two entries on the `fields` line and two nullable columns. Both are stored
+  per activity rather than per athlete, because a zone table is not a constant — it moves whenever
+  the threshold is recomputed, and a run from March has to be read against March's zones.
+- **Splits do not exist as an endpoint.** intervals.icu publishes no per-kilometre data: an
+  activity has one average pace and one average heart rate, and `icu_intervals` is its *detected*
+  interval structure, which on a steady run is one block. So the app computes the splits itself
+  from the recorded streams — `time`, `distance`, `heartrate`, `altitude` — which is the principle
+  at the top of this document applied to the one measurement that most needed it. The kilometre
+  mark is interpolated between the samples that straddle it rather than charged to whichever
+  sample lands past it; at one sample a second that is worth up to three seconds a kilometre.
+
+Streams are the only per-activity request in the integration, so the sync rations them: runs only,
+a kilometre or more, newest first, six per sync, and **every attempt is recorded whether or not it
+produced anything** — otherwise a treadmill run with no distance channel would be re-requested
+forever and would crowd real runs out of the budget.
+
+Where each lands:
+
+| | Per-session prompt | Whole-programme prompt |
+| --- | --- | --- |
+| Zones | every zone, its beat range, its time and its share | totals per planned intensity |
+| Splits | every kilometre: pace, heart rate, climb | not sent |
+
+Splits are deliberately absent from the programme report. Forty runs at ten lines each is four
+hundred lines to answer a question the per-intensity zone totals answer in twenty. What the
+programme report gains instead is the one comparison no summary figure could make: **whether the
+easy days were actually easy.** A block of easy runs averaging 148 bpm might be eight easy runs, or
+six easy ones and two that were raced, and the averages cannot tell those apart.
+
+Two things are refused rather than guessed at. A run the strap recorded nothing for is counted out
+of the group entirely, not folded in as zeros — that would make every group look easier than it
+was. And where the zone table moved mid-programme, the beat ranges are dropped and only the zone
+numbers are quoted, because a range that was true in week 1 and false in week 7 is a fabricated
+fact about half the runs.

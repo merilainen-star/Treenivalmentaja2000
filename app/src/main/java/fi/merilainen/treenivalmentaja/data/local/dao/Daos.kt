@@ -4,10 +4,13 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsSplitFetchEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.SessionEventEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.TrainingPlanEntity
@@ -248,4 +251,56 @@ interface IntervalsDao {
   @Query("DELETE FROM intervals_wellness") suspend fun clearWellness()
 
   @Query("DELETE FROM intervals_activities") suspend fun clearActivities()
+
+  // ---------------------------------------------------------------- kilometre splits
+
+  /**
+   * Replaces one activity's splits and records that they were fetched, in one transaction.
+   *
+   * The two writes belong together: a fetch marker without its splits would hide a run's detail
+   * permanently, since the marker is exactly what stops the app asking again. [splits] may be
+   * empty — that is the case the marker exists for.
+   */
+  @Transaction
+  suspend fun replaceSplits(
+    activityId: String,
+    splits: List<IntervalsRunSplitEntity>,
+    fetchedAtUtc: Long,
+  ) {
+    deleteSplits(activityId)
+    if (splits.isNotEmpty()) upsertSplits(splits)
+    upsertSplitFetch(
+      IntervalsSplitFetchEntity(
+        activityId = activityId,
+        splitCount = splits.size,
+        fetchedAtUtc = fetchedAtUtc,
+      )
+    )
+  }
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertSplits(splits: List<IntervalsRunSplitEntity>)
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertSplitFetch(fetch: IntervalsSplitFetchEntity)
+
+  @Query("DELETE FROM intervals_run_splits WHERE activityId = :activityId")
+  suspend fun deleteSplits(activityId: String)
+
+  /** Which activities have already been asked about — successfully or not. See the entity. */
+  @Query("SELECT activityId FROM intervals_split_fetches")
+  suspend fun splitFetchedActivityIds(): List<String>
+
+  /** Every split of every activity tied to a session, for the screens and the prompts. */
+  @Query(
+    "SELECT s.* FROM intervals_run_splits s " +
+      "INNER JOIN intervals_activities a ON a.id = s.activityId " +
+      "WHERE a.matchedSessionId IS NOT NULL " +
+      "ORDER BY s.activityId, s.splitIndex"
+  )
+  fun observeMatchedSplits(): Flow<List<IntervalsRunSplitEntity>>
+
+  @Query("DELETE FROM intervals_run_splits") suspend fun clearSplits()
+
+  @Query("DELETE FROM intervals_split_fetches") suspend fun clearSplitFetches()
 }

@@ -27,6 +27,13 @@ data class TrainingProgramAnalysis(
   /** One per planned intensity that had enough runs to compare. See [ProgramRunTrend]. */
   val runTrends: List<ProgramRunTrend>,
   /**
+   * Where the effort actually went, by planned intensity. See [ProgramZoneSplit].
+   *
+   * Empty when no run in the programme carried a zone distribution — runs synced before the app
+   * asked for one, or a watch with no heart-rate strap.
+   */
+  val zoneSplits: List<ProgramZoneSplit>,
+  /**
    * Run groups that could not be compared, and how many runs they had.
    *
    * Reported rather than dropped: "there were three easy runs, which is too few to call a trend" is
@@ -121,6 +128,54 @@ data class ProgramRun(
   val rpe: Int?,
   val feel: String?,
 )
+
+/**
+ * Total time in each heart-rate zone across the runs of one planned intensity.
+ *
+ * **The measurement that says whether the programme was run as written.** A block of easy runs that
+ * averaged 148 bpm might be eight easy runs, or six easy runs and two that were raced; the averages
+ * cannot tell those apart and this can. It is also the honest way to answer the commonest question
+ * about a training block — "was I doing the easy days easy" — which no summary figure has ever been
+ * able to answer.
+ *
+ * Aggregated **by zone number**, and the beat ranges are kept only where every contributing run
+ * agreed on them. Zones move when the athlete's threshold is recomputed, and a range that was true
+ * in week 1 and false in week 7 would be a fabricated fact about half the runs. See
+ * [ProgramZoneTotal.label].
+ */
+data class ProgramZoneSplit(
+  val intensity: Intensity?,
+  /** How many runs contributed. Fewer than the group's total when some carried no zone data. */
+  val runs: Int,
+  val zones: List<ProgramZoneTotal>,
+) {
+
+  val totalSeconds: Long
+    get() = zones.sumOf { it.seconds }
+
+  /** That zone's share of the group, 0–100. `null` when the group recorded no time at all. */
+  fun percentOf(zone: ProgramZoneTotal): Int? {
+    val total = totalSeconds
+    if (total <= 0L) return null
+    return (zone.seconds * 100.0 / total).roundToInt()
+  }
+}
+
+/** One zone's total across a group of runs. */
+data class ProgramZoneTotal(
+  val zone: Int,
+  /**
+   * The beat range, when every run in the group had the same one — `124–145`, or `–123` for the
+   * bottom zone. `null` when the zone table moved during the programme, which is a real event and
+   * not a reason to quote one week's numbers over another's.
+   */
+  val bpmRange: String?,
+  val seconds: Long,
+) {
+  /** `Z2 (124–145)`, or `Z2` when the range could not be stated. */
+  val label: String
+    get() = bpmRange?.let { "Z$zone ($it)" } ?: "Z$zone"
+}
 
 /**
  * The first half of a group of runs against the second half.
@@ -303,6 +358,7 @@ fun buildProgramAnalysis(
     weeks = weeksOf(records),
     runs = completedRuns,
     runTrends = trends.sortedBy { it.intensity?.ordinal ?: Int.MAX_VALUE },
+    zoneSplits = zoneSplitsOf(records),
     runGroupsTooSmall = tooSmall,
     strength = strengthOf(records),
     feedback = feedbackOf(records),
@@ -377,6 +433,44 @@ private fun ProgramSessionRecord.durationMinutes(): Int? =
   run?.primaryDurationSec?.let { (it / 60).toInt() }
     ?: oura?.durationMin
     ?: session.durationMin?.takeIf { it > 0 }
+
+/**
+ * Adds up the zone times of every completed run that carried them, grouped by planned intensity.
+ *
+ * Runs without a zone distribution are counted out entirely rather than treated as zeros: a run the
+ * strap did not record is not a run spent in Z1, and folding it in as one would make every group
+ * look easier than it was. A group where no run carried zones produces no entry at all.
+ *
+ * The beat range for a zone survives only if every contributing run agreed on it — see
+ * [ProgramZoneTotal.bpmRange].
+ */
+private fun zoneSplitsOf(records: List<ProgramSessionRecord>): List<ProgramZoneSplit> =
+  records
+    .filter { it.session.type == WorkoutType.RUNNING && it.session.status == SessionStatus.COMPLETED }
+    .mapNotNull { record -> record.run?.heartRateZones?.let { record.session.intensity to it } }
+    .groupBy({ it.first }, { it.second })
+    .mapNotNull { (intensity, distributions) ->
+      val zoneCount = distributions.maxOf { it.zones.size }
+      if (zoneCount == 0) return@mapNotNull null
+      val totals =
+        (1..zoneCount).map { number ->
+          val entries = distributions.mapNotNull { it.zones.getOrNull(number - 1) }
+          val ranges = entries.map { bpmRange(it) }.distinct()
+          ProgramZoneTotal(
+            zone = number,
+            bpmRange = ranges.singleOrNull(),
+            seconds = entries.sumOf { it.seconds },
+          )
+        }
+      ProgramZoneSplit(intensity = intensity, runs = distributions.size, zones = totals)
+    }
+    .sortedBy { it.intensity?.ordinal ?: Int.MAX_VALUE }
+
+private fun bpmRange(zone: HeartRateZoneTime): String? {
+  val high = zone.highBpm ?: return null
+  val low = zone.lowBpm
+  return if (low == null) "–$high" else "$low–$high"
+}
 
 private fun ProgramSessionRecord.toProgramRun(): ProgramRun? {
   val date = date() ?: return null

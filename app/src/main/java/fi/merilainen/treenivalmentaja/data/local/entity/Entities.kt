@@ -195,6 +195,17 @@ data class IntervalsActivityEntity(
   val maxSpeedMps: Double? = null,
   val avgHeartRate: Int? = null,
   val maxHeartRate: Int? = null,
+  /**
+   * The athlete's heart-rate zone upper bounds when this activity was recorded, ascending.
+   *
+   * Stored per activity rather than per athlete because a zone table is not a constant: it moves
+   * whenever the threshold or maximum is recomputed, and a run from March has to be read against
+   * March's zones. Held as `12,3` text through the [Converters] list converter — five small
+   * integers in one column, against a child table and a join for the same five numbers.
+   */
+  val hrZoneUpperBpm: List<Int>? = null,
+  /** Seconds in each zone, in the same order as [hrZoneUpperBpm]. */
+  val hrZoneSeconds: List<Int>? = null,
   /** **Cycles** per minute as the service sent it — one leg. Doubled at display, not here. */
   val avgCadence: Int? = null,
   val elevationGainMeters: Double? = null,
@@ -230,6 +241,45 @@ data class IntervalsActivityEntity(
   val deviceName: String? = null,
   /** The planned session this activity answers, decided by the matcher — never by intervals.icu. */
   val matchedSessionId: String? = null,
+  val fetchedAtUtc: Long,
+)
+
+/**
+ * One kilometre of one recorded run.
+ *
+ * **Its own table, and not a column on the activity.** The splits are computed from the streams
+ * endpoint, which is a second request per activity; the activities table is rewritten wholesale by
+ * every sync, so anything expensive kept there would be thrown away and re-fetched a fortnight at a
+ * time. Here it survives, keyed on intervals.icu's own activity id.
+ *
+ * There is no foreign key to `intervals_activities` for the same reason the Oura tables have none:
+ * nothing in this database cascades, and an orphan row costs a few bytes where a constraint would
+ * cost an ordering rule in every writer.
+ */
+@Entity(tableName = "intervals_run_splits", primaryKeys = ["activityId", "splitIndex"])
+data class IntervalsRunSplitEntity(
+  val activityId: String,
+  /** 1-based. The first kilometre is 1. */
+  val splitIndex: Int,
+  /** Usually 1000. Less for the last split of a run that did not end on a whole kilometre. */
+  val distanceMeters: Int,
+  val durationSec: Long,
+  val avgHeartRate: Int? = null,
+  val elevationGainMeters: Int? = null,
+)
+
+/**
+ * That the splits for an activity were **asked for**, whatever came back.
+ *
+ * Without this, an activity the streams endpoint has nothing useful for — a treadmill run with no
+ * distance channel, a walk recorded without GPS — would be re-requested on every sync forever, and
+ * would crowd real runs out of the per-sync request budget. [splitCount] of zero is a complete and
+ * final answer, recorded as one.
+ */
+@Entity(tableName = "intervals_split_fetches")
+data class IntervalsSplitFetchEntity(
+  @PrimaryKey val activityId: String,
+  val splitCount: Int,
   val fetchedAtUtc: Long,
 )
 

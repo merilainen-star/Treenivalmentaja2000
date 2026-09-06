@@ -1,7 +1,10 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
+import fi.merilainen.treenivalmentaja.domain.RunSplit
+import fi.merilainen.treenivalmentaja.domain.kilometreSplits
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -49,6 +52,11 @@ internal object IntervalsMappers {
       distanceMeters = icuDistance?.takeIf { it > 0.0 } ?: distance?.takeIf { it > 0.0 },
       avgHeartRate = averageHeartrate?.takeIf { it > 0 },
       maxHeartRate = maxHeartrate?.takeIf { it > 0 },
+      // Kept only as a pair, and only when it says something: a zone table with no times is a
+      // setting rather than a measurement, and times that are all zero are a session the strap
+      // recorded nothing for. Either alone would read on screen as a distribution.
+      hrZoneUpperBpm = icuHrZones?.takeIf { it.isNotEmpty() && hasZoneTimes() },
+      hrZoneSeconds = icuHrZoneTimes?.takeIf { hasZoneTimes() },
       avgCadence = averageCadence?.takeIf { it > 0.0 }?.roundToInt(),
       // A flat run reports 0.0, and "nousu 0 m" on screen is noise rather than a measurement.
       elevationGainMeters = totalElevationGain?.takeIf { it > 0.0 },
@@ -65,6 +73,40 @@ internal object IntervalsMappers {
       fetchedAtUtc = fetchedAtUtc,
     )
   }
+
+  /** Times exist and at least one is non-zero — see the zone columns on the entity. */
+  private fun IntervalsActivityDto.hasZoneTimes(): Boolean =
+    icuHrZoneTimes?.any { it > 0 } == true
+
+  /**
+   * The streams response as channels addressed by name.
+   *
+   * intervals.icu returns whatever the recording had, in whatever order, so nothing here assumes a
+   * position. A channel that arrived with no samples is dropped: an empty array and an absent one
+   * mean the same thing to the split calculation, and collapsing them keeps that decision in one
+   * place.
+   */
+  fun toStreams(streams: List<IntervalsStreamDto>): Map<String, List<Double?>> =
+    streams
+      .mapNotNull { stream ->
+        val type = stream.type?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val data = stream.data?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+        type to data
+      }
+      .toMap()
+
+  /** Splits as rows. Pure renaming — the arithmetic happened in [kilometreSplits]. */
+  fun toSplitRows(activityId: String, splits: List<RunSplit>): List<IntervalsRunSplitEntity> =
+    splits.map {
+      IntervalsRunSplitEntity(
+        activityId = activityId,
+        splitIndex = it.index,
+        distanceMeters = it.distanceMeters,
+        durationSec = it.durationSec,
+        avgHeartRate = it.avgHeartRate,
+        elevationGainMeters = it.elevationGainMeters,
+      )
+    }
 
   /**
    * When the activity started, as epoch millis.

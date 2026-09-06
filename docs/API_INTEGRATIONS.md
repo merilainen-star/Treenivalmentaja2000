@@ -256,8 +256,8 @@ which is one fewer thing to get wrong than either of the other two APIs this app
 
 ### The fields this app reads
 
-Fifteen, of the **183** the `Activity` schema declares. They are named in `fields` so the rest are
-never sent.
+Twenty-seven, of the **183** the `Activity` schema declares. They are named in `fields` so the rest
+are never sent.
 
 | Field | Notes |
 | --- | --- |
@@ -268,6 +268,8 @@ never sent.
 | `moving_time`, `elapsed_time` | Seconds. **Pace is computed from `moving_time`** — a pause at a crossing is not part of how fast the running was. |
 | `distance` | Metres. |
 | `average_heartrate`, `max_heartrate` | Integers here, unlike Strava's doubles. |
+| `icu_hr_zones` | The athlete's zone **upper bounds** in bpm, ascending, as they stood for this activity. A zone's floor is the previous entry plus one. |
+| `icu_hr_zone_times` | Seconds in each zone, parallel to `icu_hr_zones`. What turns "keskisyke 148" into an answer about whether an easy run stayed easy. |
 | `total_elevation_gain` | Metres. |
 | `average_cadence` | Steps per minute. A float in the schema, read as a whole number. |
 | `calories` | Present, where Strava's summary endpoint had none. |
@@ -279,6 +281,29 @@ never sent.
 
 **`pace` is deliberately not read**, though the field exists: its unit is undocumented, and a number
 whose unit is a guess is worse than one derived from two that are known.
+
+### The splits intervals.icu does not publish
+
+There is no split endpoint. An activity carries one average pace and one average heart rate, and
+`icu_intervals` — reachable through `GET /api/v1/activity/{id}/intervals` — is intervals.icu's
+*detected* interval structure, which on a steady run is a single block. Neither answers the question
+the per-session analysis kept declining to answer: did the run that averaged 5:35 start calmly and
+finish calmly, or start at 5:00 and fall apart.
+
+So the app computes the splits itself, from `GET /api/v1/activity/{id}/streams`:
+
+| | |
+| --- | --- |
+| Channels asked for | `time`, `distance`, `heartrate`, `altitude` — named in `types`, with `includeDefaults` left off so nothing arrives unasked |
+| Response shape | The specification types a stream's `data` as a bare **`object`**; the real responses send an array of numbers, one per sample, aligned across channels by position. This is the one shape in the integration read off the wire rather than out of the schema, so a parse failure is treated as "no splits" rather than as a failed sync |
+| Missing samples | A channel can carry nulls in the middle — a strap that dropped out — and they stay nulls |
+| Boundary time | **Interpolated** between the two samples that straddle the kilometre mark. At one sample a second and 3 m/s, charging the whole straddling sample is worth up to three seconds a kilometre |
+| Kept | Per kilometre: duration, mean heart rate, metres climbed. The stream itself is discarded |
+
+**One request per run, and a budget.** Streams are the only part of this integration that costs a
+request per activity rather than per window, so the sync rations them: runs only, a kilometre or
+more, newest first, six per sync. Every attempt is recorded whether or not it produced anything —
+otherwise a treadmill run with no distance channel would be re-requested forever.
 
 ### The three durations, measured
 

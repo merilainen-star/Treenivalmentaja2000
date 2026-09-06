@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
+import fi.merilainen.treenivalmentaja.data.intervals.clearCachedIntervalsData
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
@@ -48,6 +49,12 @@ class IntervalsRepositoryTest {
   private var status = 200
   private var body = "[]"
 
+  /** Served for `/streams` only, so a sync's second request can be answered on its own terms. */
+  private var streamsBody = "[]"
+
+  /** How many times the streams endpoint was asked, which is the budget under test. */
+  private var streamRequests = 0
+
   @Before
   fun setUp() {
     db =
@@ -61,7 +68,9 @@ class IntervalsRepositoryTest {
         .build()
     server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     server.createContext("/") { exchange: HttpExchange ->
-      val bytes = body.toByteArray()
+      val streams = exchange.requestURI.path.endsWith("/streams")
+      if (streams) streamRequests++
+      val bytes = (if (streams) streamsBody else body).toByteArray()
       exchange.sendResponseHeaders(status, bytes.size.toLong())
       exchange.responseBody.use { it.write(bytes) }
     }
@@ -420,6 +429,121 @@ class IntervalsRepositoryTest {
     assertEquals(540, metrics.calories)
   }
 
+  // ------------------------------------------------------------------ zones and splits
+
+  private suspend fun syncAndMatch(start: String = "2026-08-15T06:12:03Z") {
+    repository.sync(FROM, TO, zone)
+    repository.matchActivities(
+      listOf(
+        PlannedSession(
+          "session-run",
+          Instant.parse(start).toEpochMilli(),
+          WorkoutType.RUNNING,
+        )
+      ),
+      0,
+      Long.MAX_VALUE,
+    )
+  }
+
+  @Test
+  fun `a sync fetches a run's streams and stores the kilometres it computed`() =
+    runTest(dispatcher) {
+      body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+      streamsBody = steadyStreams(seconds = 700, metresPerSecond = 3.0, heartRate = 140)
+
+      syncAndMatch()
+
+      val metrics = repository.observeMatchedRunMetrics().first().getValue("session-run")
+      assertEquals(2, metrics.splits.size)
+      assertEquals(listOf(1, 2), metrics.splits.map { it.index })
+      assertEquals(333L, metrics.splits.first().durationSec)
+      assertEquals(140, metrics.splits.first().avgHeartRate)
+    }
+
+  /**
+   * The fetch marker's whole reason for existing: a run whose streams say nothing must be asked
+   * about once, not on every sync until the end of time.
+   */
+  @Test
+  fun `an activity whose streams yield nothing is not asked about twice`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    streamsBody = "[]"
+
+    repository.sync(FROM, TO, zone)
+    repository.sync(FROM, TO, zone)
+
+    assertEquals(1, streamRequests)
+  }
+
+  @Test
+  fun `a walk is never asked for streams`() = runTest(dispatcher) {
+    body = """[${oneRunBody("i1", "2026-08-15T06:12:03Z", type = "Walk")}]"""
+
+    repository.sync(FROM, TO, zone)
+
+    assertEquals(0, streamRequests)
+  }
+
+  /** Streams are the only per-activity request in this integration, so the sync rations them. */
+  @Test
+  fun `a sync asks for no more streams than its budget allows`() = runTest(dispatcher) {
+    body =
+      (1..10).joinToString(
+        prefix = "[",
+        postfix = "]",
+        separator = ",",
+      ) { oneRunBody("i$it", "2026-08-0${it % 9 + 1}T06:12:03Z") }
+
+    repository.sync(FROM, TO, zone)
+
+    assertEquals(IntervalsRepository.MAX_SPLIT_FETCHES_PER_SYNC, streamRequests)
+  }
+
+  /** A streams endpoint that is down must cost the splits and nothing else. */
+  @Test
+  fun `a failing streams request does not fail the sync`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    streamsBody = "not json at all"
+
+    val result = repository.sync(FROM, TO, zone)
+
+    assertTrue(result.toString(), result is IntervalsSyncResult.Success)
+    assertEquals(1, db.intervalsDao().getActivitiesBetween(0, Long.MAX_VALUE).size)
+  }
+
+  @Test
+  fun `the heart-rate zone distribution survives the round trip to the screen`() =
+    runTest(dispatcher) {
+      body =
+        """[{"id":"i1","type":"Run","start_date":"2026-08-15T06:12:03Z","moving_time":2280,
+           "distance":6200.0,"icu_hr_zones":[120,145,160,172,190],
+           "icu_hr_zone_times":[240,1500,480,60,0]}]"""
+
+      syncAndMatch()
+
+      val zones =
+        repository.observeMatchedRunMetrics().first().getValue("session-run").heartRateZones!!
+      assertEquals(5, zones.zones.size)
+      assertEquals("Z2 (121–145)", zones.label(zones.zones[1]))
+      assertEquals(1500L, zones.zones[1].seconds)
+      assertEquals(2280L, zones.totalSeconds)
+    }
+
+  /** Clearing the key must take the splits with it — see `clearCachedIntervalsData`. */
+  @Test
+  fun `splits and their fetch markers are part of what clearing the key removes`() =
+    runTest(dispatcher) {
+      body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+      streamsBody = steadyStreams(seconds = 700, metresPerSecond = 3.0, heartRate = 140)
+      syncAndMatch()
+
+      db.intervalsDao().clearCachedIntervalsData()
+
+      assertTrue(db.intervalsDao().splitFetchedActivityIds().isEmpty())
+      assertTrue(db.intervalsDao().observeMatchedSplits().first().isEmpty())
+    }
+
   private companion object {
     val FROM: LocalDate = LocalDate.of(2026, 8, 1)
     val TO: LocalDate = LocalDate.of(2026, 8, 15)
@@ -439,5 +563,19 @@ class IntervalsRepositoryTest {
     fun oneRun(id: String, movingTime: Int = 2280) = "[${oneRunBody(id, movingTime = movingTime)}]"
 
     fun oneRunBodyWrapped(id: String, start: String) = "[${oneRunBody(id, start)}]"
+
+    /** One sample a second at a constant pace — what the streams endpoint sends for a steady run. */
+    fun steadyStreams(seconds: Int, metresPerSecond: Double, heartRate: Int): String {
+      fun channel(name: String, values: List<Number>) =
+        """{"type":"$name","data":[${values.joinToString(",")}]}"""
+      return "[" +
+        listOf(
+            channel("time", (0..seconds).toList()),
+            channel("distance", (0..seconds).map { it * metresPerSecond }),
+            channel("heartrate", (0..seconds).map { heartRate }),
+          )
+          .joinToString(",") +
+        "]"
+    }
   }
 }

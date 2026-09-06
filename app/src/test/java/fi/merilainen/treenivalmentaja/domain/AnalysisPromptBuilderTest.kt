@@ -867,4 +867,102 @@ class AnalysisPromptBuilderTest {
 
     assertFalse(prompt.contains("Toteutunut ajankäyttö"))
   }
+
+  // ------------------------------------------------------------------ zones and splits
+
+  private fun runWithDetail(
+    zones: HeartRateZones? = null,
+    splits: List<RunSplit> = emptyList(),
+  ): CompletedRunMetrics =
+    CompletedRunMetrics(
+      activityId = "i1",
+      sportType = "Run",
+      startTimeUtc = 0L,
+      movingTimeSec = 2700,
+      distanceKm = 8.0,
+      avgSpeedMps = 3.0,
+      avgHeartRate = 148,
+      heartRateZones = zones,
+      splits = splits,
+    )
+
+  @Test
+  fun `the zone section names the beat range beside every time`() {
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 5, 4),
+            run =
+              runWithDetail(
+                zones = heartRateZones(listOf(123, 145, 160, 172, 190), listOf(240, 1800, 600, 60, 0))
+              ),
+          )
+        )
+
+    assertTrue(prompt.contains("## Sykealueet"))
+    assertTrue(prompt.contains("Z2 (124–145): 30:00"))
+    assertTrue(prompt.contains("Z1 (–123): 4:00"))
+    // Every zone is written, including the empty one: a missing Z5 on a session that was supposed
+    // to have one is a finding, and an omitted line is not.
+    assertTrue(prompt.contains("Z5 (173–190): 0:00 (0 %)"))
+  }
+
+  @Test
+  fun `a run with no zone table writes no zone section`() {
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 5, 4),
+            run = runWithDetail(),
+          )
+        )
+
+    assertFalse(prompt.contains("Sykealueet"))
+  }
+
+  @Test
+  fun `the split section is the answer to the analysis that could not verify a calm start`() {
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 5, 4),
+            run =
+              runWithDetail(
+                splits =
+                  listOf(
+                    RunSplit(1, 1000, 350, avgHeartRate = 132, elevationGainMeters = 8),
+                    RunSplit(2, 1000, 331, avgHeartRate = 145),
+                    RunSplit(3, 600, 186, avgHeartRate = 158),
+                  )
+              ),
+          )
+        )
+
+    assertTrue(prompt.contains("## Kilometrijaot"))
+    assertTrue(prompt.contains("- 1 km: 5:50 /km, syke 132, nousu 8 m"))
+    assertTrue(prompt.contains("- 2 km: 5:31 /km, syke 145"))
+    // The tail says how long it actually was, so a fast 600 m is not read as a fast kilometre.
+    assertTrue(prompt.contains("- 3. osuus (600 m): 5:10 /km, syke 158"))
+  }
+
+  @Test
+  fun `a run with no splits writes no split section`() {
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 5, 4),
+            run = runWithDetail(),
+          )
+        )
+
+    assertFalse(prompt.contains("Kilometrijaot"))
+  }
 }

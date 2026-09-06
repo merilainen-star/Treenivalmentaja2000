@@ -43,6 +43,7 @@ class ProgramReportPromptBuilder {
     appendWeeks(analysis.weeks)
     appendRuns(analysis.runs)
     appendRunTrends(analysis)
+    appendZoneSplits(analysis.zoneSplits)
     appendStrength(analysis.strength)
     appendFeedback(analysis.feedback)
     appendRecovery(analysis.recovery)
@@ -192,6 +193,37 @@ class ProgramReportPromptBuilder {
       "- Vertailu tehdään vain saman suunnitellun tehon sisällä, ja vain jos molemmilla puolilla " +
         "on vähintään $MINIMUM_RUNS_PER_HALF juoksua. Negatiivinen tahtimuutos tarkoittaa " +
         "nopeampaa, negatiivinen sykemuutos matalampaa sykettä."
+    )
+    appendLine()
+  }
+
+  /**
+   * Where the effort actually went, by planned intensity.
+   *
+   * **The section that answers "were the easy days easy".** The run lines above carry an average
+   * heart rate each, and an average cannot distinguish eight easy runs from six easy ones and two
+   * that were raced. This can, and it is the one thing in the report that checks the *plan* against
+   * the *execution* rather than the execution against itself.
+   *
+   * Aggregated per group rather than written per run, which is what makes it affordable: five lines
+   * for a whole intensity group against five for every run in it.
+   */
+  private fun StringBuilder.appendZoneSplits(splits: List<ProgramZoneSplit>) {
+    if (splits.isEmpty()) return
+    appendLine("## Sykealueiden jakauma suunnitellun tehon mukaan (sovelluksen laskema)")
+    splits.forEach { split ->
+      appendLine(
+        "- ${split.intensity?.title ?: "Teho ei tiedossa"} (${split.runs} juoksua, joissa " +
+          "sykealuetiedot):"
+      )
+      split.zones.forEach { zone ->
+        val share = split.percentOf(zone)?.let { " ($it %)" }.orEmpty()
+        appendLine("  ${zone.label}: ${zone.seconds.formatDuration()}$share")
+      }
+    }
+    appendLine(
+      "- Mukana ovat vain ne juoksut, joista sykealuetiedot löytyivät. Sykealueiden rajat on " +
+        "merkitty vain, jos ne pysyivät samoina koko jakson ajan."
     )
     appendLine()
   }

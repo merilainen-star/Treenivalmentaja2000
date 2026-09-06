@@ -110,6 +110,26 @@ internal class IntervalsClient(
     return decodeList(get(url), wellnessAdapter)
   }
 
+  /**
+   * One activity's recorded channels — `GET /api/v1/activity/{id}/streams`.
+   *
+   * Asked for by name, and only the four the split calculation reads: `time` and `distance` are
+   * what a split *is*, `heartrate` is what makes a split worth reading, and `altitude` is what
+   * keeps a hill from looking like a collapse. The full set for an hour's running is several
+   * hundred kilobytes; these four are a fraction of it.
+   *
+   * `includeDefaults` is left off, so nothing arrives that was not named.
+   */
+  suspend fun streams(activityId: String): List<IntervalsStreamDto> {
+    val url =
+      "$baseUrl/api/v1/activity/$activityId/streams"
+        .toHttpUrl()
+        .newBuilder()
+        .addQueryParameter("types", STREAM_TYPES)
+        .build()
+    return decodeList(get(url), streamAdapter)
+  }
+
   private fun activitiesUrl(): HttpUrl = "$baseUrl/api/v1/athlete/$SELF/activities".toHttpUrl()
 
   // ------------------------------------------------------------------ diagnostics
@@ -289,7 +309,7 @@ internal class IntervalsClient(
     internal const val SELF = "0"
 
     /**
-     * The twenty-five fields the app reads, of the **183** the `Activity` schema declares.
+     * The twenty-seven fields the app reads, of the **183** the `Activity` schema declares.
      *
      * Naming them is not a micro-optimisation: without this the service sends every property of
      * every activity in the range, which for a fortnight of training is a large multiple of what
@@ -307,7 +327,7 @@ internal class IntervalsClient(
       "id,name,type,start_date,start_date_local," +
         "moving_time,elapsed_time,icu_recording_time," +
         "distance,icu_distance,average_speed,max_speed," +
-        "average_heartrate,max_heartrate,average_cadence," +
+        "average_heartrate,max_heartrate,icu_hr_zones,icu_hr_zone_times,average_cadence," +
         "total_elevation_gain,calories," +
         "icu_training_load,icu_intensity,hr_load,trimp,icu_atl,icu_ctl," +
         "source,device_name"
@@ -320,6 +340,15 @@ internal class IntervalsClient(
 
     private val adapter: JsonAdapter<List<IntervalsActivityDto?>> =
       moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsActivityDto::class.java))
+
+    /**
+     * The four channels the split calculation reads. Order is the request's, not the response's —
+     * the service returns whatever it has, and the caller looks each one up by name.
+     */
+    internal const val STREAM_TYPES = "time,distance,heartrate,altitude"
+
+    private val streamAdapter: JsonAdapter<List<IntervalsStreamDto?>> =
+      moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsStreamDto::class.java))
 
     private val wellnessAdapter: JsonAdapter<List<IntervalsWellnessDto?>> =
       moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsWellnessDto::class.java))
