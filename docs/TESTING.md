@@ -55,10 +55,10 @@ which is a real distinction, and the reason two behaviours the specification doe
 found by hand instead: that `end_date` excludes its own day for some collections, and that
 third-party imports never appear in the workout collection at all. What the tests prove is that the
 client obeys the specification. `WorkoutViewModel`'s cover is
-its guide sheet and its import confirmation; the training-engine actions it delegates
+its guide sheet, import confirmation and the report/next-programme flow; the training-engine actions it delegates
 (`markSick`, `checkMissedSessions`) are tested through `TrainingEngineTest` rather than through
-it. No test drives a screen's interactions — the captures are of states, not of tapping through
-them; `ImportStartDialogTest` is the only interaction test and it is instrumented.
+it. Screenshots capture states; `ImportStartDialogTest` and `DestructiveConfirmationTest` exercise
+dialog interactions on a device. They do not cover the full app navigation or a real AI provider.
 
 ## Test Types (Planned & Implemented)
 
@@ -108,3 +108,24 @@ them; `ImportStartDialogTest` is the only interaction test and it is instrumente
 - `MockData` is gone. On first launch `TrainingRepository.seedIfEmpty()` writes a starter week
   through the real JSON importer, so the app has content without an Oura ring or API connection —
   and the seed is continuously validated against the published plan schema.
+
+## September 2026 audit regressions
+
+- `WorkoutViewModelTest`: report → goal → generated plan → preview → replacement confirmation;
+  cancellation preserves history, acceptance imports, stored constraints reach the generation
+  request without a UI flow subscriber, double taps do not duplicate requests, and a short
+  but structurally valid programme cannot reach import.
+- `GeneratedPlanValidationTest`: request-specific dates, zone, duration and week alignment,
+  while manual imports retain their existing flexibility.
+- Oura authenticator and service repository tests hold HTTP responses until after deletion,
+  then assert that late refresh/sync/backfill responses do not restore credentials or rows.
+- `RescheduleAlarmsUseCaseTest` completes a session after capturing the scheduling snapshot;
+  its completed status and event survive and it is not scheduled.
+- Device `DestructiveConfirmationTest` taps cancel and confirm in the reset and import dialogs.
+
+Run unit tests and `:app:verifyRoborazziDebug` in separate wrapper invocations. The screenshot
+helper installs an `InfiniteAnimationPolicy` for captures only: indeterminate spinners never
+become idle, so their infinite animation is cancelled at its initial frame; finite transitions
+still settle. Production animations are unchanged. This addresses the hang in
+`ComponentScreenshotTest.updateCard_installStates` rather than excluding that test.
+Measured outcomes and exact commands belong in [PROJECT_STATUS.md](../PROJECT_STATUS.md).

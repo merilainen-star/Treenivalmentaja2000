@@ -134,6 +134,9 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     )
   }
 
+  private val ouraGeneration = fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration()
+  private val intervalsGeneration = fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration()
+
   private val ouraTokenStore: OuraTokenStore by lazy { OuraTokenStore(this) }
 
   /**
@@ -162,6 +165,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
       authService = ouraAuthService,
       credentials = ouraCredentials,
       onDisconnected = { db.ouraDao().clearCachedOuraData() },
+      generation = ouraGeneration,
     )
   }
 
@@ -181,6 +185,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
           .authenticator(
             OuraAuthenticator(
               store = ouraTokenStore,
+              generation = ouraGeneration,
               service = ouraAuthService,
               onRefreshFailed = { applicationScope.launch { ouraConnection.refreshState() } },
             )
@@ -190,7 +195,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
   }
 
   internal val ouraRepository: OuraRepository by lazy {
-    OuraRepository(client = ouraClient, dao = db.ouraDao())
+    OuraRepository(client = ouraClient, dao = db.ouraDao(), generation = ouraGeneration)
   }
 
   private val intervalsApiKeyStore: IntervalsApiKeyStore by lazy { IntervalsApiKeyStore(this) }
@@ -220,11 +225,12 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
       store = intervalsApiKeyStore,
       client = intervalsClient,
       onKeyCleared = { db.intervalsDao().clearCachedIntervalsData() },
+      generation = intervalsGeneration,
     )
   }
 
   internal val intervalsRepository: IntervalsRepository by lazy {
-    IntervalsRepository(client = intervalsClient, dao = db.intervalsDao())
+    IntervalsRepository(client = intervalsClient, dao = db.intervalsDao(), generation = intervalsGeneration)
   }
 
   /**

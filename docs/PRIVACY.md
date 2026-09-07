@@ -1,6 +1,9 @@
 # Privacy Policy — Treenivalmentaja
 
-**Last updated: 24 August 2026** *(revised: AI plan proposals can send the open schedule and the
+**Last updated: 7 September 2026** — clarified whole-programme reports, next-programme generation,
+standing constraints and deletion controls.
+
+Previous revision, 24 August 2026: *(revised: AI plan proposals can send the open schedule and the
 standing constraints entered in Settings to the selected AI provider, only after an explicit tap.
 Unaccepted proposals are not stored; accepted typed operations are recorded in the local event
 log. Automatic Android backup and device transfer are
@@ -24,9 +27,11 @@ reserve rights the app does not exercise. The source code is public at
 The app has **no server of its own**. Nothing you enter, and nothing it reads from Oura, is sent to
 the author or to any analytics service. Data lives on your phone until you delete it.
 
-**One exception, and it only happens when you ask for it.** If you set up the optional AI analysis
-and tap "AI-analyysi" on a workout, that workout's numbers and your recent recovery readings are
-sent to **one** AI provider — whichever you picked in Settings — to be commented on. Nothing is sent
+**AI requests are the exception, and happen only when you ask for them.** A workout analysis sends
+that workout and recent recovery. A plan proposal sends the open schedule and constraints; an
+interim or final report sends a whole-programme summary with completed runs and recovery trends;
+next-programme generation sends the previous programme's summary, goals, feedback, standing
+constraints and any open final report. These go to **one** provider, selected in Settings. Nothing is sent
 unless you tap the button; the app shows you the exact text it sent; and if you enter no API key the
 feature does nothing at all. Only the selected provider is ever contacted: the app does not ask two
 of them, and a key stored for a provider you are not using is never sent anywhere.
@@ -58,7 +63,7 @@ of them, and a key stored for a provider you are not using is never sent anywher
   you close it or leave the screen. Accepted proposal effects are ordinary local plan changes with
   `AI_ADVISOR` audit events; the provider's prose is not stored.
 - **AI advisor constraints**, such as "long runs only on weekends", are stored locally in the
-  settings DataStore and sent only when you request a plan proposal.
+  settings DataStore and sent when you request a plan proposal or a new programme.
 - **App settings**, such as reminder times.
 
 All of it is stored inside the app's private storage, protected by the Android application sandbox.
@@ -76,7 +81,7 @@ providers are contacted **only** when you tap the button, and only the one you s
 | --- | --- | --- |
 | `api.ouraring.com`, `cloud.ouraring.com` | Your Oura credentials and tokens; requests for date ranges | To sign in to Oura and read your own Oura data |
 | `intervals.icu` | Your intervals.icu API key; requests for date ranges | To read your own activities, which arrive there from your Suunto watch |
-| `api.anthropic.com` | **Only after an explicit AI action with Claude selected:** your Anthropic key and either one workout plus recent recovery, or the open schedule plus advisor constraints | To get a workout comment or a structured plan proposal |
+| `api.anthropic.com` | **Only after an explicit AI action with Claude selected:** your Anthropic key and the context for the requested workout analysis, plan proposal, whole-programme report or new programme (detailed below) | To answer the AI action you requested |
 | `api.openai.com` | The same, when ChatGPT is selected | The same |
 | `generativelanguage.googleapis.com` | The same, when Gemini is selected | The same |
 | `oss.exercisedb.dev` (ExerciseDB) | The name or catalogue id of an exercise in your plan | To show an animation and instructions when you tap a movement |
@@ -99,9 +104,26 @@ precise. One tap sends **one** request containing:
   the nightly HRV and resting heart rate.
 - For an upcoming workout, your current acute and chronic training load.
 
-It does **not** send your name, your email, your Oura or intervals.icu credentials, your training
-plan as a whole, or any workout other than the one you tapped. Readings the app does not have are
+This per-workout request does **not** add your account name, email, Oura or intervals.icu
+credentials, or your whole plan. Your own descriptions and free text are sent as written, so avoid
+putting information in them that you do not want the selected provider to receive. Readings the app does not have are
 simply left out — nothing is filled in with a placeholder.
+
+### What whole-programme reports and next-programme generation send
+
+An explicit **Väliraportti** or **Loppuraportti** request sends the active programme's name, goals,
+dates, adherence and weekly totals; completed runs with recorded duration, distance, pace, heart
+rate, training load and available heart-rate zone distributions; strength and subjective RPE/feel summaries;
+and recovery and performance trends. An interim report also describes the remaining programme.
+This covers the programme, not just one workout or seven days. Raw event rows, second-by-second
+recordings and per-movement timers are not included.
+
+Requesting a **new programme** sends a summary of the previous programme and its ending level,
+feedback, the chosen goal and length, requested start date and time zone, the standing constraints
+from Settings and the open final report when available. Opening the goal form alone sends nothing.
+The generated JSON is validated and previewed locally; replacing an existing plan requires a
+separate confirmation that explicitly warns that its sessions and event history will be deleted.
+Reports and unimported responses remain in memory; an accepted programme is stored as a plan.
 
 ### What an AI plan proposal sends
 
@@ -122,8 +144,7 @@ a third party at all, enter no AI key — the feature is then invisible and send
 tier, and they treat your data differently: on the free tier submitted content may be used to
 improve Google's products, while the paid tier states it is not. Because these requests carry health
 measurements, **this app is used with the paid Gemini tier**, and the Settings hint says so at the
-point the key is pasted. That is what keeps the "no use of your data for training machine-learning
-models" statement below true.
+point the key is pasted. The app cannot verify your account tier or enforce a provider's handling of requests.
 
 ## What the app requests from Oura, and what it does not
 
@@ -151,8 +172,9 @@ was granted with until you disconnect and reconnect.
 
 ## What the app reads from intervals.icu, and what it does not
 
-The app makes **one kind of request**: a list of your own activities between two dates. It names
-the fifteen fields it uses, of the 183 the API offers, so nothing else is even sent.
+The app reads your activities and daily wellness for date ranges, and fetches streams for running
+kilometre splits. Activity fields are explicitly selected; wellness stores CTL/ATL, and streams
+are reduced on the device to split rows and then discarded.
 
 It **never writes anything** to intervals.icu — no activity is created, edited, uploaded or
 deleted, and no note, plan or calendar entry is posted. It does not read your profile, your athlete
@@ -165,8 +187,9 @@ account; see [INTERVALS_SETUP.md](INTERVALS_SETUP.md#why-an-api-key-rather-than-
 
 - No analytics, telemetry, crash reporting or advertising. There are no such SDKs in the build.
 - No account, no sign-up, no user profile on any server.
-- No selling, sharing, renting or transferring of data to anyone.
-- No use of your data for training machine-learning models.
+- No selling or renting of data. User-requested AI transfers are described above.
+- The app does not train models. Provider retention and training use depend on your provider
+  agreement and account tier; the app cannot enforce those settings.
 - No location tracking.
 
 ## Deleting your data
@@ -179,7 +202,10 @@ account; see [INTERVALS_SETUP.md](INTERVALS_SETUP.md#why-an-api-key-rather-than-
   own. There is nothing else to delete: no analysis was ever stored. Removing the key of the
   selected provider stops the feature from being able to send anything.
 - **"Vaihda tunnukset"** under Oura additionally deletes its stored Client ID and Secret.
-- **Uninstalling the app** removes everything it has stored.
+- **Android Settings → Apps → Treenivalmentaja → Storage → Clear storage**, or **uninstalling the
+  app**, removes its locally stored data. The app's own Settings has no complete-wipe button.
+- **Palauta esimerkkidata** asks for confirmation and deletes plans and their session history;
+  it does not clear service credentials or health caches.
 
 The app cannot revoke its own access at Oura, because the Oura API publishes no revocation endpoint.
 To withdraw the application's access to your Oura account, remove it in your Oura account settings.

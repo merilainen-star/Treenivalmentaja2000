@@ -467,13 +467,7 @@ fun SettingsScreenContent(
                     Text("Tuo leikepöydältä")
                 }
 
-                OutlinedButton(
-                    onClick = onResetSampleData,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Palauta esimerkkidata")
-                }
+                ResetSampleDataButton(onResetSampleData)
 
                 HorizontalDivider()
 
@@ -489,6 +483,30 @@ fun SettingsScreenContent(
         }
     }
 
+}
+
+/** A reset destroys recorded history; opening the confirmation never calls the repository. */
+@Composable
+internal fun ResetSampleDataButton(onReset: () -> Unit) {
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    OutlinedButton(
+        onClick = { confirming = true },
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) { Text("Palauta esimerkkidata") }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Poistetaanko harjoitushistoria?") },
+            text = { Text("Nykyinen ohjelma, harjoitusmerkinnät ja niiden historia häviävät pysyvästi. Tilalle tulee esimerkkiohjelma. Tätä ei voi perua.") },
+            confirmButton = {
+                TextButton(onClick = { confirming = false; onReset() }) { Text("Poista ja palauta") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirming = false }) { Text("Peruuta") }
+            },
+        )
+    }
 }
 
 /**

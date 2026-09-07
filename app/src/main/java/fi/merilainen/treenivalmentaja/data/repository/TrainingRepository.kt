@@ -456,14 +456,17 @@ class TrainingRepository(
    * Lives on the repository rather than in the ViewModel so the importer's types stay inside the
    * data layer — what comes back is domain sessions and Finnish error strings.
    */
-  fun previewPlan(rawJson: String): PlanPreviewResult {
+  fun previewPlan(
+    rawJson: String,
+    requirements: fi.merilainen.treenivalmentaja.domain.NextProgramRequirements? = null,
+  ): PlanPreviewResult {
     val document =
       PlanJson.parse(rawJson).getOrElse { error ->
         return PlanPreviewResult.Invalid(
           listOf("Vastausta ei voitu lukea JSON-dokumenttina: ${error.message ?: "tuntematon virhe"}")
         )
       }
-    return when (val outcome = PlanValidator.validate(document)) {
+    return when (val outcome = PlanValidator.validate(document, requirements)) {
       is ValidationOutcome.Errors -> PlanPreviewResult.Invalid(outcome.errors.map { it.toString() })
       is ValidationOutcome.Valid ->
         PlanPreviewResult.Valid(

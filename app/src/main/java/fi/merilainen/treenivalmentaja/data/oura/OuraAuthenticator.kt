@@ -1,5 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.oura
 
+import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
+
 import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
@@ -33,6 +35,7 @@ internal class OuraAuthenticator(
   private val store: OuraTokenStorage,
   private val service: OuraAuthService,
   private val onRefreshFailed: () -> Unit = {},
+  private val generation: ConnectionGeneration = ConnectionGeneration(),
 ) : Authenticator {
 
   private val lock = Any()
@@ -40,7 +43,9 @@ internal class OuraAuthenticator(
   override fun authenticate(route: Route?, response: Response): Request? {
     // OkHttp calls this on a background thread it owns, so blocking here is what it expects.
     if (responseCount(response) > 1) return null
+    val expected = generation.current()
     synchronized(lock) {
+      if (generation.current() != expected) return null
       val stored = runBlocking { store.load() } ?: return null
       val attempted = response.request.header("Authorization")
       if (attempted != bearer(stored.accessToken)) {
@@ -57,21 +62,32 @@ internal class OuraAuthenticator(
           // later request repeat this. Dropping it is what turns a dead connection into a visible
           // "connect again" instead of a silent, permanent failure.
           if (e is OuraAuthorizationException) {
-            runBlocking { store.clear() }
-            onRefreshFailed()
+            runBlocking {
+              generation.commit(expected) {
+                store.clear()
+                onRefreshFailed()
+              }
+            }
           }
           return null
         }
       val saved = runBlocking {
         // Oura returns a new refresh token; if it ever does not, the old one is still the only one
         // there is, and dropping it would end the connection at the next expiry.
-        store.save(renewed.copy(refreshToken = renewed.refreshToken ?: refreshToken))
+        generation.commit(expected) {
+          store.save(renewed.copy(refreshToken = renewed.refreshToken ?: refreshToken))
+        }
       }
+      if (saved == null) return null // Disconnected while the refresh was in flight.
       if (saved != CredentialSaveResult.Success) {
         // Keeping the expired token would make refreshState report Connected after the secure
         // write failed. Drop it so the UI can never claim this connection is usable.
-        runBlocking { store.clear() }
-        onRefreshFailed()
+        runBlocking {
+          generation.commit(expected) {
+            store.clear()
+            onRefreshFailed()
+          }
+        }
         return null
       }
       return response.request.retryWith(renewed.accessToken)

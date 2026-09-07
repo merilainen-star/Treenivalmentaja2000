@@ -42,6 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -158,6 +159,8 @@ class WorkoutViewModelTest {
 
   private fun viewModel(
     rolloverDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    analysisClient: fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient? = null,
+    advisorStore: fi.merilainen.treenivalmentaja.data.settings.AdvisorSettingsStore? = null,
   ): WorkoutViewModel {
     val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     val settingsStore = NotificationSettingsStore(context)
@@ -180,6 +183,7 @@ class WorkoutViewModelTest {
       }
     return WorkoutViewModel(
       repository = repository,
+      advisorSettingsStore = advisorStore,
       engine = TrainingEngine(repository, clock, reschedule),
       clock = clock,
       rolloverDispatcher = rolloverDispatcher,
@@ -212,6 +216,9 @@ class WorkoutViewModelTest {
           dao = db.ouraDao(),
         ),
       activeWorkoutProgressStore = progressStore,
+      analysisClients = if (analysisClient == null) emptyMap() else
+        fi.merilainen.treenivalmentaja.domain.AnalysisProvider.entries.associateWith { analysisClient },
+
     )
   }
 
@@ -774,4 +781,82 @@ class WorkoutViewModelTest {
 
     assertNull(progressStore.stored)
   }
+
+  private fun nextJson(start: LocalDate, weeks: Int = 8): String = """
+    {"schemaVersion":1,"plan":{"id":"next-test","name":"Next","timeZone":"Europe/Helsinki","startDate":"$start"},
+      "weeks":[${(1..weeks).joinToString(",") { week -> """
+        {"weekNumber":$week,"sessions":[{"id":"next-$week","type":"RUNNING","date":"${start.plusWeeks(week - 1L)}","time":"17:00","durationMin":30}]}
+      """ }}]}
+  """
+
+  @Test fun `AI successor leaves history intact until the destructive confirmation is accepted`() = runTest(dispatcher) {
+    repository.importPlan(PLAN)
+    repository.transition("s-1", SessionStatus.COMPLETED)
+    clock.advance(Duration.ofDays(1))
+    var requests = 0
+    val advisorStore = fi.merilainen.treenivalmentaja.data.settings.AdvisorSettingsStore(ApplicationProvider.getApplicationContext())
+    advisorStore.setConstraints("Pitkä lenkki vain sunnuntaisin.")
+    var generatedPrompt = ""
+    val client = object : fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient {
+      override suspend fun analyse(prompt: String, model: fi.merilainen.treenivalmentaja.domain.AnalysisModel): String {
+        requests++
+        if (requests > 1) generatedPrompt = prompt
+        return if (requests == 1) "Loppuraportti: harjoitus tehtiin." else nextJson(LocalDate.of(2026, 8, 12))
+      }
+    }
+    val vm = viewModel(analysisClient = client, advisorStore = advisorStore)
+    advanceUntilIdle()
+    vm.requestProgramReport()
+    advanceUntilIdle()
+    assertTrue(vm.programReport.value is fi.merilainen.treenivalmentaja.domain.ProgramReportState.Loaded)
+    vm.startNextProgram()
+    assertEquals(1, requests)
+    vm.requestNextProgram(fi.merilainen.treenivalmentaja.domain.NextProgramRequest(fi.merilainen.treenivalmentaja.domain.NextProgramGoal.BALANCED))
+    vm.nextProgram.first { it !is fi.merilainen.treenivalmentaja.domain.NextProgramState.Loading }
+    assertTrue(vm.nextProgram.value is fi.merilainen.treenivalmentaja.domain.NextProgramState.Ready)
+    // No UI subscriber has started the constraints StateFlow: generation must read persistence.
+    assertTrue(generatedPrompt.contains("Pitkä lenkki vain sunnuntaisin."))
+    advisorStore.setConstraints("")
+    val history = repository.getEvents("s-1")
+    vm.importNextProgram()
+    advanceUntilIdle()
+    assertTrue(vm.pendingImport.value?.action is PendingImport.Replace)
+    assertEquals(history, repository.getEvents("s-1"))
+    vm.cancelPendingImport()
+    advanceUntilIdle()
+    assertEquals(history, repository.getEvents("s-1"))
+    vm.importNextProgram()
+    advanceUntilIdle()
+    vm.confirmPendingImport()
+    advanceUntilIdle()
+    assertTrue(vm.nextProgram.value is fi.merilainen.treenivalmentaja.domain.NextProgramState.Imported)
+    assertEquals(8, repository.getSessions().size)
+    assertNull(repository.getSession("s-1"))
+    assertTrue(repository.getEvents("s-1").isEmpty())
+    vm.viewModelScope.coroutineContext.cancelChildren()
+  }
+
+  @Test fun `a structurally valid but short AI successor cannot reach import`() = runTest(dispatcher) {
+    repository.importPlan(PLAN)
+    var requests = 0
+    val vm = viewModel(analysisClient = object : fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient {
+      override suspend fun analyse(prompt: String, model: fi.merilainen.treenivalmentaja.domain.AnalysisModel): String {
+        requests++
+        return nextJson(LocalDate.of(2026, 8, 11), weeks = 1)
+      }
+    })
+    advanceUntilIdle()
+    val before = repository.getSessions()
+    vm.requestNextProgram(fi.merilainen.treenivalmentaja.domain.NextProgramRequest(fi.merilainen.treenivalmentaja.domain.NextProgramGoal.BALANCED))
+    vm.requestNextProgram(fi.merilainen.treenivalmentaja.domain.NextProgramRequest(fi.merilainen.treenivalmentaja.domain.NextProgramGoal.BALANCED))
+    advanceUntilIdle()
+    assertTrue(vm.nextProgram.value is fi.merilainen.treenivalmentaja.domain.NextProgramState.Invalid)
+    assertEquals(1, requests)
+    vm.importNextProgram()
+    advanceUntilIdle()
+    assertEquals(before, repository.getSessions())
+    assertNull(vm.pendingImport.value)
+    vm.viewModelScope.coroutineContext.cancelChildren()
+  }
+
 }

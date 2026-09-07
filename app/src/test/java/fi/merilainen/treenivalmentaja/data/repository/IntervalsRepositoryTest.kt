@@ -13,6 +13,7 @@ import java.net.InetSocketAddress
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.async
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -44,6 +45,9 @@ class IntervalsRepositoryTest {
 
   private lateinit var db: AppDatabase
   private lateinit var server: HttpServer
+  private val generation = fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration()
+  private var responseEntered: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+  private var responseRelease: java.util.concurrent.CountDownLatch? = null
   private lateinit var repository: IntervalsRepository
 
   private var status = 200
@@ -68,6 +72,8 @@ class IntervalsRepositoryTest {
         .build()
     server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     server.createContext("/") { exchange: HttpExchange ->
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
       val streams = exchange.requestURI.path.endsWith("/streams")
       if (streams) streamRequests++
       val bytes = (if (streams) streamsBody else body).toByteArray()
@@ -84,6 +90,7 @@ class IntervalsRepositoryTest {
           ),
         dao = db.intervalsDao(),
         clock = { FETCHED_AT },
+        generation = generation,
       )
   }
 
@@ -180,6 +187,8 @@ class IntervalsRepositoryTest {
   fun `a rate limit carries Retry-After through to the result`() = runTest(dispatcher) {
     server.removeContext("/")
     server.createContext("/") { exchange: HttpExchange ->
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
       exchange.responseHeaders.add("Retry-After", "90")
       exchange.sendResponseHeaders(429, 2)
       exchange.responseBody.use { it.write("[]".toByteArray()) }
@@ -205,6 +214,8 @@ class IntervalsRepositoryTest {
     var request = 0
     server.removeContext("/")
     server.createContext("/") { exchange: HttpExchange ->
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
       val bytes = oneRunBodyWrapped("i${request++}", "2026-08-15T06:00:00Z").toByteArray()
       exchange.sendResponseHeaders(200, bytes.size.toLong())
       exchange.responseBody.use { it.write(bytes) }
@@ -229,6 +240,8 @@ class IntervalsRepositoryTest {
     var request = 0
     server.removeContext("/")
     server.createContext("/") { exchange: HttpExchange ->
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
       val bytes = years.getOrElse(request++) { "[]" }.toByteArray()
       exchange.sendResponseHeaders(200, bytes.size.toLong())
       exchange.responseBody.use { it.write(bytes) }
@@ -261,6 +274,8 @@ class IntervalsRepositoryTest {
     var request = 0
     server.removeContext("/")
     server.createContext("/") { exchange: HttpExchange ->
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
       if (request++ == 0) {
         val bytes = oneRun("i1").toByteArray()
         exchange.sendResponseHeaders(200, bytes.size.toLong())
@@ -578,4 +593,29 @@ class IntervalsRepositoryTest {
         "]"
     }
   }
+
+  @Test fun `a disconnected sync cannot put activities back`() = runTest(dispatcher) {
+    body = oneRun(id = "late")
+    responseEntered = kotlinx.coroutines.CompletableDeferred()
+    responseRelease = java.util.concurrent.CountDownLatch(1)
+    val sync = backgroundScope.async { repository.sync(FROM, TO, zone) }
+    responseEntered!!.await()
+    generation.invalidate { db.intervalsDao().clearCachedIntervalsData() }
+    responseRelease!!.countDown()
+    assertTrue(sync.await() is IntervalsSyncResult.Failure)
+    assertTrue(db.intervalsDao().getActivitiesBetween(0, Long.MAX_VALUE).isEmpty())
+  }
+
+  @Test fun `a disconnected backfill cannot put activities back`() = runTest(dispatcher) {
+    body = oneRun(id = "late")
+    responseEntered = kotlinx.coroutines.CompletableDeferred()
+    responseRelease = java.util.concurrent.CountDownLatch(1)
+    val sync = backgroundScope.async { repository.backfill(TO, zone, maxYears = 1) }
+    responseEntered!!.await()
+    generation.invalidate { db.intervalsDao().clearCachedIntervalsData() }
+    responseRelease!!.countDown()
+    assertTrue(sync.await().failure != null)
+    assertTrue(db.intervalsDao().getActivitiesBetween(0, Long.MAX_VALUE).isEmpty())
+  }
+
 }

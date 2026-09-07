@@ -272,3 +272,16 @@ of the group entirely, not folded in as zeros — that would make every group lo
 was. And where the zone table moved mid-programme, the beat ranges are dropped and only the zone
 numbers are quoted, because a range that was true in week 1 and false in week 7 is a fabricated
 fact about half the runs.
+
+## Import safeguards (7 September 2026)
+
+Next-programme generation reads standing constraints directly from Settings persistence and
+includes them in the request, alongside the goal and available final report. Local validation
+requires the requested start date, exact time-zone id, weeks 1 through the requested count, and
+each session date inside its declared programme week. Free-text constraints are prompt context,
+not rules the JSON validator can prove; the owner checks their fulfilment in the preview.
+
+Choosing the generated programme first runs the ordinary unconfirmed import. When it would
+replace the active plan, the existing import dialog explicitly warns that its sessions and
+history will be deleted. Cancel keeps them; only confirmation retries with `confirmed = true`.
+The sample reset in Settings has its own explicit destructive confirmation.

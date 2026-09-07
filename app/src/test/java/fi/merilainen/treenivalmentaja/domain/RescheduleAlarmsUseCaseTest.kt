@@ -161,4 +161,25 @@ class RescheduleAlarmsUseCaseTest {
         val rearm = scheduler.scheduled.first { it.first == "REARM" }
         assertEquals(scheduler.scheduled.maxOf { it.third }, rearm.third)
     }
+
+    @Test fun aCompletionAfterTheSchedulingReadIsNeverOverwritten() = runTest {
+        val realDao = db.workoutSessionDao()
+        var interleave = true
+        val dao = object : fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao by realDao {
+            override suspend fun getByStatusInActivePlan(status: SessionStatus): List<fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity> {
+                val snapshot = realDao.getByStatusInActivePlan(status)
+                if (interleave) {
+                    interleave = false
+                    fi.merilainen.treenivalmentaja.data.repository.TrainingRepository(db)
+                        .transition("s-3", SessionStatus.COMPLETED)
+                }
+                return snapshot
+            }
+        }
+        RescheduleAlarmsUseCase(db, db.trainingPlanDao(), dao, settingsStore, resolveReminderUseCase, scheduler).execute()
+        assertEquals(SessionStatus.COMPLETED, realDao.getById("s-3")?.status)
+        assertTrue(scheduler.scheduled.none { it.first == "s-3" })
+        assertEquals(SessionStatus.COMPLETED, db.sessionEventDao().getForSession("s-3").last().toStatus)
+    }
+
 }

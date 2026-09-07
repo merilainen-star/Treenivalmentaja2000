@@ -10,6 +10,7 @@ import fi.merilainen.treenivalmentaja.data.oura.OuraTokenSource
 import java.net.InetSocketAddress
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -39,6 +40,9 @@ class OuraRepositoryTest {
 
   private lateinit var db: AppDatabase
   private lateinit var server: HttpServer
+  private val generation = fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration()
+  private var responseEntered: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+  private var responseRelease: java.util.concurrent.CountDownLatch? = null
   private lateinit var repository: OuraRepository
 
   /** Path -> (status, body). Replaced per test. */
@@ -57,6 +61,8 @@ class OuraRepositoryTest {
         .build()
     server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     server.createContext("/") { exchange: HttpExchange ->
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
       val (status, body) = routes[exchange.requestURI.path] ?: (200 to EMPTY)
       val bytes = body.toByteArray()
       exchange.sendResponseHeaders(status, bytes.size.toLong())
@@ -72,6 +78,7 @@ class OuraRepositoryTest {
           ),
         dao = db.ouraDao(),
         clock = { FETCHED_AT },
+        generation = generation,
       )
   }
 
@@ -374,4 +381,17 @@ class OuraRepositoryTest {
 
     const val EMPTY = """{"data":[],"next_token":null}"""
   }
+
+  @Test fun `a disconnected sync cannot put recovery rows back`() = runTest(dispatcher) {
+    routes = mapOf(READINESS to (200 to scores(DAY, "66")))
+    responseEntered = kotlinx.coroutines.CompletableDeferred()
+    responseRelease = java.util.concurrent.CountDownLatch(1)
+    val sync = backgroundScope.async { repository.sync(LocalDate.parse(DAY), LocalDate.parse(DAY)) }
+    responseEntered!!.await()
+    generation.invalidate { db.ouraDao().clearDailySummaries(); db.ouraDao().clearWorkouts() }
+    responseRelease!!.countDown()
+    assertTrue(sync.await() is OuraSyncResult.Failure)
+    assertNull(repository.observeDay(LocalDate.parse(DAY)).first())
+  }
+
 }

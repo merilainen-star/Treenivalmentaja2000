@@ -2,8 +2,8 @@
 
 This document outlines the architecture for the Treenivalmentaja Android application. 
 *(This architecture is implemented. Oura and intervals.icu sync and matching run on-device. The
-optional AI feature is a direct, user-triggered, read-only workout analysis; AI-proposed plan
-changes remain future work. Update checks and exercise-guide lookups are the other network flows.)*
+optional AI flows include workout analysis, confirmed MOVE/LIGHTEN proposals, whole-programme
+reports and validated next-programme generation with destructive replacement confirmation. Update checks and exercise-guide lookups are the other network flows.)*
 
 ## System Context
 The application is a standalone Android app that acts as an offline-first training companion. It
@@ -11,7 +11,7 @@ retrieves health data from Oura, synchronizes it locally, and provides notificat
 
 Per [ADR-006](DECISIONS.md#adr-006-no-separate-backend-in-the-mvp) the MVP has **no backend of its
 own**. The app talks directly to Oura, intervals.icu, the selected AI provider, ExerciseDB/wger and
-the release metadata endpoint. AI providers are contacted only after an explicit analysis tap.
+the release metadata endpoint. AI providers are contacted only after an explicit AI request.
 
 ```mermaid
 graph TD
@@ -172,3 +172,13 @@ The app is fully functional offline. The local deterministic engine reschedules 
 
 ### Notification Scheduling Flow
 `RescheduleAlarmsUseCase` computes the correct `remindAtUtc` for `PLANNED` sessions based on `ResolveReminderUseCase` and updates the database, ensuring AlarmManager fires at the exact desired times.
+
+## Concurrency boundaries (7 September 2026)
+
+Each service has a `ConnectionGeneration` shared in the application graph. Network requests
+capture the generation and may commit only while it is current; disconnect invalidates it and
+clears storage under the same lock. Oura token renewal uses the same gate as Oura sync.
+
+`RescheduleAlarmsUseCase` serializes executions, reads the active plan and sessions inside a
+Room transaction and updates only reminder fields of still-PLANNED rows. It never writes a
+whole session copied from an earlier snapshot, preserving completed status and event history.

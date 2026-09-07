@@ -64,7 +64,7 @@ class ScreenScreenshotTest {
         compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.005f)
     )
 
-    private fun capture(name: String, content: @Composable () -> Unit) {
+    private fun capture(name: String, content: @Composable () -> Unit) = stillScreenshot {
         captureRoboImage("src/test/screenshots/$name.png", roborazziOptions = options) {
             MyApplicationTheme {
                 Surface(
