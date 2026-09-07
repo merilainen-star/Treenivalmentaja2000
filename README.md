@@ -14,7 +14,7 @@ but only an explicit approval writes it to the plan.
 **Implemented:**
 - Jetpack Compose UI (Today, Calendar and Settings) with bottom-tab navigation; a Calendar row expands to
   show what that session is
-- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 13
+- Room database as the local source of truth, observed by `WorkoutViewModel`, at schema version 15
   with tested migrations
 - Session state machine with an append-only event history
 - Training plan JSON import (file + clipboard) with validation and duplicate detection
@@ -41,6 +41,8 @@ but only an explicit approval writes it to the plan.
   user's own API key; the exact prompt is visible and no analysis is stored
 - AI plan advisor with visible prompt and preview, optional clarification, persistent constraints,
   strict MOVE/LIGHTEN operations and an atomic write only after explicit approval
+- Whole-programme interim/final reports and a validated next-programme preview; replacing the
+  current programme explicitly confirms deletion of its history ([docs](docs/PROGRAM_ANALYSIS.md))
 - Full-screen Active Workout Mode with preparation, movement/rest/round phases, monotonic timers,
   skip tracking and an RPE/feel completion summary
 - A scrollable calendar rather than a fixed week, and a daily background sync (WorkManager)
@@ -109,7 +111,8 @@ an update.
 
 ## Quick-Start Commands
 Always use the wrapper:
-- **Build app:** `./gradlew assembleDebug`
+- **Personal daily APK:** `./gradlew :app:assemblePersonal` (non-debuggable, existing signing key)
+- **Development APK:** `./gradlew :app:assembleDebug`
 - **Run tests:** `./gradlew :app:testDebugUnitTest`
 - **Screenshot tests:** `./gradlew :app:verifyRoborazziDebug`
 
@@ -159,5 +162,5 @@ has been entered in the app.
   [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md#two-fields-the-specification-does-not-describe).
 - Oura publishes a workout to the API some time after the app shows it, so today's session may
   appear only later.
-- No test taps through a screen: the captures pin what each state looks like, not what happens
-  when you use it.
+- Device interaction tests cover import/reset dialogs; ViewModel tests cover the next-programme
+  flow with a fake AI provider. Full navigation and real-provider end-to-end checks remain manual.

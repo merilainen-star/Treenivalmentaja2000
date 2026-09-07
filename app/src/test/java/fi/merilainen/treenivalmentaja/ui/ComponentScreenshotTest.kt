@@ -130,7 +130,7 @@ class ComponentScreenshotTest {
      * whatever qualifier the class is configured with — a capture that read the system setting
      * would say nothing about which scheme it actually drew.
      */
-    private fun capture(name: String, darkTheme: Boolean, content: @Composable () -> Unit) {
+    private fun capture(name: String, darkTheme: Boolean, content: @Composable () -> Unit) = stillScreenshot {
         captureRoboImage("src/test/screenshots/$name.png", roborazziOptions = options) {
             MyApplicationTheme(darkTheme = darkTheme) {
                 Surface(color = MaterialTheme.colorScheme.background) {

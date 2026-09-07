@@ -1,5 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
+import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
+
 import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +44,7 @@ class IntervalsConnection internal constructor(
   private val store: IntervalsApiKeyStorage,
   private val client: IntervalsClient,
   private val onKeyCleared: suspend () -> Unit,
+  private val generation: ConnectionGeneration = ConnectionGeneration(),
 ) {
 
   private val _state = MutableStateFlow<IntervalsConnectionState>(
@@ -104,9 +107,11 @@ class IntervalsConnection internal constructor(
   /** Forgets the key and every activity cached with it. The training plan is untouched. */
   suspend fun clearApiKey() {
     mutex.withLock {
-      store.clearApiKey()
-      onKeyCleared()
-      _state.value = IntervalsConnectionState.NotConfigured
+      generation.invalidate {
+        store.clearApiKey()
+        onKeyCleared()
+        _state.value = IntervalsConnectionState.NotConfigured
+      }
     }
   }
 

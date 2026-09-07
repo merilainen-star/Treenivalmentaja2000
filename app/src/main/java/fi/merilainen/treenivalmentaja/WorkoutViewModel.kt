@@ -162,6 +162,7 @@ data class PendingImportPrompt(
   /** The name the incoming document gives itself. */
   val planName: String,
   val action: PendingImport,
+  val nextProgram: NextProgramState.Ready? = null,
 )
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -964,7 +965,7 @@ class WorkoutViewModel(
     val model = analysisModel.value
     val client = analysisClients[model.provider] ?: return
     if (_nextProgram.value is NextProgramState.Loading) return
-
+    _nextProgram.value = NextProgramState.Loading(request)
     viewModelScope.launch {
       val analysis = buildProgramAnalysisNow()
       if (analysis == null) {
@@ -977,12 +978,16 @@ class WorkoutViewModel(
       // The day after the previous programme's last session, or tomorrow if it already ended —
       // never today, because a plan that starts this morning has already missed its first session.
       val startDate = maxOf(analysis.identity.endDate, currentDate.value).plusDays(1)
+      val requirements = fi.merilainen.treenivalmentaja.domain.NextProgramRequirements(
+        startDate, repository.activePlanTimeZone().id, request.weeks,
+      )
       val prompt =
         nextProgramPromptBuilder.build(
           analysis = analysis,
           request = request,
           startDate = startDate,
-          timeZone = repository.activePlanTimeZone().id,
+          timeZone = requirements.timeZone,
+          constraints = advisorSettingsStore?.constraintsFlow?.first().orEmpty(),
           finalReport =
             (_programReport.value as? ProgramReportState.Loaded)
               ?.takeIf { it.kind == ProgramReportKind.FINAL }
@@ -992,7 +997,7 @@ class WorkoutViewModel(
       _nextProgram.value =
         try {
           val raw = client.analyse(prompt, model)
-          when (val preview = repository.previewPlan(raw)) {
+          when (val preview = repository.previewPlan(raw, requirements)) {
             is PlanPreviewResult.Invalid ->
               NextProgramState.Invalid(preview.errors, prompt, request)
             is PlanPreviewResult.Valid -> {
@@ -1019,17 +1024,26 @@ class WorkoutViewModel(
   /**
    * Writes the previewed plan and makes it the active one.
    *
-   * `confirmed = true` because the preview **is** the confirmation: the person has just read what
-   * the plan contains and how it differs from the last one, which is more than the ordinary import
-   * dialog shows them.
+   * The preview approves the new content. The importer's separate confirmation explains any
+   * permanent loss of the previous programme's history, just as it does for a file import.
    */
   fun importNextProgram() {
     val ready = _nextProgram.value as? NextProgramState.Ready ?: return
-
+    _nextProgram.value = NextProgramState.Importing
     viewModelScope.launch {
-      _nextProgram.value = NextProgramState.Importing
+      runNextProgramImport(ready, confirmed = false)
+    }
+  }
+
+  private suspend fun runNextProgramImport(ready: NextProgramState.Ready, confirmed: Boolean) {
       _nextProgram.value =
-        when (val result = repository.importPlan(ready.rawJson, activate = true, confirmed = true)) {
+        when (val result = repository.importPlan(ready.rawJson, activate = true, confirmed = confirmed)) {
+          is ImportResult.NeedsConfirmation -> {
+            _pendingImport.value = PendingImportPrompt(
+              ready.rawJson, false, result.planName, result.action, nextProgram = ready,
+            )
+            ready
+          }
           is ImportResult.Success ->
             NextProgramState.Imported(result.planName, result.sessionCount)
           is ImportResult.Invalid ->
@@ -1048,7 +1062,6 @@ class WorkoutViewModel(
       // The calendar is driven by the active plan, so a successful import has already changed what
       // is behind this card. The alarms have not moved themselves.
       if (_nextProgram.value is NextProgramState.Imported) rescheduleAlarmsUseCase.execute()
-    }
   }
 
   /**
@@ -1634,7 +1647,12 @@ class WorkoutViewModel(
   fun confirmPendingImport() {
     val pending = _pendingImport.value ?: return
     _pendingImport.value = null
-    viewModelScope.launch { runImport(pending.rawJson, pending.startToday, confirmed = true) }
+    if (pending.nextProgram != null) {
+      _nextProgram.value = NextProgramState.Importing
+      viewModelScope.launch { runNextProgramImport(pending.nextProgram, confirmed = true) }
+    } else {
+      viewModelScope.launch { runImport(pending.rawJson, pending.startToday, confirmed = true) }
+    }
   }
 
   fun cancelPendingImport() {

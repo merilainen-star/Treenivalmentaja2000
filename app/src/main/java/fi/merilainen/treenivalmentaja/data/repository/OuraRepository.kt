@@ -1,5 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.repository
 
+import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
+
 import fi.merilainen.treenivalmentaja.data.local.dao.OuraDao
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
@@ -49,6 +51,7 @@ class OuraRepository internal constructor(
   private val dao: OuraDao,
   private val clock: () -> Long = System::currentTimeMillis,
   private val matcher: MatchOuraWorkoutsUseCase = MatchOuraWorkoutsUseCase(),
+  private val generation: ConnectionGeneration = ConnectionGeneration(),
 ) {
 
   /**
@@ -61,8 +64,9 @@ class OuraRepository internal constructor(
    * initiative, and an exception escaping into a `LaunchedEffect` would be a crash for a network
    * that was merely unavailable.
    */
-  suspend fun sync(from: LocalDate, to: LocalDate): OuraSyncResult =
-    try {
+  suspend fun sync(from: LocalDate, to: LocalDate): OuraSyncResult {
+    val expected = generation.current()
+    return try {
       val readiness = client.readiness(from, to)
       val sleep = client.sleep(from, to)
       val activity = client.activity(from, to)
@@ -74,8 +78,10 @@ class OuraRepository internal constructor(
         OuraMappers.toDailySummaries(readiness, sleep, activity, fetchedAt, sleepPeriods)
       val workoutRows = withHeartRatePerWorkout(OuraMappers.toWorkouts(workouts))
 
-      if (summaries.isNotEmpty()) dao.upsertDailySummaries(summaries)
-      if (workoutRows.isNotEmpty()) dao.upsertWorkouts(workoutRows)
+      generation.commit(expected) {
+        if (summaries.isNotEmpty()) dao.upsertDailySummaries(summaries)
+        if (workoutRows.isNotEmpty()) dao.upsertWorkouts(workoutRows)
+      } ?: return OuraSyncResult.Failure("Oura-yhteys on katkaistu.", false)
 
       OuraSyncResult.Success(days = summaries.size, workouts = workoutRows.size)
     } catch (e: OuraException) {
@@ -84,6 +90,8 @@ class OuraRepository internal constructor(
         canRetry = e.canRetry,
       )
     }
+
+  }
 
   /**
    * Asks Oura the same questions a sync asks, and reports what came back rather than storing it.

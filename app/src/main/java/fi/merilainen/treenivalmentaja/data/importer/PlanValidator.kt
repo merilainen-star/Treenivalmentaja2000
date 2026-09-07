@@ -49,7 +49,10 @@ object PlanValidator {
   private val TIME_FORMAT: DateTimeFormatter =
     DateTimeFormatter.ofPattern("HH:mm").withResolverStyle(ResolverStyle.STRICT)
 
-  fun validate(document: PlanDocumentDto): ValidationOutcome {
+  fun validate(
+    document: PlanDocumentDto,
+    requirements: fi.merilainen.treenivalmentaja.domain.NextProgramRequirements? = null,
+  ): ValidationOutcome {
     val errors = mutableListOf<ImportError>()
 
     when (document.schemaVersion) {
@@ -147,6 +150,29 @@ object PlanValidator {
     }
 
     if (errors.isNotEmpty()) return ValidationOutcome.Errors(errors)
+
+    if (requirements != null) {
+      if (startDate != requirements.startDate) {
+        errors += ImportError("plan.startDate", "aloituspäivän on oltava ${requirements.startDate}")
+      }
+      if (zone?.id != requirements.timeZone) {
+        errors += ImportError("plan.timeZone", "aikavyöhykkeen on oltava ${requirements.timeZone}")
+      }
+      if (requirements.weeks !in 1..52 ||
+        weeks?.mapNotNull { it?.weekNumber }?.sorted() != (1..requirements.weeks).toList()) {
+        errors += ImportError("weeks", "ohjelmassa on oltava viikot 1–${requirements.weeks}, jokainen kerran")
+      }
+      val end = requirements.startDate.plusWeeks(requirements.weeks.toLong())
+      sessions.forEach { session ->
+        val date = LocalDate.parse(session.scheduledDate)
+        if (date < requirements.startDate || date >= end) {
+          errors += ImportError("session.${session.id}.date", "päivän on oltava pyydetyn jakson sisällä")
+        } else if ((date.toEpochDay() - requirements.startDate.toEpochDay()) / 7 + 1 != session.weekNumber.toLong()) {
+          errors += ImportError("session.${session.id}.date", "päivä ei kuulu ilmoitettuun ohjelmaviikkoon")
+        }
+      }
+      if (errors.isNotEmpty()) return ValidationOutcome.Errors(errors)
+    }
 
     return ValidationOutcome.Valid(
       ValidatedPlan(

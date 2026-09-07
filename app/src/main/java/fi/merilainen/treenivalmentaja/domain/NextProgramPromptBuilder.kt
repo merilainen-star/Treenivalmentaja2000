@@ -26,6 +26,7 @@ class NextProgramPromptBuilder {
     timeZone: String,
     /** The loppuraportti the model just wrote, when the person has one open. */
     finalReport: String? = null,
+    constraints: String = "",
   ): String = buildString {
     appendLine(ROLE)
     appendLine()
@@ -37,6 +38,12 @@ class NextProgramPromptBuilder {
     appendPreviousLevel(analysis)
     appendFeedback(analysis, request)
     appendGoal(request)
+    if (constraints.isNotBlank()) {
+      appendLine("## Käyttäjän pysyvät rajoitteet")
+      appendLine(constraints.trim())
+      appendLine("Noudata näitä myös uudessa ohjelmassa. Käyttäjä tarkistaa ne ennen hyväksyntää.")
+      appendLine()
+    }
     finalReport?.trim()?.takeIf { it.isNotEmpty() }?.let {
       appendLine("## Juuri kirjoittamasi loppuraportti edellisestä jaksosta")
       appendLine(it)

@@ -72,8 +72,8 @@ The app handles personal health data and training schedules. Threats include una
   `ApkTransferTest` and `UpdateInfoParsingTest` hold both halves in place.
 
 ## Exported Android Components
-- `OuraCallbackActivity` (`treenivalmentaja://oauth2callback`) is once again the **only** exported
-  component in the app. It has to be: a browser starts it. It therefore acts on nothing it is
+- `MainActivity` is exported for the launcher. `OuraCallbackActivity`
+  (`treenivalmentaja://oauth2callback`) is also exported because a browser starts it. It therefore acts on nothing it is
   given — it forwards the URI to `OuraConnection`, which discards anything whose `state` is not the
   exact value this device generated for a login it actually started. A forged redirect produces a
   visible refusal and no token exchange, which `OuraConnectionTest` holds in place.
@@ -127,7 +127,7 @@ OAuth exchange and provider calls happen in the app; a local build that opts int
 
   The honest position, which replaces it: the data is raw, and the protections are that **nothing is
   sent unless the user taps the button**, that the request is **shown to them verbatim** afterwards,
-  that **only one workout and about a week of readings** go with it rather than the whole history,
+  that **per-workout analysis sends one workout and about a week of readings**,
   and that **not entering a key disables the feature entirely**. Recorded as a change of position
   rather than edited away, because a security document that quietly drops a promise it broke is
   worse than one that never made it.
@@ -135,12 +135,19 @@ OAuth exchange and provider calls happen in the app; a local build that opts int
   referenced session, date and legal transition is checked again inside one Room transaction.
   Nothing is written before the user taps **Hyväksy muutokset**, and a partly invalid list rolls
   back as a whole. Accepted event rows are tagged `AI_ADVISOR`.
-- User can trigger a complete local data wipe from the Settings screen.
+- Whole-programme reports and next-programme requests have a wider scope than per-workout
+  analysis: programme summaries, completed runs and recovery trends, and (for generation) goals,
+  feedback, constraints and an available final report. See [PRIVACY.md](PRIVACY.md).
+- Generated programmes must also match the requested start date, time zone and week count.
+  Previewing does not write; replacing the plan requires the destructive import confirmation.
+- **Correction:** the app's Settings screen does not offer a complete local data wipe, despite the
+  previous claim here. Connection controls clear their respective credentials/caches; sample reset
+  clears plans/history after confirmation. Clear all local data through Android's app-storage
+  settings or uninstall. This corrects the documentation, not a promise of a new wipe feature.
 
 ## Known Security Gaps
-- **The whole OAuth flow is untested against Oura.** It is covered by unit tests against a local
-  server, but no login has ever been completed — that needs credentials only the owner's account
-  can issue. Until one has, nothing here is proven end to end.
+- OAuth regression tests use a local server and device Keystore tests. The September audit did
+  not perform a real-account login; these results do not establish provider end-to-end behaviour.
 - The app cannot revoke its own access, because the Oura specification documents no revoke
   endpoint. Disconnecting deletes everything locally; revoking the application is done from Oura's
   account settings.
@@ -150,3 +157,15 @@ OAuth exchange and provider calls happen in the app; a local build that opts int
   revisited if distribution expands beyond the owner.
 - A local build can opt into compiling the Oura client secret into the APK. Published test builds
   leave that fallback empty — see "Secret Management".
+
+## Private daily build and disconnect races (7 September 2026)
+
+The `personal` variant is non-debuggable and uses the existing private `debug.keystore` signing
+identity so it can update the owner's installed app in place. The key's filename does not make
+the APK debuggable. `debug` remains for development. This is a single-user sideloading workflow;
+no store distribution, backend or new signing identity is introduced.
+
+Oura connection, authenticator and repository share a connection generation; intervals.icu
+connection and repository share another. Disconnect invalidates that generation and clears
+storage under the same short lock used for writes. Network calls run outside it: late token
+refresh, login, sync and backfill results cannot reinsert data after deletion.

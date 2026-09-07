@@ -83,6 +83,9 @@ data class NextProgramRequest(
 /** Eight, because that is the block length the owner asked for and the previous plans used. */
 const val DEFAULT_NEXT_PROGRAM_WEEKS = 8
 
+/** Exact structural contract for generated programmes, separate from free-text coaching goals. */
+data class NextProgramRequirements(val startDate: LocalDate, val timeZone: String, val weeks: Int)
+
 /**
  * The plan the model produced, described by the app rather than by the model.
  *

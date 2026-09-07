@@ -6,6 +6,8 @@ import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
 import fi.merilainen.treenivalmentaja.data.settings.NotificationSettingsStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 import fi.merilainen.treenivalmentaja.data.alarm.ReminderScheduler
 
@@ -26,7 +28,9 @@ open class RescheduleAlarmsUseCase(
   private val reminderScheduler: ReminderScheduler
 ) {
   
-  open suspend fun execute() {
+  private val mutex = Mutex()
+
+  open suspend fun execute() = mutex.withLock {
     val previousCount = settingsStore.alarmCountFlow.first()
     if (previousCount > 0) {
         val requestCodes = (0 until previousCount).toList()
@@ -35,54 +39,38 @@ open class RescheduleAlarmsUseCase(
 
     val settings = settingsStore.settingsFlow.first()
 
-    // Active plan only. A replaced plan keeps its rows — importing deactivates the old plan
-    // rather than deleting it — and scheduling from every PLANNED row made a superseded
-    // programme carry on notifying beside the current one.
-    val plannedSessions = sessionDao.getByStatusInActivePlan(SessionStatus.PLANNED)
+    val currentSessions = database.withTransaction {
+      // Preserve the active-plan guard even though imports now delete replaced plans.
+      val plannedSessions = sessionDao.getByStatusInActivePlan(SessionStatus.PLANNED)
+      val plans = plannedSessions.map { it.planId }.distinct()
+        .mapNotNull { planDao.getById(it) }.associateBy { it.id }
 
-    if (plannedSessions.isEmpty()) {
-        settingsStore.updateAlarmCount(0)
-        return
-    }
-
-    val planIds = plannedSessions.map { it.planId }.distinct()
-    val plans = planIds.mapNotNull { planDao.getById(it) }.associateBy { it.id }
-
-    val updatedSessions = plannedSessions.mapNotNull { session ->
-      val plan = plans[session.planId] ?: return@mapNotNull null
-      val newRemindAtUtc = resolveReminderUseCase.resolveRemindAtUtc(
-        sessionScheduledDate = session.scheduledDate,
-        sessionScheduledTime = session.scheduledTime,
-        sessionTimeIsFixed = session.timeIsFixed,
-        sessionReminderOverride = session.reminderOverride,
-        sessionType = session.type,
-        timeZone = plan.timeZone,
-        settings = settings
-      )
-
-      if (session.remindAtUtc != newRemindAtUtc) {
-        session.copy(
-          remindAtUtc = newRemindAtUtc,
-          updatedAt = System.currentTimeMillis()
+      for (session in plannedSessions) {
+        val plan = plans[session.planId] ?: continue
+        val newRemindAtUtc = resolveReminderUseCase.resolveRemindAtUtc(
+          sessionScheduledDate = session.scheduledDate,
+          sessionScheduledTime = session.scheduledTime,
+          sessionTimeIsFixed = session.timeIsFixed,
+          sessionReminderOverride = session.reminderOverride,
+          sessionType = session.type,
+          timeZone = plan.timeZone,
+          settings = settings
         )
-      } else null
-    }
-
-    if (updatedSessions.isNotEmpty()) {
-      database.withTransaction {
-        for (session in updatedSessions) {
-          sessionDao.update(session)
+        if (session.remindAtUtc != newRemindAtUtc) {
+          sessionDao.updateReminder(session.id, newRemindAtUtc, System.currentTimeMillis())
         }
       }
-    }
 
+      sessionDao.getByStatusInActivePlan(SessionStatus.PLANNED)
+    }
+    if (currentSessions.isEmpty()) {
+      settingsStore.updateAlarmCount(0)
+      return@withLock
+    }
     val now = System.currentTimeMillis()
     val windowEnd = now + ReminderScheduler.REMINDER_WINDOW_DAYS * 24L * 60 * 60 * 1000
-
-    val allSessionsMap = plannedSessions.associateBy { it.id }.toMutableMap()
-    updatedSessions.forEach { allSessionsMap[it.id] = it }
     
-    val sessionsToSchedule = allSessionsMap.values
+    val sessionsToSchedule = currentSessions
         .filter { it.remindAtUtc in now..windowEnd }
         .sortedBy { it.remindAtUtc }
 

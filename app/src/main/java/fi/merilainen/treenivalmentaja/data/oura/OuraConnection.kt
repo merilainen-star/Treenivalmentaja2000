@@ -1,5 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.oura
 
+import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
+
 import fi.merilainen.treenivalmentaja.data.local.dao.OuraDao
 import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import java.security.SecureRandom
@@ -51,6 +53,7 @@ class OuraConnection internal constructor(
   private val credentials: OuraCredentialsSource,
   private val onDisconnected: suspend () -> Unit,
   private val random: SecureRandom = SecureRandom(),
+  private val generation: ConnectionGeneration = ConnectionGeneration(),
 ) {
 
   /**
@@ -107,7 +110,7 @@ class OuraConnection internal constructor(
     }
 
   /** Forgets the client credentials as well as the tokens — the full way back to a clean app. */
-  suspend fun forgetCredentials() {
+  suspend fun forgetCredentials() = generation.invalidate {
     store.clear()
     store.clearCredentials()
     onDisconnected()
@@ -188,6 +191,7 @@ class OuraConnection internal constructor(
   }
 
   private suspend fun exchange(code: String) {
+    val expected = generation.current()
     val verifier = store.pendingVerifier()
     if (verifier == null) {
       store.clearPending()
@@ -198,16 +202,20 @@ class OuraConnection internal constructor(
     _state.value = OuraConnectionState.Connecting
     try {
       val tokens = authService.exchange(code, verifier)
-      if (store.save(tokens) == CredentialSaveResult.Success) {
-        _state.value = OuraConnectionState.Connected
-      } else {
-        _state.value = OuraConnectionState.Failed(SECURE_SAVE_ERROR)
+      generation.commit(expected) {
+        if (store.save(tokens) == CredentialSaveResult.Success) {
+          _state.value = OuraConnectionState.Connected
+        } else {
+          _state.value = OuraConnectionState.Failed(SECURE_SAVE_ERROR)
+        }
       }
     } catch (e: OuraException) {
-      _state.value = OuraConnectionState.Failed(e.message ?: "Oura-yhteys epäonnistui.")
+      generation.commit(expected) {
+        _state.value = OuraConnectionState.Failed(e.message ?: "Oura-yhteys epäonnistui.")
+      }
     } finally {
-      // A verifier is good for one attempt whether it worked or not.
-      store.clearPending()
+      // A late response must not clear a newer login's verifier either.
+      generation.commit(expected) { store.clearPending() }
     }
   }
 
@@ -229,7 +237,7 @@ class OuraConnection internal constructor(
    * checked against it. Access is given up locally, and revoking the application itself is done
    * from Oura's own account settings. Documented rather than approximated with a guessed URL.
    */
-  suspend fun disconnect() {
+  suspend fun disconnect() = generation.invalidate {
     store.clear()
     onDisconnected()
     refreshState()

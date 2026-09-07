@@ -60,6 +60,14 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    // Private daily-use APK. Keep the existing certificate/application id so the owner's
+    // installed test build upgrades in place, but do not ship debugger/run-as access.
+    create("personal") {
+      initWith(getByName("release"))
+      signingConfig = signingConfigs.getByName("debugConfig")
+      isDebuggable = false
+      matchingFallbacks += "release"
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

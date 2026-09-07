@@ -96,7 +96,17 @@ fun WeekScreen(viewModel: WorkoutViewModel) {
     val analysisModel by viewModel.analysisModel.collectAsState()
     val programReport by viewModel.programReport.collectAsState()
     val nextProgram by viewModel.nextProgram.collectAsState()
+    val pendingImport by viewModel.pendingImport.collectAsState()
     val today by viewModel.currentDate.collectAsState()
+
+    pendingImport?.let { pending ->
+        ImportConfirmDialog(
+            planName = pending.planName,
+            action = pending.action,
+            onConfirm = viewModel::confirmPendingImport,
+            onDismiss = viewModel::cancelPendingImport,
+        )
+    }
 
     // On resume, for the same reason as Today: an app left open in the background would otherwise
     // keep showing what was true when the screen was first composed.

@@ -1,5 +1,7 @@
 package fi.merilainen.treenivalmentaja.data.repository
 
+import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
+
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsMappers
@@ -67,16 +69,23 @@ class IntervalsRepository internal constructor(
   private val dao: IntervalsDao,
   private val clock: () -> Long = System::currentTimeMillis,
   private val matcher: MatchOuraWorkoutsUseCase = MatchOuraWorkoutsUseCase(),
+  private val generation: ConnectionGeneration = ConnectionGeneration(),
 ) {
 
   /** Reads intervals.icu between two dates and writes what came back. */
-  suspend fun sync(from: LocalDate, to: LocalDate, zone: ZoneId): IntervalsSyncResult =
-    try {
+  suspend fun sync(from: LocalDate, to: LocalDate, zone: ZoneId): IntervalsSyncResult {
+    val expected = generation.current()
+    return try {
       val activities = client.activities(from, to)
       val rows = IntervalsMappers.toActivities(activities, clock(), zone)
-      if (rows.isNotEmpty()) dao.upsertActivities(rows)
-      syncWellness(from, to)
-      syncSplits(rows)
+      generation.commit(expected) {
+        if (rows.isNotEmpty()) dao.upsertActivities(rows)
+      } ?: return IntervalsSyncResult.Failure("Intervals.icu-yhteys on poistettu.", false)
+      syncWellness(from, to, expected)
+      syncSplits(rows, expected)
+      if (generation.current() != expected) {
+        return IntervalsSyncResult.Failure("Intervals.icu-yhteys on poistettu.", false)
+      }
       IntervalsSyncResult.Success(activities = rows.size)
     } catch (e: IntervalsException) {
       IntervalsSyncResult.Failure(
@@ -87,6 +96,8 @@ class IntervalsRepository internal constructor(
             ?.retryAfterSeconds,
       )
     }
+
+  }
 
   /**
    * The daily load series, or nothing — **a failure here is not a failure of the sync**.
@@ -99,7 +110,8 @@ class IntervalsRepository internal constructor(
    * What it costs when it fails: the upcoming-workout analysis loses its load section, which the
    * prompt builder omits rather than guesses at.
    */
-  private suspend fun syncWellness(from: LocalDate, to: LocalDate) {
+  private suspend fun syncWellness(from: LocalDate, to: LocalDate, expected: Long) {
+    if (generation.current() != expected) return
     val days =
       try {
         client.wellness(from, to)
@@ -107,7 +119,7 @@ class IntervalsRepository internal constructor(
         return
       }
     val rows = IntervalsMappers.toWellness(days, clock())
-    if (rows.isNotEmpty()) dao.upsertWellness(rows)
+    generation.commit(expected) { if (rows.isNotEmpty()) dao.upsertWellness(rows) }
   }
 
   /**
@@ -130,7 +142,7 @@ class IntervalsRepository internal constructor(
    * A failure stops the walk rather than the sync — the connection is probably gone, and the
    * remaining runs will be picked up next time.
    */
-  private suspend fun syncSplits(activities: List<IntervalsActivityEntity>) {
+  private suspend fun syncSplits(activities: List<IntervalsActivityEntity>, expected: Long) {
     val already = dao.splitFetchedActivityIds().toSet()
     val candidates =
       activities
@@ -138,6 +150,7 @@ class IntervalsRepository internal constructor(
         .sortedByDescending { it.startTimeUtc }
         .take(MAX_SPLIT_FETCHES_PER_SYNC)
     for (activity in candidates) {
+      if (generation.current() != expected) return
       val streams =
         try {
           IntervalsMappers.toStreams(client.streams(activity.id))
@@ -151,11 +164,13 @@ class IntervalsRepository internal constructor(
           heartRate = streams[STREAM_HEART_RATE],
           altitude = streams[STREAM_ALTITUDE],
         )
-      dao.replaceSplits(
-        activityId = activity.id,
-        splits = IntervalsMappers.toSplitRows(activity.id, splits),
-        fetchedAtUtc = clock(),
-      )
+      generation.commit(expected) {
+        dao.replaceSplits(
+          activityId = activity.id,
+          splits = IntervalsMappers.toSplitRows(activity.id, splits),
+          fetchedAtUtc = clock(),
+        )
+      } ?: return
     }
   }
 
@@ -210,6 +225,7 @@ class IntervalsRepository internal constructor(
     maxYears: Int = MAX_BACKFILL_YEARS,
     onYearDone: (Int) -> Unit = {},
   ): IntervalsBackfillResult {
+    val expected = generation.current()
     var stored = 0
     var emptyYears = 0
     var scanned = 0
@@ -233,7 +249,8 @@ class IntervalsRepository internal constructor(
         if (++emptyYears >= EMPTY_YEARS_BEFORE_STOPPING) break
       } else {
         emptyYears = 0
-        dao.upsertActivities(rows)
+        generation.commit(expected) { dao.upsertActivities(rows) }
+          ?: return IntervalsBackfillResult(stored, scanned, "Intervals.icu-yhteys on poistettu.")
         stored += rows.size
       }
       onYearDone(stored)

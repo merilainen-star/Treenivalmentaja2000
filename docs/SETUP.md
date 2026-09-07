@@ -21,7 +21,7 @@ If you are not using Android Studio, point the build at your SDK by creating `lo
 sdk.dir=/path/to/Android/sdk
 ```
 
-The debug build is signed with a local `debug.keystore` at the repository root. It is git-ignored
+The debug and personal builds are signed with a local `debug.keystore` at the repository root. It is git-ignored
 (a signing key never belongs in version control), so generate it once after cloning:
 ```bash
 keytool -genkeypair -v -keystore debug.keystore -storepass android -keypass android \
@@ -123,8 +123,9 @@ The build runs automatically on every push to `main` that touches code, and can 
 from <https://github.com/merilainen-star/Treenivalmentaja2000/actions> — "Build Treenivalmentaja
 Test APK" → *Run workflow*, which works from a phone browser.
 
-An APK is published only when `assembleDebug`, `testDebugUnitTest`, `verifyRoborazziDebug` and
-`lintDebug` all pass. If any fails, the workflow fails and the previous APK stays downloadable.
+An APK is published only when `assemblePersonal`, `testDebugUnitTest`, `verifyRoborazziDebug`,
+`lintDebug` and `lintPersonal` all pass. Unit and screenshot tasks run in separate Gradle
+invocations; the job has a 30-minute timeout. If any fails, the workflow fails and the previous APK stays downloadable.
 Instrumented tests are **not** run in CI — they need a device, so they remain a local check.
 
 Each build's version name carries its commit (`1.0-0fd8c46`), visible in Android's app info, so
@@ -154,3 +155,15 @@ app was signed with a different key, and the only route is to uninstall it first
 the training database**. Take a copy with `tools/backup-db.ps1` first and put it back afterwards
 with its `-Restore` switch. Once the app has been installed from a GitHub build, every later
 GitHub build updates it in place.
+
+## Personal daily APK
+
+Use `./gradlew :app:assemblePersonal`; output is `app/build/outputs/apk/personal/app-personal.apk`.
+It inherits the release build configuration with `isDebuggable = false`, but deliberately keeps
+the package, version-code policy and existing `debug.keystore` certificate. Install over the
+previous app (`adb install -r ...`) without uninstalling. CI uses this variant while preserving
+the existing download filename and signing secret. This is for the owner's private use.
+
+Use `debug` for development and instrumented tests. ADB `run-as` database inspection works only
+with a debuggable APK; it is deliberately unavailable in `personal`. Do not uninstall to work
+around a signing mismatch: restore the original key.

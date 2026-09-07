@@ -3,6 +3,10 @@ package fi.merilainen.treenivalmentaja.data.oura
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import fi.merilainen.treenivalmentaja.data.security.CredentialSaveResult
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -28,6 +32,8 @@ class OuraConnectionTest {
   private var status = 200
   private var body = TOKEN_BODY
   private var tokenRequests = 0
+  private var responseEntered: CompletableDeferred<Unit>? = null
+  private var responseRelease: CountDownLatch? = null
 
   private val store = FakeOuraTokenStorage()
   private var clearedRows = 0
@@ -38,6 +44,8 @@ class OuraConnectionTest {
     server.createContext("/oauth/token") { exchange: HttpExchange ->
       tokenRequests++
       exchange.requestBody.use { it.readBytes() }
+      responseEntered?.complete(Unit)
+      responseRelease?.await(5, TimeUnit.SECONDS)
       val bytes = body.toByteArray()
       exchange.sendResponseHeaders(status, bytes.size.toLong())
       exchange.responseBody.use { it.write(bytes) }
@@ -47,6 +55,7 @@ class OuraConnectionTest {
 
   @After
   fun stop() {
+    responseRelease?.countDown()
     server.stop(0)
   }
 
@@ -96,6 +105,26 @@ class OuraConnectionTest {
     }
 
   // ------------------------------------------------------------------ before anything happens
+
+  @Test
+  fun `disconnect during token exchange cannot reconnect from the late response`() = runTest {
+    responseEntered = CompletableDeferred()
+    responseRelease = CountDownLatch(1)
+    val connection = connection()
+    connection.beginAuthorization()
+    val callback = redirect(code = "the-code", state = store.state)
+    val login = backgroundScope.async { connection.completeAuthorization(callback) }
+    responseEntered!!.await()
+    connection.disconnect()
+    val disconnected = connection.state.value
+    assertNull(store.tokens)
+    responseRelease!!.countDown()
+    login.await()
+    assertNull(store.tokens)
+    assertNull(store.verifier)
+    assertEquals(disconnected, connection.state.value)
+    assertEquals(1, clearedRows)
+  }
 
   @Test
   fun `a build without credentials is not merely disconnected`() = runTest {

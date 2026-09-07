@@ -1,5 +1,104 @@
 # Project status
 
+## Last verified build — 7 September 2026, audit fixes
+
+Measured on the working tree based on `96477e3`, after the owner authorized findings 1–7.
+Windows, Temurin 21.0.12+8, wrapper Gradle 9.6.1, Android platform 36.1/build-tools 36.1.0.
+The headless `treeni-test` emulator ran Android 16/API 36; it was stopped after verification.
+This change keeps the private, single-user installation model.
+
+| Check | Measured result |
+| --- | --- |
+| JVM tests | **890/0/0** tests/failures/errors, 0 skipped |
+| Device tests | **57/0/0**, 0 skipped; actually run, including `migrate14To15` and the two destructive-confirmation UI tests |
+| Screenshots | **73** comparisons: 73 unchanged, 0 changed/added/recorded |
+| Debug lint | **0 errors, 47 warnings** |
+| Personal lint | **0 errors, 47 warnings** |
+| Debug APK | **22,143,390 bytes = 22.14 MB** (decimal MB) |
+| Personal APK | **14,789,242 bytes = 14.79 MB**; non-debuggable |
+| In-place debug → personal install | Passed; **1 plan, 8 sessions, 8 event rows** preserved in the emulator fixture database, as was a private-storage marker |
+| Personal cold start after upgrade | `Status: ok`, **1,239 ms**; a second cold start was 1,247 ms and the Today screen was captured and visually inspected |
+| Personal `run-as` | Refused: `package not debuggable` |
+| APK signing | Both certificates have SHA-256 `ed6498c93b60af7582cece4b4ad480cc5b1897ccf96a52285224e677a87810c0` |
+
+Exact final wrapper commands (PowerShell; separate invocations deliberately):
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:assemblePersonal :app:lintDebug :app:lintPersonal :app:testDebugUnitTest :app:connectedDebugAndroidTest
+.\gradlew.bat :app:verifyRoborazziDebug
+```
+
+Both succeeded: the first in **2m 51s**, the second in **1m 6s**. Counts were summed from
+`app/build/test-results/testDebugUnitTest/TEST-*.xml` and the root `testsuites` attributes in
+`app/build/outputs/androidTest-results/connected/debug/TEST-treeni-test(AVD) - 16-_app-.xml`.
+Screenshot counts came from `app/build/test-results/roborazzi/debug/results-summary.json`;
+lint severities from `app/build/reports/lint-results-{debug,personal}.xml`.
+APK byte counts were measured with `(Get-Item <apk-path>).Length` (also checked through Python
+`Path.stat().st_size`); outputs are `app/build/outputs/apk/{debug,personal}/app-{debug,personal}.apk`.
+
+Installation and signing checks used these commands (ADB always targeted `emulator-5554`):
+
+```powershell
+& "$env:ANDROID_HOME/build-tools/36.1.0/aapt.exe" dump badging app/build/outputs/apk/personal/app-personal.apk
+& "$env:ANDROID_HOME/build-tools/36.1.0/apksigner.bat" verify --print-certs app/build/outputs/apk/debug/app-debug.apk
+& "$env:ANDROID_HOME/build-tools/36.1.0/apksigner.bat" verify --print-certs app/build/outputs/apk/personal/app-personal.apk
+& "$env:ANDROID_HOME/platform-tools/adb.exe" -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+& "$env:ANDROID_HOME/platform-tools/adb.exe" -s emulator-5554 install -r app/build/outputs/apk/personal/app-personal.apk
+& "$env:ANDROID_HOME/platform-tools/adb.exe" -s emulator-5554 shell run-as fi.merilainen.treenivalmentaja id
+& "$env:ANDROID_HOME/platform-tools/adb.exe" -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+```
+
+The upgrade check compared the following SQLite query output before installing personal, after
+installing it, and after its first launch (the app was force-stopped before each snapshot).
+It used the emulator's `su 0 sqlite3` to inspect the non-debuggable app; this is test-device access,
+not a capability of the personal APK. No real account or phone data was used.
+
+```sql
+SELECT id, name FROM training_plans ORDER BY id;
+SELECT id, status, scheduledDate FROM workout_sessions ORDER BY id;
+SELECT count(*) FROM session_events;
+```
+
+### Corrections and preserved safeguards
+
+- A generated successor now follows the same destructive confirmation as a file import;
+  cancel keeps the current history. The sample-data reset also confirms before calling its
+  callback. Replaced plans are still deleted when explicitly confirmed; no archive redesign.
+- One connection generation per service gates cached-data and token commits. Held HTTP-response
+  tests cover Oura login, token refresh, Oura sync, intervals.icu sync and backfill after deletion.
+- Alarm rescheduling serializes runs and replaces whole-row updates with a conditional reminder-only
+  update in a Room transaction. The deliberate **active-plan filter remains**; its obsolete
+  explanation about retaining replaced plans was corrected, not used to remove the guard.
+- Generated plans must match requested start date, zone, week count and session/week alignment.
+  Stored advisor constraints reach the actual request without relying on a UI subscription.
+- Privacy/security documentation now describes whole-programme requests and real deletion controls.
+  The false claim of a complete-wipe button was explicitly corrected. Schema summaries now say 15;
+  no generated schema JSON was edited.
+- The personal build retains the existing signing identity and download filename. CI builds it,
+  checks it is non-debuggable, runs unit/screenshot tasks separately and has a 30-minute timeout.
+  Debug remains available for development. **No signing key or defensive credential clearing was removed.**
+- The screenshot hang in `updateCard_installStates` was reproduced, then fixed with a test-only
+  infinite-animation policy. Its isolated verification and the full suite passed; no baseline or
+  production animation changed.
+
+Intermediate failures were resolved: the screenshot helper initially needed the Compose
+experimental API opt-in, and the new persisted-constraints test initially asserted before the
+DataStore read completed. The test now awaits the ViewModel result. An initial PowerShell call
+split an unquoted dotted Gradle property; the corrected isolated command was:
+`.\gradlew.bat :app:testDebugUnitTest --tests '*.ComponentScreenshotTest.updateCard_installStates' '-Proborazzi.test.verify=true'`.
+The original pre-fix screenshot audit was stopped when its worker remained stuck in the infinite
+spinner; that stopped run is not counted as passing. Local scratch logs and helper scripts remain
+under git-ignored `.scratch/`.
+
+Remaining limits: lint still reports the 47 warnings above. This run did not perform real-provider
+OAuth/AI calls or run GitHub Actions remotely. The workflow has been changed locally, not published.
+The larger ViewModel/UI files remain a maintenance concern; this audit fix does not redesign their
+architecture or turn the owner's app into a general-distribution product.
+
+## Measurement history
+
+All previous measurements and their reasoning below are retained verbatim.
+
 ## Last verified build
 
 Every number here was measured from the current working tree; test counts are not duplicated in

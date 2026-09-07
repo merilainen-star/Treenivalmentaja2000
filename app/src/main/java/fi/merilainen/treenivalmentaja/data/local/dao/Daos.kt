@@ -63,6 +63,10 @@ interface WorkoutSessionDao {
 
   @Update suspend fun update(session: WorkoutSessionEntity)
 
+  /** Scheduling owns these fields only; it must never restore a stale session status. */
+  @Query("UPDATE workout_sessions SET remindAtUtc = :remindAtUtc, updatedAt = :updatedAt WHERE id = :id AND status = 'PLANNED'")
+  suspend fun updateReminder(id: String, remindAtUtc: Long, updatedAt: Long)
+
   @Query(
     """
     SELECT s.* FROM workout_sessions s

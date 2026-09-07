@@ -32,6 +32,7 @@ jobs:
   build:
     name: Build, verify and publish
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out the repository
@@ -91,16 +92,19 @@ jobs:
           echo "Keystore certificate SHA-256: $FINGERPRINT"
           echo "KEYSTORE_SHA256=$FINGERPRINT" >> "$GITHUB_ENV"
 
-      # Oura is not implemented, and the Secrets Gradle Plugin falls back to .env.example, so no
-      # Oura credentials are needed to compile.
+      # Credentials are entered on the phone. Preserve the installed signing identity while
+      # publishing a non-debuggable APK for the owner's personal use.
       - name: Build and verify
         run: |
           ./gradlew --no-daemon \
             -PversionSuffix="-${GITHUB_SHA::7}" \
-            :app:assembleDebug \
+            :app:assemblePersonal \
             :app:testDebugUnitTest \
-            :app:verifyRoborazziDebug \
-            :app:lintDebug
+            :app:lintDebug :app:lintPersonal
+
+      # Separate invocation so Roborazzi enables capture for a fresh test task execution.
+      - name: Verify screenshots
+        run: ./gradlew --no-daemon :app:verifyRoborazziDebug
 
       # Roborazzi baselines were recorded on Windows; if Linux renders text even slightly
       # differently the comparison fails, and the diff images are the only way to tell an
@@ -116,8 +120,12 @@ jobs:
       - name: Collect measured results
         id: results
         run: |
-          APK=app/build/outputs/apk/debug/app-debug.apk
+          APK=app/build/outputs/apk/personal/app-personal.apk
           test -s "$APK" || { echo "::error::$APK is missing or empty"; exit 1; }
+          "$ANDROID_BUILD_TOOLS/aapt" dump badging "$APK" > apk-badging.txt
+          if grep -q '^application-debuggable' apk-badging.txt; then
+            echo "::error::The personal APK must not be debuggable"; exit 1
+          fi
           mkdir -p dist
           cp "$APK" dist/Treenivalmentaja-test.apk
           echo "apk_mb=$(du -m "$APK" | cut -f1)" >> "$GITHUB_OUTPUT"
@@ -267,7 +275,7 @@ jobs:
 
           | Check | Result |
           | --- | --- |
-          | Build | app-debug.apk, ${{ steps.results.outputs.apk_mb }} MB |
+          | Build | app-personal.apk (non-debuggable), ${{ steps.results.outputs.apk_mb }} MB |
           | Unit tests | ${{ steps.results.outputs.unit_tests }} / ${{ steps.results.outputs.unit_failures }} failures / ${{ steps.results.outputs.unit_errors }} errors |
           | Screenshots | ${{ steps.results.outputs.screenshots }} comparisons, no diffs |
           | Lint | ${{ steps.results.outputs.lint_errors }} errors, ${{ steps.results.outputs.lint_warnings }} warnings |

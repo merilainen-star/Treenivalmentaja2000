@@ -37,12 +37,15 @@ class OuraAuthenticatorTest {
 
   private val store = FakeOuraTokenStorage()
   private var refreshFailures = 0
+  private val generation = fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration()
+  private val refreshStarted = CountDownLatch(1)
 
   @Before
   fun start() {
     server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
     server.createContext("/oauth/token") { exchange: HttpExchange ->
       tokenRequests++
+      refreshStarted.countDown()
       exchange.requestBody.use { it.readBytes() }
       gate?.await(5, TimeUnit.SECONDS)
       val bytes = body.toByteArray()
@@ -66,6 +69,7 @@ class OuraAuthenticatorTest {
           tokenUrl = "http://127.0.0.1:${server.address.port}/oauth/token",
         ),
       onRefreshFailed = { refreshFailures++ },
+      generation = generation,
     )
 
   private fun unauthorized(sentToken: String, priorResponses: Int = 0): Response {
@@ -250,6 +254,7 @@ class OuraAuthenticatorTest {
             tokenUrl = "http://127.0.0.1:1/oauth/token",
           ),
         onRefreshFailed = { refreshFailures++ },
+      generation = generation,
       )
 
     val retry = offline.authenticate(null, unauthorized("access-1"))
@@ -258,4 +263,28 @@ class OuraAuthenticatorTest {
     assertEquals("refresh-1", store.tokens!!.refreshToken)
     assertEquals(0, refreshFailures)
   }
+
+  @Test fun `disconnect during refresh cannot restore tokens`() {
+    store.tokens = OuraTokens("access-1", "refresh-1", OuraTokens.UNKNOWN_EXPIRY)
+    val open = CountDownLatch(1)
+    gate = open
+    val auth = authenticator()
+    val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    try {
+      val pending = executor.submit<Request?> { auth.authenticate(null, unauthorized("access-1")) }
+      assertTrue(refreshStarted.await(3, TimeUnit.SECONDS))
+      kotlinx.coroutines.runBlocking {
+        val connection = OuraConnection(store, OuraAuthService({ OuraCredentials("id", "secret") }),
+          { OuraCredentials("id", "secret") }, {}, generation = generation)
+        connection.disconnect()
+      }
+      open.countDown()
+      assertNull(pending.get(3, TimeUnit.SECONDS))
+      assertNull(store.tokens)
+    } finally {
+      open.countDown()
+      executor.shutdownNow()
+    }
+  }
+
 }
