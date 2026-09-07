@@ -212,6 +212,19 @@ session in a ten-day window is an advertisement; one card at the top of the cale
 it, and the error treatment would claim something went wrong when nothing did. The threshold is
 three completed sessions — enough for a shape, few enough that a plan is not silent for a month.
 
+**The report opens in a sheet, not in the card.** This changed on 2026-09-07, after the owner
+installed it and found what a phone shows and a screenshot test did not: the calendar lays its
+children out in a `Column`, which does not scroll and gives each child what is left over, so a
+loaded report filled the screen, could not be scrolled past its first screenful, and left the day
+rows measured at zero height. The feature had eaten the screen it was a feature of.
+
+The card on the calendar now stays a fixed few lines — title, the report's own first paragraph
+capped at two, and *Lue raportti* — and the document itself opens in a full-height
+`ModalBottomSheet` with one scrolling region and nothing competing underneath. That is also the
+right shape for what it is: a document asked for deliberately, organised into fact, reading and
+advice, which a third of a screen serves badly. The day list additionally carries
+`Modifier.weight(1f)`, so nothing placed above it can starve it again.
+
 **The report's headings are rendered as headings.** The first version printed the model's `##`
 markers literally, which turned the one thing the report is organised around into punctuation. The
 card now splits the text into headings and paragraphs — deliberately not with a Markdown parser,

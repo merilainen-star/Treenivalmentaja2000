@@ -26,6 +26,7 @@ import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.captureRoboImage
 import fi.merilainen.treenivalmentaja.NextProgramSection
 import fi.merilainen.treenivalmentaja.ProgramReportCard
+import fi.merilainen.treenivalmentaja.ProgramReportSheetContent
 import fi.merilainen.treenivalmentaja.EasyRunDriftCard
 import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
 import fi.merilainen.treenivalmentaja.ImportConfirmDialog
@@ -264,38 +265,54 @@ class ComponentScreenshotTest {
         ProgramReportCard(state = null, configured = true)
     }
 
+    private val finishedReport = ProgramReportState.Loaded(
+        kind = ProgramReportKind.FINAL,
+        text = """
+            ## Näin ohjelma toteutui
+            Kahdeksasta viikosta toteutui 92 %. Yksi lihaskuntotreeni jäi väliin ja yksi
+            juoksu siirtyi.
+
+            ## Tulkinta
+            Kevyet juoksut kulkivat lopussa 18 s/km nopeammin kahdeksan lyönnin matalammalla
+            sykkeellä, mikä on aerobisen kunnon kehittymistä eikä päivän vaihtelua.
+
+            ## Alussa → lopussa
+            Kevyt tahti 6:05 /km → 5:47 /km
+            Keskisyke kevyillä 149 → 141
+
+            ## Suositus seuraavalle jaksolle
+            Jatka samalla kevyellä painotuksella ja lisää pitkää lenkkiä varovasti.
+        """.trimIndent(),
+        prompt = "## Ohjelma\n- Nimi: Kesän peruskuntokausi",
+    )
+
     /**
-     * A finished report, headings and all.
+     * A finished report as the calendar shows it: a card of a fixed few lines, with the sheet it
+     * opens over the top. Robolectric draws the sheet into the same root, so both are in frame.
      *
-     * The structure is the feature: fact, then reading, then advice, kept apart so the reader can
-     * see which sentence is which. This baseline is what would catch a future change that flattened
-     * the model's headings into a wall of prose.
+     * This baseline exists because of the bug it would have caught. The report used to render
+     * inline in the card, and on a phone that filled the screen, could not be scrolled, and
+     * squeezed the day rows to nothing. The property worth pinning is that the card stays this size
+     * whatever the model wrote — its first paragraph is capped at two lines for the same reason.
      */
     @Test
     fun programReportLoaded() = capture("card_program_report_loaded") {
-        ProgramReportCard(
-            state = ProgramReportState.Loaded(
-                kind = ProgramReportKind.FINAL,
-                text = """
-                    ## Näin ohjelma toteutui
-                    Kahdeksasta viikosta toteutui 92 %. Yksi lihaskuntotreeni jäi väliin ja yksi
-                    juoksu siirtyi.
+        ProgramReportCard(state = finishedReport, configured = true)
+    }
 
-                    ## Tulkinta
-                    Kevyet juoksut kulkivat lopussa 18 s/km nopeammin kahdeksan lyönnin matalammalla
-                    sykkeellä, mikä on aerobisen kunnon kehittymistä eikä päivän vaihtelua.
-
-                    ## Alussa → lopussa
-                    Kevyt tahti 6:05 /km → 5:47 /km
-                    Keskisyke kevyillä 149 → 141
-
-                    ## Suositus seuraavalle jaksolle
-                    Jatka samalla kevyellä painotuksella ja lisää pitkää lenkkiä varovasti.
-                """.trimIndent(),
-                prompt = "## Ohjelma\n- Nimi: Kesän peruskuntokausi",
-            ),
-            configured = true,
-        )
+    /**
+     * The document itself, as the sheet lays it out.
+     *
+     * Captured through `ProgramReportSheetContent` rather than through the card, because a
+     * `ModalBottomSheet` draws in its own window and a screenshot of the card cannot see inside it.
+     *
+     * The structure is the feature: fact, then reading, then advice, kept apart so the reader can
+     * see which sentence is which. This is the baseline that would catch a future change flattening
+     * the model's headings into a wall of prose.
+     */
+    @Test
+    fun programReportSheet() = capture("sheet_program_report") {
+        ProgramReportSheetContent(state = finishedReport)
     }
 
     /**

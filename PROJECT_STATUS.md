@@ -5,40 +5,29 @@
 Every number here was measured from the current working tree; test counts are not duplicated in
 other documentation.
 
-- Date: 2026-09-06
-- Base commit: `ad07760` — heart-rate zones and the app-computed kilometre splits
+- Date: 2026-09-07
+- Base commit: `96477e3` plus the report-sheet fix
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
 - Emulator: none attached
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 875 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 73 comparisons, 0 changed, 0 added, 73 unchanged |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 876 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 74 comparisons, 0 changed, 74 unchanged |
 | Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
-| Debug APK | `./gradlew clean :app:assembleDebug` | 21,662,707 bytes |
-| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** This is the line that matters most this time: schema v15 ships a new migration, and `MigrationTest.migrate14To15` is **written but unrun**. Room generated `15.json` and the auto-migration is declared, so the guard against a silent destructive fallback still holds — but nobody has watched a v14 database become a v15 one. |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,679,091 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** `MigrationTest.migrate14To15` is still unrun here — but the v15 migration itself is now proven in the field: the owner installed run 75 on their phone, the app opened and the calendar still showed their programme. |
 
-**No baseline moved, and none was added.** Nothing in this change draws anything: the zones and the
-splits reach the model through the prompt and appear on no screen. 73 comparisons, all unchanged,
-is the assertion that says so.
+One baseline moved and one is new: `card_program_report_loaded` now shows the compact card with the
+sheet over it, and `sheet_program_report` is the document itself.
 
-The run detail costs **32,768 B (+0.15 %)**: 21,629,939 B for `2648dd9` against 21,662,707 B with
-it, both from `./gradlew clean :app:assembleDebug` on one machine. Two dex pages, which is what two
-pure domain functions, two Room entities and two prompt sections come to.
-
-**58 new unit tests**, and the ones worth naming are the refusals — `heartRateZones` returning
-`null` rather than an empty distribution when the times are all zero or the arrays cannot be paired;
-a run with no zone data being counted *out* of its programme group rather than folded in as zeros;
-a zone table that moved mid-programme losing its beat ranges. `kilometreSplits` is tested against
-generated channels rather than a recorded fixture, so "did the interpolation put the boundary in the
-right place" is an assertion (100 s, not 115) rather than an eyeball.
-
-Two things carried forward from the previous entry and still true: run the suite at least once in
-the evening (`AiAnalysisPromptSourcingTest` and `EasyRunDriftWiringTest` used to fail only between
-21:00 UTC and midnight), and never combine `testDebugUnitTest` with `verifyRoborazziDebug` in one
-invocation — they race on `app/build/test-results` and the loser dies with a `NoSuchFileException`
-that looks like a test failure.
+**The report card was fixed after the owner found it on the phone**: *"tänä analyysi sivu ei rullaa
+alaspäin"*. The calendar lays its children out in a `Column`, which does not scroll and hands each
+child what is left, so a loaded report took the whole screen, could not be scrolled, and left the
+day rows measured at zero height. Two changes: the report now opens in a full-height
+`ModalBottomSheet` with one scrolling region, and the day list carries `Modifier.weight(1f)` so
+nothing above it can starve it again.
 
 ## Previously verified build
 
