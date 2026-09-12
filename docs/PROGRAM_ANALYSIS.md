@@ -285,3 +285,23 @@ Choosing the generated programme first runs the ordinary unconfirmed import. Whe
 replace the active plan, the existing import dialog explicitly warns that its sessions and
 history will be deleted. Cancel keeps them; only confirmation retries with `confirmed = true`.
 The sample reset in Settings has its own explicit destructive confirmation.
+
+
+## Programme output budget (12 September 2026)
+
+Next-programme requests explicitly select `AnalysisTask.PROGRAM`: 32,768 output tokens,
+compared with 8,192 for prose analyses. All three provider clients send that task budget.
+The previous shared prose ceiling could be exhausted by reasoning before any visible answer.
+OpenAI documents this possibility in its [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
+The screenshot alone does not establish which provider stop reason occurred.
+
+Provider token-limit stop reasons now produce a specific Finnish error when the response is
+empty or the task requires complete programme JSON. Retrying the identical request is not
+offered for a known ceiling; the message directs the owner to select another model. Partial
+prose remains visible, as before. Refusal guards, local plan validation, and explicit import
+confirmation remain in place. No automatic extra paid request is made. The larger ceiling
+allows more billable output when used; it is not a guarantee of successful live generation.
+
+Local HTTP fixtures cover budgets, empty token-limited output, partial programme rejection,
+and preservation of partial prose for all providers. The ViewModel flow test checks that the
+report uses the prose task and its successor uses the programme task.

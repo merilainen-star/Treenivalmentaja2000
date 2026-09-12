@@ -996,7 +996,7 @@ class WorkoutViewModel(
 
       _nextProgram.value =
         try {
-          val raw = client.analyse(prompt, model)
+          val raw = client.analyse(prompt, model, fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask.PROGRAM)
           when (val preview = repository.previewPlan(raw, requirements)) {
             is PlanPreviewResult.Invalid ->
               NextProgramState.Invalid(preview.errors, prompt, request)

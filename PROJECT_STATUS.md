@@ -1,5 +1,35 @@
 # Project status
 
+## Last verified build — 12 September 2026, next-programme output budget
+
+Measured on the working tree based on `d9751a1`, Windows, Temurin 21.0.12+8.
+
+- JVM tests: **893/0/0** tests/failures/errors, 0 skipped.
+- Targeted device UI test: **1/0/0**, run on `treeni-test`, Android 16.
+- Debug lint: **0 errors, 10 warnings**.
+- Debug APK: **22,143,508 bytes = 22.143508 MB** (decimal).
+- Live paid AI generation was not run; the user's original provider response is unavailable.
+- KSP printed an AWT background-thread exception; both Gradle commands finished successfully.
+- Screenshot comparison and the complete instrumented suite were not run for this change.
+
+Exact verification commands (PowerShell):
+
+```powershell
+$env:JAVA_HOME='C:/Users/mimer/.jdks/jdk-21.0.12+8'
+./gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline
+./gradlew.bat :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=fi.merilainen.treenivalmentaja.NextProgramFailureTest' --offline
+```
+
+The first sandboxed Gradle attempt could not access the wrapper cache lock; the verified runs
+used approved access to the existing user Gradle cache. Counts come from the JUnit XML files
+under `app/build/test-results/testDebugUnitTest` and
+`app/build/outputs/androidTest-results/connected`; lint counts from
+`app/build/reports/lint-results-debug.txt`. APK size is the byte length of
+`app/build/outputs/apk/debug/app-debug.apk`.
+
+## Measurement history
+
+
 ## Last verified build — 7 September 2026, audit fixes
 
 Measured on the working tree based on `96477e3`, after the owner authorized findings 1–7.

@@ -22,7 +22,7 @@ internal constructor(
   private val calls: Call.Factory = AnalysisHttp.defaultCallFactory(),
 ) : AnalysisClient {
 
-  override suspend fun analyse(prompt: String, model: AnalysisModel): String {
+  override suspend fun analyse(prompt: String, model: AnalysisModel, task: AnalysisTask): String {
     val key =
       apiKeys.apiKey()?.takeIf { it.isNotBlank() }
         ?: throw AnalysisNotConfiguredException(AnalysisProvider.ANTHROPIC.label)
@@ -30,7 +30,7 @@ internal constructor(
       requestAdapter.toJson(
         AnthropicRequestDto(
           model = model.id,
-          maxTokens = AnalysisHttp.MAX_OUTPUT_TOKENS,
+          maxTokens = task.maxOutputTokens,
           messages = listOf(AnthropicMessageDto(role = "user", content = prompt)),
         )
       )
@@ -43,7 +43,7 @@ internal constructor(
         // and sending the key there authenticates as nobody.
         headers = mapOf("x-api-key" to key, "anthropic-version" to API_VERSION),
       )
-    return AnalysisHttp.decode(response, responseAdapter).firstText()
+    return AnalysisHttp.decode(response, responseAdapter).firstText(task)
   }
 
   /**
@@ -59,8 +59,12 @@ internal constructor(
    *     `content[0].text` would work on one of the three and render blank on the other two — a bug
    *     that shipped once already and is now pinned by a test.
    */
-  private fun AnthropicResponseDto.firstText(): String {
+  private fun AnthropicResponseDto.firstText(task: AnalysisTask): String {
     if (stopReason == STOP_REFUSAL) throw AnalysisRefusedException()
+    val text = content.orEmpty().filterNotNull().firstOrNull { it.type == BLOCK_TEXT }?.text
+    if (stopReason == "max_tokens" && (task == AnalysisTask.PROGRAM || text.isNullOrBlank())) {
+      throw AnalysisOutputLimitException()
+    }
     return with(AnalysisHttp) {
       content.orEmpty().filterNotNull().firstOrNull { it.type == BLOCK_TEXT }?.text.orEmptyFailure()
     }

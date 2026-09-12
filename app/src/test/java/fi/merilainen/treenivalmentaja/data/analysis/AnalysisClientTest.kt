@@ -70,6 +70,47 @@ class AnalysisClientTest {
 
   private fun gemini(key: String? = "AIza-test") = GeminiClient(apiKeys = { key }, baseUrl = base())
 
+  @Test
+  fun `programme requests have a larger budget for every provider`() = runTest {
+    val fixtures = listOf(
+      Triple(anthropic(), AnalysisModel.CLAUDE_SONNET, """{"content":[{"type":"text","text":"ok"}]}"""),
+      Triple(openAi(), AnalysisModel.GPT_SOL, """{"choices":[{"message":{"content":"ok"}}]}"""),
+      Triple(gemini(), AnalysisModel.GEMINI_FLASH, """{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}"""),
+    )
+    for ((client, model, response) in fixtures) {
+      body = response
+      assertEquals("ok", client.analyse("programme", model, AnalysisTask.PROGRAM))
+      assertTrue(lastBody!!.contains("32768"))
+      assertEquals("ok", client.analyse("analysis", model))
+      assertTrue(lastBody!!.contains("8192"))
+    }
+  }
+
+  @Test
+  fun `token exhaustion distinguishes empty output and rejects partial programmes`() = runTest {
+    for (text in listOf("", "partial")) {
+      val fixtures = listOf(
+        Triple(anthropic(), AnalysisModel.CLAUDE_SONNET,
+          """{"stop_reason":"max_tokens","content":[{"type":"text","text":"$text"}]}"""),
+        Triple(openAi(), AnalysisModel.GPT_SOL,
+          """{"choices":[{"finish_reason":"length","message":{"content":"$text"}}]}"""),
+        Triple(gemini(), AnalysisModel.GEMINI_FLASH,
+          """{"candidates":[{"finishReason":"MAX_TOKENS","content":{"parts":[{"text":"$text"}]}}]}"""),
+      )
+      for ((client, model, response) in fixtures) {
+        body = response
+        val failure = runCatching { client.analyse("programme", model, AnalysisTask.PROGRAM) }.exceptionOrNull()
+        assertTrue(failure is AnalysisOutputLimitException)
+        assertFalse((failure as AnalysisException).canRetry)
+        if (text.isEmpty()) {
+          assertTrue(runCatching { client.analyse("analysis", model) }.exceptionOrNull() is AnalysisOutputLimitException)
+        } else {
+          assertEquals(text, client.analyse("analysis", model))
+        }
+      }
+    }
+  }
+
   // ================================================================== Anthropic
 
   /**

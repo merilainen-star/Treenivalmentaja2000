@@ -75,7 +75,7 @@ class AiAnalysisPromptSourcingTest {
   private class CapturingClient : AnalysisClient {
     var prompt: String? = null
 
-    override suspend fun analyse(prompt: String, model: AnalysisModel): String {
+    override suspend fun analyse(prompt: String, model: AnalysisModel, task: fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask): String {
       this.prompt = prompt
       return "Vastaus."
     }

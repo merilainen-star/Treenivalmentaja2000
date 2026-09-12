@@ -798,8 +798,13 @@ class WorkoutViewModelTest {
     advisorStore.setConstraints("Pitkä lenkki vain sunnuntaisin.")
     var generatedPrompt = ""
     val client = object : fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient {
-      override suspend fun analyse(prompt: String, model: fi.merilainen.treenivalmentaja.domain.AnalysisModel): String {
+      override suspend fun analyse(prompt: String, model: fi.merilainen.treenivalmentaja.domain.AnalysisModel, task: fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask): String {
         requests++
+        assertEquals(
+          if (requests == 1) fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask.PROSE
+          else fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask.PROGRAM,
+          task,
+        )
         if (requests > 1) generatedPrompt = prompt
         return if (requests == 1) "Loppuraportti: harjoitus tehtiin." else nextJson(LocalDate.of(2026, 8, 12))
       }
@@ -840,7 +845,7 @@ class WorkoutViewModelTest {
     repository.importPlan(PLAN)
     var requests = 0
     val vm = viewModel(analysisClient = object : fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient {
-      override suspend fun analyse(prompt: String, model: fi.merilainen.treenivalmentaja.domain.AnalysisModel): String {
+      override suspend fun analyse(prompt: String, model: fi.merilainen.treenivalmentaja.domain.AnalysisModel, task: fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask): String {
         requests++
         return nextJson(LocalDate.of(2026, 8, 11), weeks = 1)
       }
@@ -852,6 +857,32 @@ class WorkoutViewModelTest {
     advanceUntilIdle()
     assertTrue(vm.nextProgram.value is fi.merilainen.treenivalmentaja.domain.NextProgramState.Invalid)
     assertEquals(1, requests)
+    vm.importNextProgram()
+    advanceUntilIdle()
+    assertEquals(before, repository.getSessions())
+    assertNull(vm.pendingImport.value)
+    vm.viewModelScope.coroutineContext.cancelChildren()
+  }
+
+  @Test fun `AI successor token exhaustion leaves the plan intact and explains the failure`() = runTest(dispatcher) {
+    repository.importPlan(PLAN)
+    val before = repository.getSessions()
+    val vm = viewModel(analysisClient = object : fi.merilainen.treenivalmentaja.data.analysis.AnalysisClient {
+      override suspend fun analyse(
+        prompt: String,
+        model: fi.merilainen.treenivalmentaja.domain.AnalysisModel,
+        task: fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask,
+      ): String {
+        assertEquals(fi.merilainen.treenivalmentaja.data.analysis.AnalysisTask.PROGRAM, task)
+        throw fi.merilainen.treenivalmentaja.data.analysis.AnalysisOutputLimitException()
+      }
+    })
+    advanceUntilIdle()
+    vm.requestNextProgram(fi.merilainen.treenivalmentaja.domain.NextProgramRequest(fi.merilainen.treenivalmentaja.domain.NextProgramGoal.BALANCED))
+    advanceUntilIdle()
+    val failure = vm.nextProgram.value as fi.merilainen.treenivalmentaja.domain.NextProgramState.Failed
+    assertFalse(failure.canRetry)
+    assertTrue(failure.message.contains("pituusraja"))
     vm.importNextProgram()
     advanceUntilIdle()
     assertEquals(before, repository.getSessions())

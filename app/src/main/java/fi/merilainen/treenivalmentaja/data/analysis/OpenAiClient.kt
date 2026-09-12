@@ -18,7 +18,7 @@ internal constructor(
   private val calls: Call.Factory = AnalysisHttp.defaultCallFactory(),
 ) : AnalysisClient {
 
-  override suspend fun analyse(prompt: String, model: AnalysisModel): String {
+  override suspend fun analyse(prompt: String, model: AnalysisModel, task: AnalysisTask): String {
     val key =
       apiKeys.apiKey()?.takeIf { it.isNotBlank() }
         ?: throw AnalysisNotConfiguredException(AnalysisProvider.OPENAI.label)
@@ -28,7 +28,7 @@ internal constructor(
           model = model.id,
           // `max_completion_tokens`, not `max_tokens`: the older field is deprecated and is
           // rejected outright by the reasoning-capable models, which is every model offered here.
-          maxCompletionTokens = AnalysisHttp.MAX_OUTPUT_TOKENS,
+          maxCompletionTokens = task.maxOutputTokens,
           messages = listOf(OpenAiMessageDto(role = "user", content = prompt)),
         )
       )
@@ -39,7 +39,7 @@ internal constructor(
         calls = calls,
         headers = mapOf("Authorization" to "Bearer $key"),
       )
-    return AnalysisHttp.decode(response, responseAdapter).firstText()
+    return AnalysisHttp.decode(response, responseAdapter).firstText(task)
   }
 
   /**
@@ -51,13 +51,16 @@ internal constructor(
    * provider made, so it is checked first and reported as a refusal, the same state Claude's
    * `stop_reason: "refusal"` produces.
    *
-   * `length` is deliberately *not* treated as a failure: the ceiling is 8192 tokens against an
-   * answer asked to be 110 words, so hitting it means the model spent the budget reasoning and
-   * still produced prose. Truncated prose is worth showing; an exception would throw it away.
+   * Partial prose remains readable. Programme JSON must be complete, and an empty answer
+   * at the ceiling is a token-limit failure even when all tokens went into hidden reasoning.
    */
-  private fun OpenAiResponseDto.firstText(): String {
+  private fun OpenAiResponseDto.firstText(task: AnalysisTask): String {
     val choice = choices.orEmpty().filterNotNull().firstOrNull()
     if (choice?.finishReason == FINISH_CONTENT_FILTER) throw AnalysisRefusedException()
+    if (choice?.finishReason == "length" &&
+      (task == AnalysisTask.PROGRAM || choice.message?.content.isNullOrBlank())) {
+      throw AnalysisOutputLimitException()
+    }
     return with(AnalysisHttp) { choice?.message?.content.orEmptyFailure() }
   }
 

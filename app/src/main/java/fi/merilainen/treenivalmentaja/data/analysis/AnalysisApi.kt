@@ -29,7 +29,11 @@ interface AnalysisClient {
    *   [AnalysisModel.provider], so a mismatch is a programming error rather than a user-facing one.
    * @return the model's text, trimmed and never empty.
    */
-  suspend fun analyse(prompt: String, model: AnalysisModel): String
+  suspend fun analyse(
+    prompt: String,
+    model: AnalysisModel,
+    task: AnalysisTask = AnalysisTask.PROSE,
+  ): String
 }
 
 /**
@@ -109,3 +113,15 @@ internal object AnalysisMessages {
 
   const val EMPTY = "Vastaus tuli tyhjänä."
 }
+
+/** A complete programme needs room for all sessions as well as the model's reasoning. */
+enum class AnalysisTask(val maxOutputTokens: Int) {
+  PROSE(8192),
+  PROGRAM(32768),
+}
+
+/** A known token ceiling, not a network failure or an unexplained empty response. */
+class AnalysisOutputLimitException : AnalysisException(
+  "AI-vastauksen pituusraja täyttyi ennen valmistumista. Valitse toinen AI-malli Asetuksista ja yritä uudelleen.",
+  canRetry = false,
+)

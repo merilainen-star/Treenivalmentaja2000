@@ -35,7 +35,7 @@ internal constructor(
   private val calls: Call.Factory = AnalysisHttp.defaultCallFactory(),
 ) : AnalysisClient {
 
-  override suspend fun analyse(prompt: String, model: AnalysisModel): String {
+  override suspend fun analyse(prompt: String, model: AnalysisModel, task: AnalysisTask): String {
     val key =
       apiKeys.apiKey()?.takeIf { it.isNotBlank() }
         ?: throw AnalysisNotConfiguredException(AnalysisProvider.GEMINI.label)
@@ -44,7 +44,7 @@ internal constructor(
         GeminiRequestDto(
           contents = listOf(GeminiContentDto(parts = listOf(GeminiPartDto(text = prompt)))),
           generationConfig =
-            GeminiGenerationConfigDto(maxOutputTokens = AnalysisHttp.MAX_OUTPUT_TOKENS),
+            GeminiGenerationConfigDto(maxOutputTokens = task.maxOutputTokens),
         )
       )
     val response =
@@ -55,7 +55,7 @@ internal constructor(
         headers = mapOf("x-goog-api-key" to key),
         authOn400 = true,
       )
-    return AnalysisHttp.decode(response, responseAdapter).firstText()
+    return AnalysisHttp.decode(response, responseAdapter).firstText(task)
   }
 
   /**
@@ -73,7 +73,7 @@ internal constructor(
    * Both are reported as [AnalysisRefusedException] — the distinction matters to this comment, not
    * to someone looking at a training card.
    */
-  private fun GeminiResponseDto.firstText(): String {
+  private fun GeminiResponseDto.firstText(task: AnalysisTask): String {
     if (promptFeedback?.blockReason != null) throw AnalysisRefusedException()
     val candidate = candidates.orEmpty().filterNotNull().firstOrNull()
     if (candidate?.finishReason == FINISH_SAFETY) throw AnalysisRefusedException()
@@ -87,6 +87,10 @@ internal constructor(
         .filterNotNull()
         .mapNotNull { it.text }
         .joinToString("")
+    if (candidate?.finishReason == "MAX_TOKENS" &&
+      (task == AnalysisTask.PROGRAM || text.isBlank())) {
+      throw AnalysisOutputLimitException()
+    }
     return with(AnalysisHttp) { text.orEmptyFailure() }
   }
 

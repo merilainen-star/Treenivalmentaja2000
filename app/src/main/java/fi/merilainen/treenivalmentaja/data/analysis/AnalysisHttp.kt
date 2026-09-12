@@ -121,14 +121,4 @@ internal object AnalysisHttp {
 
   private fun String.toRequestBody() =
     okhttp3.RequestBody.create(JSON, this.toByteArray(Charsets.UTF_8))
-
-  /**
-   * The output ceiling, shared by all three.
-   *
-   * Far above the ~110 words the Finnish answer is now asked for, because on the reasoning models
-   * this bounds hidden thinking as well: a budget sized for the prose alone would be spent on
-   * reasoning and truncate the answer mid-sentence. A ceiling costs nothing unless it is reached;
-   * only tokens actually generated are billed.
-   */
-  const val MAX_OUTPUT_TOKENS = 8192
 }
