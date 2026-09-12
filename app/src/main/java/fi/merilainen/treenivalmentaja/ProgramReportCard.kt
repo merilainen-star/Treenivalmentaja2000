@@ -5,17 +5,23 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,6 +33,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fi.merilainen.treenivalmentaja.domain.NextProgramRequest
 import fi.merilainen.treenivalmentaja.domain.NextProgramState
@@ -81,20 +88,16 @@ fun ProgramReportCard(
           )
         }
 
-      is ProgramReportState.Loaded -> {
-        ReportResult(state, onDismiss)
-        // Offered under a final report only: a programme still running does not need a successor,
-        // and the recommendation this flow acts on is written in that report's last section.
-        if (state.kind == ProgramReportKind.FINAL) {
-          NextProgramSection(
-            state = nextProgram,
-            onStart = onStartNextProgram,
-            onGenerate = onGenerateNextProgram,
-            onImport = onImportNextProgram,
-            onDismiss = onDismissNextProgram,
-          )
-        }
-      }
+      is ProgramReportState.Loaded ->
+        LoadedReport(
+          state = state,
+          onDismiss = onDismiss,
+          nextProgram = nextProgram,
+          onStartNextProgram = onStartNextProgram,
+          onGenerateNextProgram = onGenerateNextProgram,
+          onImportNextProgram = onImportNextProgram,
+          onDismissNextProgram = onDismissNextProgram,
+        )
 
       is ProgramReportState.Failed ->
         Card(
@@ -146,6 +149,140 @@ fun ProgramReportCard(
 }
 
 /**
+ * A finished report: a one-line card on the calendar, and the document itself on the whole screen.
+ *
+ * **It used to render inline, and that was wrong in a way only a phone shows.** The calendar lays
+ * its children out in a Column, so a report of a few hundred words took the entire screen, could
+ * not be scrolled — a Column does not scroll — and left the day rows measured at zero height. The
+ * feature ate the screen it was a feature of. The owner found it the day it shipped: "tänä
+ * analyysi sivu ei rullaa alaspäin".
+ *
+ * A sheet is the fix rather than a scrollbox in the card, because the content says so. This is a
+ * document that was asked for deliberately, organised into fact, reading and advice; reading it in
+ * a third of a screen while a calendar competes underneath serves neither. The sheet opens by
+ * itself when the report arrives — that is the continuation of the tap that asked for it — and the
+ * card stays behind so it can be reopened rather than re-requested. Re-requesting would spend
+ * another call on a question already answered.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LoadedReport(
+  state: ProgramReportState.Loaded,
+  onDismiss: () -> Unit,
+  nextProgram: NextProgramState?,
+  onStartNextProgram: () -> Unit,
+  onGenerateNextProgram: (NextProgramRequest) -> Unit,
+  onImportNextProgram: () -> Unit,
+  onDismissNextProgram: () -> Unit,
+) {
+  // Keyed on the report's own text, so a freshly generated one opens itself while a reopened card
+  // does not fight the person who just closed it.
+  var open by rememberSaveable(state.text) { mutableStateOf(true) }
+
+  Card(
+    modifier = Modifier.fillMaxWidth(),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+  ) {
+    Column(
+      modifier = Modifier.padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+      Text(
+        text = state.kind.title(),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+      )
+      // The report's own first line, so the card says something about this report rather than
+      // being a button that could belong to any of them.
+      programReportBlocks(state.text)
+        .filterIsInstance<ProgramReportBlock.Paragraph>()
+        .firstOrNull()
+        ?.let { first ->
+          Text(
+            text = first.text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = { open = true }) { Text("Lue raportti") }
+        TextButton(onClick = onDismiss) { Text("Sulje") }
+      }
+    }
+  }
+
+  if (open) {
+    ModalBottomSheet(
+      onDismissRequest = { open = false },
+      sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+      ProgramReportSheetContent(
+        state = state,
+        nextProgram = nextProgram,
+        onStartNextProgram = onStartNextProgram,
+        onGenerateNextProgram = onGenerateNextProgram,
+        onImportNextProgram = onImportNextProgram,
+        onDismissNextProgram = onDismissNextProgram,
+      )
+    }
+  }
+}
+
+/**
+ * What the sheet holds: the report, and under a final one the offer to build the next programme.
+ *
+ * Stateless and separate from the sheet that hosts it, for the reason every `…Content` composable
+ * in this app is: a `ModalBottomSheet` renders in its own window and a screenshot test cannot see
+ * inside it, so the thing worth having a baseline of has to be capturable on its own.
+ *
+ * The scroll lives here rather than around the card, which is the whole point of the change — one
+ * scrolling region, the height of the screen, with nothing underneath competing for it.
+ */
+@Composable
+fun ProgramReportSheetContent(
+  state: ProgramReportState.Loaded,
+  nextProgram: NextProgramState? = null,
+  onStartNextProgram: () -> Unit = {},
+  onGenerateNextProgram: (NextProgramRequest) -> Unit = {},
+  onImportNextProgram: () -> Unit = {},
+  onDismissNextProgram: () -> Unit = {},
+  modifier: Modifier = Modifier,
+) {
+  Column(
+    modifier =
+      modifier
+        .fillMaxWidth()
+        .verticalScroll(rememberScrollState())
+        .padding(horizontal = 16.dp)
+        .navigationBarsPadding(),
+    verticalArrangement = Arrangement.spacedBy(8.dp),
+  ) {
+    ReportResult(state)
+    // Offered under a final report only: a programme still running does not need a successor, and
+    // the recommendation this flow acts on is written in that report's last section.
+    if (state.kind == ProgramReportKind.FINAL) {
+      NextProgramSection(
+        state = nextProgram,
+        onStart = onStartNextProgram,
+        onGenerate = onGenerateNextProgram,
+        onImport = onImportNextProgram,
+        onDismiss = onDismissNextProgram,
+      )
+    }
+    Spacer(modifier = Modifier.size(16.dp))
+  }
+}
+
+private fun ProgramReportKind.title(): String =
+  when (this) {
+    ProgramReportKind.INTERIM -> "Väliraportti"
+    ProgramReportKind.FINAL -> "Loppuraportti"
+  }
+
+/**
  * The report itself.
  *
  * Rendered as the model wrote it, headings and all. The session analysis forbids headings because
@@ -154,7 +291,7 @@ fun ProgramReportCard(
  * decoration to be flattened away.
  */
 @Composable
-private fun ReportResult(state: ProgramReportState.Loaded, onDismiss: () -> Unit) {
+private fun ReportResult(state: ProgramReportState.Loaded) {
   var showPrompt by rememberSaveable { mutableStateOf(false) }
   val clipboard = LocalClipboardManager.current
 
@@ -167,12 +304,8 @@ private fun ReportResult(state: ProgramReportState.Loaded, onDismiss: () -> Unit
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       Text(
-        text =
-          when (state.kind) {
-            ProgramReportKind.INTERIM -> "Väliraportti"
-            ProgramReportKind.FINAL -> "Loppuraportti"
-          },
-        style = MaterialTheme.typography.titleMedium,
+        text = state.kind.title(),
+        style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSecondaryContainer,
       )
@@ -196,11 +329,8 @@ private fun ReportResult(state: ProgramReportState.Loaded, onDismiss: () -> Unit
         }
       }
 
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = { showPrompt = !showPrompt }) {
-          Text(if (showPrompt) "Piilota pyyntö" else "Näytä pyyntö")
-        }
-        TextButton(onClick = onDismiss) { Text("Sulje") }
+      TextButton(onClick = { showPrompt = !showPrompt }) {
+        Text(if (showPrompt) "Piilota pyyntö" else "Näytä pyyntö")
       }
 
       AnimatedVisibility(visible = showPrompt) {

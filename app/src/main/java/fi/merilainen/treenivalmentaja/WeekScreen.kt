@@ -329,7 +329,14 @@ fun WeekScreenContent(
 
         // Recomputed when either the plan or Oura's own record changes, so a day that holds only a
         // walk still gets a row.
+        //
+        // `weight(1f)` is load-bearing rather than cosmetic. A Column measures its children in
+        // order and hands each one what is left, so anything above this that grew tall took the
+        // list's height away: a loaded programme report filled the screen, the day rows were
+        // measured at zero, and the calendar became a report with no calendar under it. The weight
+        // reserves the remaining space for the days first, whatever sits above them.
         LazyColumn(
+            modifier = Modifier.weight(1f),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

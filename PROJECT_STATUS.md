@@ -129,49 +129,48 @@ architecture or turn the owner's app into a general-distribution product.
 
 All previous measurements and their reasoning below are retained verbatim.
 
-## Last verified build
+### 2026-09-07 — the report sheet, merged onto the audit fixes
 
-Every number here was measured from the current working tree; test counts are not duplicated in
-other documentation.
+Measured on this Linux container after merging `origin/main` at `d9751a1` (the audit-fixes commit
+above) into the report-sheet fix. **Not comparable to the Windows numbers above**: different
+machine, different JDK build, and the APK figure there is from a different toolchain — the only
+honest comparison for a size delta is against another build on the same machine, which is what the
+delta below uses.
 
-- Date: 2026-09-06
-- Base commit: `ad07760` — heart-rate zones and the app-computed kilometre splits
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
 - Emulator: none attached
 
 | Check | Command | Measured result |
 | --- | --- | --- |
-| Unit tests | `./gradlew :app:testDebugUnitTest` | 875 tests, 0 failures, 0 errors, 0 skipped |
-| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 73 comparisons, 0 changed, 0 added, 73 unchanged |
-| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings, none in the new code |
-| Debug APK | `./gradlew clean :app:assembleDebug` | 21,662,707 bytes |
-| Instrumented | `adb devices -l` | **Not run: no device or emulator attached.** This is the line that matters most this time: schema v15 ships a new migration, and `MigrationTest.migrate14To15` is **written but unrun**. Room generated `15.json` and the auto-migration is declared, so the guard against a silent destructive fallback still holds — but nobody has watched a v14 database become a v15 one. |
+| Unit tests | `./gradlew :app:testDebugUnitTest` | 891 tests, 0 failures, 0 errors, 0 skipped |
+| Screenshots | `./gradlew :app:verifyRoborazziDebug` | 74 comparisons, 0 changed, 0 added, 74 unchanged |
+| Lint | `./gradlew :app:lintDebug` → `lint-results-debug.xml` | 0 errors, 48 warnings — all `GradleDependency`, `NewerVersionAvailable` and manifest checks; none in the new code |
+| Debug APK | `./gradlew clean :app:assembleDebug` | 21,695,475 bytes |
+| Instrumented | `adb devices -l` | **Not run: no device or emulator attached here.** The audit run above did run them, `migrate14To15` included; the report-sheet fix touches no migration and no DAO. |
 
-**No baseline moved, and none was added.** Nothing in this change draws anything: the zones and the
-splits reach the model through the prompt and appear on no screen. 73 comparisons, all unchanged,
-is the assertion that says so.
+The report sheet costs **32,768 B (+0.15 %)** on this machine: 21,662,707 B for `96477e3` against
+21,695,475 B for the merge. Half of that is the fix and half is the audit commit's own code; the
+two were not measured apart.
 
-The run detail costs **32,768 B (+0.15 %)**: 21,629,939 B for `2648dd9` against 21,662,707 B with
-it, both from `./gradlew clean :app:assembleDebug` on one machine. Two dex pages, which is what two
-pure domain functions, two Room entities and two prompt sections come to.
+The merge itself was clean — `WeekScreen.kt`, `IntervalsRepository.kt`, `Daos.kt` and three
+documents were touched by both sides without conflicting. The one thing worth knowing is that
+`ComponentScreenshotTest.capture` now wraps every capture in `stillScreenshot`, which freezes
+infinite animations; the two baselines recorded before that arrived were re-verified after the
+merge and did not move.
 
-**58 new unit tests**, and the ones worth naming are the refusals — `heartRateZones` returning
-`null` rather than an empty distribution when the times are all zero or the arrays cannot be paired;
-a run with no zone data being counted *out* of its programme group rather than folded in as zeros;
-a zone table that moved mid-programme losing its beat ranges. `kilometreSplits` is tested against
-generated channels rather than a recorded fixture, so "did the interpolation put the boundary in the
-right place" is an assertion (100 s, not 115) rather than an eyeball.
+One baseline moved and one is new: `card_program_report_loaded` now shows the compact card with the
+sheet Robolectric draws over it, and `sheet_program_report` is the document itself.
 
-Two things carried forward from the previous entry and still true: run the suite at least once in
-the evening (`AiAnalysisPromptSourcingTest` and `EasyRunDriftWiringTest` used to fail only between
-21:00 UTC and midnight), and never combine `testDebugUnitTest` with `verifyRoborazziDebug` in one
-invocation — they race on `app/build/test-results` and the loser dies with a `NoSuchFileException`
-that looks like a test failure.
+**The report card was fixed after the owner found it on the phone**: *"tänä analyysi sivu ei rullaa
+alaspäin"*. The calendar lays its children out in a `Column`, which does not scroll and hands each
+child what is left, so a loaded report took the whole screen, could not be scrolled, and left the
+day rows measured at zero height. Two changes: the report now opens in a full-height
+`ModalBottomSheet` with one scrolling region, and the day list carries `Modifier.weight(1f)` so
+nothing above it can starve it again.
 
-## Previously verified build
+### 2026-09-06 — the next-programme flow
 
-- Date: 2026-09-06
 - Base commit: `aa31e9a` plus the next-programme flow and a test-clock fix, committed separately
 - Toolchain: JDK 21 (Temurin 21.0.10), Gradle 9.6.1 via wrapper, Android SDK platform 36 and
   build-tools 36.1.0, on Linux
@@ -371,9 +370,12 @@ engine/ViewModel logic and the deleted DataStore code are not the same size.
 
 ## Open risks
 
-- Instrumented Keystore, migration and image-cache tests still need an attached Android device or
-  emulator before release. **The v14 → v15 migration is the one to run first**: it is the newest,
-  it ships two new tables, and `MigrationTest.migrate14To15` has never executed.
+- Instrumented Keystore, migration and image-cache tests need an attached device or emulator, and
+  are therefore not run by every change. **The v14 → v15 migration is no longer among the unproven
+  ones**: the 7 September audit run executed the device suite, `migrate14To15` included, and the
+  owner separately installed the build on their phone — the app opened and the calendar still
+  showed their programme. What this line still means is that any *later* change touching the
+  schema starts unproven again until a device runs it.
 - The Oura flow is unit-tested against local HTTP fixtures but still depends on a real Oura account
   for end-to-end confirmation.
 - A rooted or unlocked device can bypass the Android application sandbox; no at-rest database
@@ -385,7 +387,7 @@ engine/ViewModel logic and the deleted DataStore code are not the same size.
   carrying it is the one that will demonstrate it.
 - Existing lint warnings and Kotlin/Java deprecations remain non-blocking maintenance work.
 
-## Measurement history
+## Measurement history — the older entries
 
 **This section is append-only, and deleting it is not how a stale number gets fixed.** It was
 removed once, on 2026-08-20, as the cure for the "Last verified build" block above having gone six
