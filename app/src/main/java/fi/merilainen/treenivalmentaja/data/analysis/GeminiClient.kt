@@ -32,7 +32,7 @@ class GeminiClient
 internal constructor(
   private val apiKeys: AnalysisApiKeySource,
   private val baseUrl: String = BASE_URL,
-  private val calls: Call.Factory = AnalysisHttp.defaultCallFactory(),
+  private val calls: Call.Factory? = null,
 ) : AnalysisClient {
 
   override suspend fun analyse(prompt: String, model: AnalysisModel, task: AnalysisTask): String {
@@ -51,7 +51,7 @@ internal constructor(
       AnalysisHttp.post(
         url = "$baseUrl/v1beta/models/${model.id}:generateContent".toHttpUrl(),
         body = body,
-        calls = calls,
+        calls = calls ?: AnalysisHttp.defaultCallFactory(task),
         headers = mapOf("x-goog-api-key" to key),
         authOn400 = true,
       )

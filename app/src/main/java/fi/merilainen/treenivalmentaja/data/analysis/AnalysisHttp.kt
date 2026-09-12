@@ -6,6 +6,7 @@ import com.squareup.moshi.JsonEncodingException
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,18 +28,28 @@ import okhttp3.Request
  */
 internal object AnalysisHttp {
 
-  /**
-   * Longer than the ten seconds every other caller in this app uses.
-   *
-   * A reasoning model on a hard analysis can take the better part of a minute, where an Oura fetch
-   * that has not answered in ten seconds is broken. The connect timeout stays short because failing
-   * to *reach* the host is a different thing from waiting for it to think.
-   */
-  fun defaultCallFactory(): Call.Factory =
+  // Keep connection establishment short; programme generation can legitimately take minutes.
+  // Derived clients share the connection pool, while each task has a bounded total duration.
+  private val proseClient by lazy {
     OkHttpClient.Builder()
       .connectTimeout(15, TimeUnit.SECONDS)
       .readTimeout(120, TimeUnit.SECONDS)
+      .callTimeout(150, TimeUnit.SECONDS)
       .build()
+  }
+
+  private val programClient by lazy {
+    proseClient.newBuilder()
+      .readTimeout(600, TimeUnit.SECONDS)
+      .callTimeout(630, TimeUnit.SECONDS)
+      .build()
+  }
+
+  fun defaultCallFactory(task: AnalysisTask = AnalysisTask.PROSE): OkHttpClient =
+    when (task) {
+      AnalysisTask.PROSE -> proseClient
+      AnalysisTask.PROGRAM -> programClient
+    }
 
   val JSON: okhttp3.MediaType = "application/json; charset=utf-8".toMediaType()
 
@@ -76,7 +87,7 @@ internal object AnalysisHttp {
         try {
           calls.newCall(request).execute()
         } catch (e: IOException) {
-          throw AnalysisUnavailableException(AnalysisMessages.OFFLINE)
+          throw e.asAnalysisFailure()
         }
       response.use {
         when (val code = it.code) {
@@ -96,9 +107,15 @@ internal object AnalysisHttp {
         try {
           it.body?.string() ?: throw AnalysisUnavailableException(AnalysisMessages.UNREADABLE)
         } catch (e: IOException) {
-          throw AnalysisUnavailableException(AnalysisMessages.OFFLINE)
+          throw e.asAnalysisFailure()
         }
       }
+    }
+
+  private fun IOException.asAnalysisFailure(): AnalysisException =
+    when (this) {
+      is InterruptedIOException -> AnalysisTimeoutException()
+      else -> AnalysisUnavailableException(AnalysisMessages.NETWORK)
     }
 
   /** Every provider's body lands here, so an unreadable one reads the same way once. */

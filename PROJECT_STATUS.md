@@ -1,5 +1,33 @@
 # Project status
 
+## Last verified build — 12 September 2026, programme request timeouts
+
+Measured on the working tree based on `c94e152`, Windows, Temurin 21.0.12+8.
+
+- JVM tests: **899/0/0** tests/failures/errors, 0 skipped; the five new timeout tests passed,
+  including delayed local HTTP responses and failures during response-body reads.
+- Targeted device tests: **2/0/0**, actually run on `treeni-test`, Android 16.
+- Debug lint: **0 errors, 10 warnings**.
+- Debug APK: **22,151,113 bytes = 22.151113 MB** (decimal); the APK's DEX contains
+  `AnalysisTimeoutException`.
+- No paid live AI generation, full device suite, or screenshot comparison was run.
+- The original phone failure cannot be classified from its screenshot alone.
+- KSP again printed its AWT background-thread exception; both Gradle runs succeeded.
+
+Exact commands (PowerShell):
+
+```powershell
+$env:JAVA_HOME='C:/Users/mimer/.jdks/jdk-21.0.12+8'
+./gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline
+./gradlew.bat :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=fi.merilainen.treenivalmentaja.NextProgramFailureTest' --offline
+```
+
+Test counts use JUnit XML under `app/build/test-results/testDebugUnitTest` and
+`app/build/outputs/androidTest-results/connected`. Lint counts use
+`app/build/reports/lint-results-debug.txt`; APK size is the byte length of
+`app/build/outputs/apk/debug/app-debug.apk`. Earlier measurements remain below.
+
+
 ## Last verified build — 12 September 2026, main integration
 
 Verified merge `a90b6f9`, combining the output-budget fix with `origin/main` at `95c6369`.

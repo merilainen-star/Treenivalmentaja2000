@@ -41,4 +41,22 @@ class NextProgramFailureTest {
     assertEquals(0, generated)
     assertEquals(0, imported)
   }
+  @Test fun timeoutExplainsTheDelayAndAllowsAnExplicitRetry() {
+    val error = fi.merilainen.treenivalmentaja.data.analysis.AnalysisTimeoutException()
+    val request = NextProgramRequest(NextProgramGoal.BALANCED)
+    var generated = 0
+    compose.setContent {
+      NextProgramSection(
+        state = NextProgramState.Failed(error.message.orEmpty(), error.canRetry, request),
+        onStart = {}, onGenerate = { assertEquals(request, it); generated++ },
+        onImport = {}, onDismiss = {},
+      )
+    }
+    compose.onNodeWithText(error.message.orEmpty()).assertExists()
+    compose.onNodeWithText("AI-analyysi vaatii verkkoyhteyden.").assertDoesNotExist()
+    assertEquals(0, generated)
+    compose.onNodeWithText("Yritä uudelleen").performClick()
+    assertEquals(1, generated)
+  }
+
 }

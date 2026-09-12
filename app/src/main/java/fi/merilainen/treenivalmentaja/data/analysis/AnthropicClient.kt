@@ -19,7 +19,7 @@ class AnthropicClient
 internal constructor(
   private val apiKeys: AnalysisApiKeySource,
   private val baseUrl: String = BASE_URL,
-  private val calls: Call.Factory = AnalysisHttp.defaultCallFactory(),
+  private val calls: Call.Factory? = null,
 ) : AnalysisClient {
 
   override suspend fun analyse(prompt: String, model: AnalysisModel, task: AnalysisTask): String {
@@ -38,7 +38,7 @@ internal constructor(
       AnalysisHttp.post(
         url = "$baseUrl/v1/messages".toHttpUrl(),
         body = body,
-        calls = calls,
+        calls = calls ?: AnalysisHttp.defaultCallFactory(task),
         // The key goes in `x-api-key`, not `Authorization` — that header is for OAuth tokens here,
         // and sending the key there authenticates as nobody.
         headers = mapOf("x-api-key" to key, "anthropic-version" to API_VERSION),

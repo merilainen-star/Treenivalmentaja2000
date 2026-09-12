@@ -318,3 +318,20 @@ allows more billable output when used; it is not a guarantee of successful live 
 Local HTTP fixtures cover budgets, empty token-limited output, partial programme rejection,
 and preservation of partial prose for all providers. The ViewModel flow test checks that the
 report uses the prose task and its successor uses the programme task.
+
+
+## Programme waiting time and connection errors (12 September 2026)
+
+The larger programme output budget also needs time to arrive. Programme calls now use a
+600-second read timeout and a 630-second total call deadline; prose keeps its 120-second read
+timeout and gets a 150-second total deadline. Both keep the deliberate 15-second connection
+timeout. Provider clients choose the task's shared HTTP client at request time, preserving
+injected test transports and sharing the connection pool.
+
+Socket and total-call timeouts, including failures while reading a 200 response body, now
+produce `AnalysisTimeoutException` with a Finnish explanation that waiting expired. Other
+I/O failures say the connection to the AI service failed, rather than claiming the phone has
+no internet. Raw exception messages, request URLs, keys, and health data are not shown.
+The screenshot alone cannot prove whether the reported request timed out or lost its connection.
+Retry remains an explicit user action. Token ceilings, refusal guards, plan validation and
+import confirmation are unchanged. No live paid generation was performed for verification.

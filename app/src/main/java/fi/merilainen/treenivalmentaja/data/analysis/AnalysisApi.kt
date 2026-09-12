@@ -107,7 +107,7 @@ class AnalysisUnavailableException(message: String) : AnalysisException(message,
 /** Shared wording, so three clients cannot drift into three phrasings of the same failure. */
 internal object AnalysisMessages {
 
-  const val OFFLINE = "AI-analyysi vaatii verkkoyhteyden."
+  const val NETWORK = "Yhteys AI-palveluun epäonnistui. Tarkista verkkoyhteys ja yritä uudelleen."
 
   const val UNREADABLE = "Vastausta ei voitu lukea."
 
@@ -124,4 +124,10 @@ enum class AnalysisTask(val maxOutputTokens: Int) {
 class AnalysisOutputLimitException : AnalysisException(
   "AI-vastauksen pituusraja täyttyi ennen valmistumista. Valitse toinen AI-malli Asetuksista ja yritä uudelleen.",
   canRetry = false,
+)
+
+/** Waiting for the service expired; this does not establish that the device is offline. */
+class AnalysisTimeoutException : AnalysisException(
+  "AI-palvelun vastausta odotettiin liian kauan. Yritä uudelleen tai valitse toinen AI-malli Asetuksista.",
+  canRetry = true,
 )

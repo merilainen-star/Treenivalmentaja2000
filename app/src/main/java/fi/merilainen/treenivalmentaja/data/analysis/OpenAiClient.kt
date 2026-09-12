@@ -15,7 +15,7 @@ class OpenAiClient
 internal constructor(
   private val apiKeys: AnalysisApiKeySource,
   private val baseUrl: String = BASE_URL,
-  private val calls: Call.Factory = AnalysisHttp.defaultCallFactory(),
+  private val calls: Call.Factory? = null,
 ) : AnalysisClient {
 
   override suspend fun analyse(prompt: String, model: AnalysisModel, task: AnalysisTask): String {
@@ -36,7 +36,7 @@ internal constructor(
       AnalysisHttp.post(
         url = "$baseUrl/v1/chat/completions".toHttpUrl(),
         body = body,
-        calls = calls,
+        calls = calls ?: AnalysisHttp.defaultCallFactory(task),
         headers = mapOf("Authorization" to "Bearer $key"),
       )
     return AnalysisHttp.decode(response, responseAdapter).firstText(task)
