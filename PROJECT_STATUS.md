@@ -1,5 +1,24 @@
 # Project status
 
+## Last verified build — 12 September 2026, main integration
+
+Verified merge `a90b6f9`, combining the output-budget fix with `origin/main` at `95c6369`.
+
+- JVM tests: **894/0/0** tests/failures/errors, 0 skipped.
+- Debug APK: **22,151,113 bytes = 22.151113 MB** (decimal).
+- Debug lint: **0 errors, 10 warnings**.
+- Device tests were not repeated after this merge; the prior targeted **1/0/0** run is recorded below.
+
+Exact command (PowerShell, Temurin 21.0.12+8):
+
+```powershell
+$env:JAVA_HOME='C:/Users/mimer/.jdks/jdk-21.0.12+8'
+./gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --offline
+```
+
+Counts and size use the same JUnit XML, lint text report, and APK byte-length methodology recorded below.
+
+
 ## Last verified build — 12 September 2026, next-programme output budget
 
 Measured on the working tree based on `d9751a1`, Windows, Temurin 21.0.12+8.
