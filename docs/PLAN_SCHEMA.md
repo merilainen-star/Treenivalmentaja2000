@@ -362,3 +362,83 @@ Kevennys uses the lighter alternative's steps, if supplied. Otherwise it clears 
 steps so old hard intervals cannot be exported as a light workout; the user must define new
 steps before export. Next-program generation asks for steps for all runs. Existing plans
 can be completed with the in-app step editor without re-importing the whole programme.
+
+### Suuntoon vietävien vaiheiden tekstit
+
+Sovelluksen **80 merkin validointiraja ei ole kellon näyttöraja**. Suunnon julkisessa
+[SuuntoPlus Guide -määrittelyssä](https://apizone.suunto.com/suuntoplus-guide-description)
+vaiheen otsikko (`FieldsStep.title`) on enintään **13 merkkiä** ja vaiheen alussa näkyvän
+ilmoituksen teksti (`Notification.text`) enintään **54 merkkiä**. Kellon näkymä ja tekstin
+mahtuminen riippuvat myös näyttökentistä ja kellomallista.
+
+Nämä ovat Suunnon Guide-tiedoston kenttiä, eivät tämän JSON-skeeman lisäkenttiä.
+Nykyinen vienti lähettää vaiheen `name`-tekstin Intervals.icu:hun, joka muodostaa Suunto Guiden.
+Emme määritä erillistä lyhyttä otsikkoa ja pitkää ilmoitusta emmekä takaa, että Intervals.icu
+välittää kaikki 54 merkkiä muuttumattomina. Älä lisää ohjelmaan keksittyjä `title`- tai
+`notification`-kenttiä.
+
+Kun laadit ohjelman Suunto-käyttöön:
+
+- Pidä `name` **enintään 54 merkissä**, mieluiten tätä lyhyempänä. Tämä on kellokäyttöä
+  koskeva kirjoitusohje; sovelluksen 80 merkin raja ja `schemaVersion: 1` säilyvät.
+- Sijoita toiminta ja toistonumero alkuun: esimerkiksi `Veto 1/6`, `Kiihdytys 1/3` tai
+  `Palautus 1/5`. Pyri saamaan tämä olennainen osa ensimmäisiin 13 merkkiin.
+- Säilytä hyödyllinen suoritusohje loppuosassa. Kaikkia nimiä ei tarvitse lyhentää
+  13 merkkiin: pidempi ohje on hyödyllinen vaiheen aloitusilmoituksessa.
+- Älä lisää nimeen näkyviksi tarkoitettuja ympäröiviä lainausmerkkejä. JSON-merkkijonon
+  normaalit lainausmerkit kuuluvat tietysti tiedostomuotoon.
+- Suosi yksinkertaisia välimerkkejä ja kirjoita esimerkiksi `vähintään` merkin `≥` sijaan.
+  Suunto ei takaa kaikkien erikoismerkkien näyttämistä kaikissa fonteissa.
+- Kirjoita tarkat kestot, matkat ja numeeriset vauhtitavoitteet omiin kenttiinsä.
+  Pelkkä tavoite nimeen tai kuvaukseen kirjoitettuna ei ohjaa kelloa. `paceSecPerKm`
+  tukee yhtä vauhtilukua, ei vaihteluväliä. Älä keksi kevyille vaiheille vauhtitavoitetta
+  vain näyttömittarin saamiseksi.
+
+Esimerkkejä kellolle tarkoitetuista vaiheista:
+
+```json
+"runSteps": [
+  {"name": "Lämmittely - 12 min kevyttä", "durationSec": 720},
+  {"name": "Veto 1/2 - 400 m, tavoite 1:44-1:46", "distanceMeters": 400, "paceSecPerKm": 265},
+  {"name": "Palautus 1/1 - kävele tai hölkkää", "durationSec": 90},
+  {"name": "Veto 2/2 - 400 m, tavoite 1:44-1:46", "distanceMeters": 400, "paceSecPerKm": 265},
+  {"name": "Loppuverryttely - 10 min kevyttä tai kävelyä", "durationSec": 600}
+]
+```
+
+Esimerkin numeerinen vauhti 265 s/km tarkoittaa 4:25/km eli 1:46/400 m.
+Matkavaihe päättyy 400 metrin täyttymiseen, ei nimessä mainitun tavoiteajan umpeutumiseen.
+Skeeman läpäisy ja paikallisen viennin onnistuminen eivät vielä varmista kellon tekstien
+mahtumista: tarkista aloitusilmoitus ja varsinainen vaihenäkymä myös kellossa.
+
+### Ajastetut osuudet kiinteän kokonaismatkan sisällä
+
+`distanceMeters` tarkoittaa **yksittäisen vaiheen matkaa**, ei koko harjoituksen kertynyttä
+matkaa. `durationSec` tarkoittaa vastaavasti kyseisen vaiheen kestoa. Nykyisessä skeemassa
+ei ole kumulatiiviseen kokonaismatkaan päättyvää vaihetta, matkabudjettia eikä käsin
+päätettävää vaihetta. Yhteenvetokenttä `distanceKm` ei katkaise kellon vaiheita.
+
+Siksi esimerkiksi 7 km:n lenkkiä, jonka sisällä tehdään 4 × 15 s kiihdytykset ajastettuine
+palautuksineen, ei voi vaiheistaa täysin automaattisesti ja samalla taata tarkkaa 7 km:n
+kokonaismatkaa. Ajastettujen osuuksien aikana kuljettua matkaa ei tiedetä etukäteen.
+
+Jos alkuperäinen kokonaismatka pitää säilyttää, käytä yhtä matkavaihetta ja kerro selvästi,
+että kiihdytykset ja palautukset ajoitetaan itse. Esimerkiksi:
+
+```json
+"runSteps": [
+  {"name": "Helppo 7 km - kiihdytykset ajoitat itse", "distanceMeters": 7000}
+]
+```
+
+Säilytä kiihdytysten määrät, kestot, palautukset sekä rauhallisen alun ja lopun ohjeet
+harjoituksen `description`-kentässä. Kello ei tässä mallissa ilmoita kiihdytysten vaihtumista;
+älä kuvaa sitä täysin automaattisesti ohjatuksi harjoitukseksi. Älä lisää ajastettuja osuuksia
+koko matkan päälle tai korvaa niitä arviomatkoilla väittäen harjoituksen säilyneen ennallaan.
+Mahdollinen muutos aika- tai matkatavoitteeseen vaatii käyttäjän hyväksynnän.
+
+Kiinteän kokonaisajan sisällä ajastetut osuudet voidaan sen sijaan vaiheistaa tarkasti:
+laske kaikkien vaiheiden kestot yhteen ja varmista, että summa vastaa alkuperäistä aikaa.
+Samoin 12 minuutin Cooper-testin testivaihe on `durationSec: 720`; tavoitematka ei ole
+sen päättymisehto. Jos lämmittely ja loppuverryttely ovat vaiheissa, niitä ei tehdä toistamiseen
+yhteenvetokenttien perusteella.
