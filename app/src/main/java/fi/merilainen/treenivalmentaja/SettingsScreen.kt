@@ -121,36 +121,22 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         }
     }
 
-    /** Plan text waiting for the user to say where in the calendar it should land. */
-    var pendingImportJson by rememberSaveable { mutableStateOf<String?>(null) }
-
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            // Reading the document is I/O; parsing and the Room write happen in the repository.
-            val text = withContext(Dispatchers.IO) {
+            // Reading is bounded I/O. Opening the choice dialog does not write a plan.
+            val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    context.contentResolver.openInputStream(uri)
-                        ?.bufferedReader()
-                        ?.use { it.readText() }
-                }.getOrNull()
+                    fi.merilainen.treenivalmentaja.data.importer.PlanDocumentReader.read(context.contentResolver, uri)
+                }
             }
-            // The start-date question is asked once the text is in hand, so a cancelled picker
-            // never raises it.
-            pendingImportJson = text
+            // A cancelled picker never opens the trial/import choice.
+            result.onSuccess(viewModel::openPlanDocument).onFailure {
+                viewModel.documentReadFailed("Tiedostoa ei voitu lukea. Tarkista lukuoikeus ja enintään 4 Mt:n koko.")
+            }
         }
-    }
-
-    pendingImportJson?.let { json ->
-        ImportStartDialog(
-            onDismiss = { pendingImportJson = null },
-            onConfirm = { startToday ->
-                pendingImportJson = null
-                viewModel.importPlanJson(json, startToday = startToday)
-            }
-        )
     }
 
     // Asked only when the import would change or discard what is already stored, which is also
@@ -232,7 +218,7 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
             // An empty clipboard is reported straight away rather than after asking a question
             // about a plan that is not there.
             val text = clipboard.getText()?.text
-            if (text.isNullOrBlank()) viewModel.importPlanJson(text) else pendingImportJson = text
+            if (text.isNullOrBlank()) viewModel.importPlanJson(text) else viewModel.openPlanDocument(text)
         },
         onResetSampleData = viewModel::resetSampleData,
         onCheckUpdate = viewModel::checkForUpdate,

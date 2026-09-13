@@ -169,3 +169,16 @@ Oura connection, authenticator and repository share a connection generation; int
 connection and repository share another. Disconnect invalidates that generation and clears
 storage under the same short lock used for writes. Network calls run outside it: late token
 refresh, login, sync and backfill results cannot reinsert data after deletion.
+
+## Program documents and trial mode (13 September 2026)
+
+MainActivity accepts JSON document VIEW/SEND intents. Only content URIs are read, on an I/O
+dispatcher with a 4 MiB limit; private file URIs and web links are rejected. The content is
+validated before the trial/import choice and never imported merely because an intent arrived.
+Pending document text now lives in the activity ViewModel, not a saved-instance Bundle.
+Normal import still goes through its start-date choice and destructive-change confirmation.
+
+Trial progress stays in memory and cannot complete or rewrite a stored session. Explicit
+watch-test export uses a separate external-ID namespace, a single upsert and no deletion;
+normal calendar reconciliation cannot match those test IDs. Actual recorded watch activities
+still follow the user's normal sync connections. See [PROGRAM_TRIAL.md](PROGRAM_TRIAL.md).

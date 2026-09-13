@@ -143,3 +143,18 @@ imports, and clearing hard stages on lightening. `MigrationTest.migrate15To16Pre
 checks the generated additive migration on a device. `WatchRunsUiTest` exercises the actual
 stage editor's validity checks, explicit save and cancellation, and the export button's
 missing-stage guard. It also captures the editor for visual inspection.
+
+## Program trial and Android document intents
+
+`TrialWorkoutTest` verifies timer pause, accelerated phase completion and explicit distance
+completion. `TrainingRepositoryTest` checks that preview and simulated completion retain
+the stored session and event history. `PlanDocumentReaderTest` covers content-only intents,
+shared streams, UTF-8 BOM and oversized document rejection. `RunExportTest` verifies that
+test upserts and regular reconciliation preserve each other's events and reject strength
+or missing run steps before a write.
+
+Device tests: `PlanTrialUiTest` exercises simulation, cancelled/confirmed export and Android's
+JSON intent resolution. `PlanOpenIntentTest` creates temporary MediaStore JSON documents and
+opens them through MainActivity, first cold and then through a second intent. It checks the
+trial choice and entry into the real application flow and removes the temporary documents.
+Screenshots are captured for visual inspection. See [PROGRAM_TRIAL.md](PROGRAM_TRIAL.md).

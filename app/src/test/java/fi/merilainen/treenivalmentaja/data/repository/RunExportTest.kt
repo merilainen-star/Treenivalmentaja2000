@@ -69,6 +69,26 @@ class RunExportTest {
   }
   @After fun teardown() { server.stop(0); db.close() }
 
+  @Test fun `test export and regular reconciliation cannot remove each other`() = runTest {
+    repository.exportRuns(listOf(run()), today)
+    val original = events.toMap()
+    val future = run("trial").copy(scheduledDate = today.plusDays(30).toString())
+    assertEquals(RunExportResult.Success(1, 0), repository.exportTestRun(future, today))
+    assertEquals(RunExportResult.Success(1, 0), repository.exportTestRun(future, today))
+    assertEquals(2, events.size)
+    val trial = events.entries.single { it.key.startsWith("treenivalmentaja-test-run-") }
+    assertEquals("2026-09-13T00:00:00", trial.value["start_date_local"])
+    original.forEach { (key, value) -> assertEquals(value, events[key]) }
+    repository.exportRuns(listOf(run()), today)
+    assertEquals(trial.value, events[trial.key])
+  }
+
+  @Test fun `test export rejects strength or missing stages before writing`() = runTest {
+    assertTrue(repository.exportTestRun(run().copy(type = WorkoutType.STRENGTH), today) is RunExportResult.Failure)
+    assertTrue(repository.exportTestRun(run().copy(runSteps = null), today) is RunExportResult.Failure)
+    assertTrue(writes.isEmpty())
+  }
+
   @Test fun `exports run stages and local date but no strength past or closed sessions`() = runTest {
     val sessions = listOf(run(), run("strength").copy(type = WorkoutType.STRENGTH), run("past").copy(scheduledDate = today.minusDays(1).toString()),
       run("later").copy(scheduledDate = today.plusDays(7).toString())) +

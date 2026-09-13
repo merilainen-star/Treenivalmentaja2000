@@ -12,6 +12,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -31,6 +32,22 @@ fun TreenivalmentajaApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val activeWorkoutVisible = currentDestination?.route?.startsWith("active/") == true
+    val openedPlan by viewModel.openedPlan.collectAsState()
+    val documentFailure by viewModel.documentFailure.collectAsState()
+    documentFailure?.let { message ->
+      androidx.compose.material3.AlertDialog(
+        onDismissRequest = viewModel::dismissDocumentFailure,
+        title = { Text("Tiedoston avaaminen epäonnistui") },
+        text = { Text(message) },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = viewModel::dismissDocumentFailure) { Text("Sulje") } },
+      )
+    }
+    openedPlan?.let { raw ->
+      PlanDocumentDialog(raw, viewModel) { json, startToday ->
+        navController.navigate("settings") { launchSingleTop = true }
+        viewModel.importPlanJson(json, startToday)
+      }
+    }
 
     Scaffold(
         bottomBar = {

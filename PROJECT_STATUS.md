@@ -1,5 +1,86 @@
 # Project status
 
+## Last verified build — 13 September 2026, final trial layout
+
+Final remeasurement after constraining the trial dialog to 90% of window height,
+with safe drawing padding, to keep its close button fully visible:
+**919/0/0 JVM tests**, **9/0/0 targeted device tests**, 0 skipped;
+debug lint **0 errors / 10 warnings**; APK **22,213,152 bytes = 22.213152 MB**.
+Same combined Gradle command and measurement method as the block immediately below,
+run again after the layout fix. No app source changed after that verification.
+
+Both screenshot repeats passed **3/0/0**. The first captured window transitions;
+the second disabled emulator animations using `adb shell settings put global
+window_animation_scale 0`, `transition_animation_scale 0`, and
+`animator_duration_scale 0` (the same settings command for each key).
+Viewed both final PNGs: trial steps and the real document-open trial list render
+clearly, with the close button fully above the gesture bar. These are repetitions
+of three of the nine device tests, not additional distinct tests.
+
+Visual follow-up uses the same APK and a direct instrumentation repeat, because UTP removes
+the installed test app and its external-files screenshots after the Gradle suite:
+
+```powershell
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' install -r app/build/outputs/apk/debug/app-debug.apk
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' shell am instrument -w -e class fi.merilainen.treenivalmentaja.PlanTrialUiTest,fi.merilainen.treenivalmentaja.PlanOpenIntentTest fi.merilainen.treenivalmentaja.test/androidx.test.runner.AndroidJUnitRunner
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' pull /sdcard/Android/data/fi.merilainen.treenivalmentaja/files/trial.png .scratch/trial.png
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' pull /sdcard/Android/data/fi.merilainen.treenivalmentaja/files/trial-open.png .scratch/trial-open.png
+```
+
+The preceding inset-only fix failed the new close-button visibility assertions
+(9/2/0 device tests); the bounded dialog height addresses that measured failure.
+The default emulator renderer produced black app surfaces despite accessible UI nodes.
+Restarted the same AVD with `-gpu swiftshader -no-snapshot-load`. Cold software-renderer
+startup produced an instrumentation startup ANR and a System UI ANR. Before the inset fix,
+one screenshot repeat timed out waiting for the second document (3/1/0), while other repeats
+passed (3/0/0, and an isolated intent check 1/0/0). These exploratory runs are not counted as
+additional distinct tests or substituted for the final Gradle suite above.
+
+Exact alternate-renderer startup:
+
+```powershell
+Start-Process -FilePath 'C:/Users/mimer/Android/Sdk/emulator/emulator.exe' -ArgumentList '-avd','treeni-test','-no-window','-no-audio','-no-boot-anim','-gpu','swiftshader','-no-snapshot-load' -WindowStyle Hidden
+```
+
+## Last verified build — 13 September 2026, program trial and JSON intents
+
+Measured on the working tree based on `f0c1d25`, Windows, Temurin 21.0.12+8.
+
+- JVM tests: **919/0/0** tests/failures/errors, 0 skipped, 64 XML reports.
+- Device tests: **9/0/0**, 0 skipped, actually run on `treeni-test`, Android 16.
+  The run includes PlanTrialUiTest, PlanOpenIntentTest, ImportStartDialogTest and
+  DestructiveConfirmationTest. It covers a real cold JSON open and a second document
+  delivered to the same MainActivity, trial UI and explicit export confirmation.
+- Debug lint: **0 errors, 10 warnings**. Final combined wrapper invocation succeeded.
+- Debug APK: **22,212,984 bytes = 22.212984 MB** (decimal).
+- No Room schema, build dependency or image asset was changed.
+
+Exact verification commands:
+
+```powershell
+$env:JAVA_HOME='C:/Users/mimer/.jdks/jdk-21.0.12+8'
+./gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=fi.merilainen.treenivalmentaja.PlanTrialUiTest,fi.merilainen.treenivalmentaja.PlanOpenIntentTest,fi.merilainen.treenivalmentaja.ImportStartDialogTest,fi.merilainen.treenivalmentaja.DestructiveConfirmationTest' --offline
+python .scratch/report_watch_checks.py
+git diff --check
+```
+
+Counts use the root tests/failures/errors/skipped attributes of the JUnit XML reports;
+nested device suites are not double-counted. APK MB is byte length / 1,000,000.
+The earlier device run was 9/1/0: the new-intent assertions passed but ActivityScenario
+ignored teardown lifecycle events after setIntent changed the document URI. The test now
+restores its launch intent in finally solely for teardown, and verifies the second URI
+before that restoration. Production intent handling was retained. The final run reused
+the passing JVM results after this Android-test-only change.
+
+The existing KSP/AWT ApplicationManager diagnostic appeared in earlier invocations;
+the final combined command completed successfully. No workaround or guard was removed.
+The pending JSON moved from Settings' saved-instance Bundle to the activity ViewModel;
+the date choice and destructive import confirmation remain on the normal import path.
+Trial state has no Room writes or alarms. Watch test export uses a separate ID namespace
+and makes no deletes. Physical Suunto/API integration remains unverified; network tests
+use a local HTTP server. No full instrumented suite or local Roborazzi comparison was run.
+
 ## Last verified build — 13 September 2026, planned runs for Suunto
 
 Measured on the working tree based on `26b7779`, Windows, Temurin 21.0.12+8.

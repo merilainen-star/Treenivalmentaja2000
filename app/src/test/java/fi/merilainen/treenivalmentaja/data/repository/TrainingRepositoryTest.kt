@@ -64,6 +64,20 @@ class TrainingRepositoryTest {
     db.close()
   }
 
+  @Test fun `trial preview and simulated completion preserve stored plan and history`() = runTest {
+    repository.importPlan(PLAN)
+    repository.transition("s-2", SessionStatus.COMPLETED)
+    val before = repository.getSession("s-2")
+    val events = repository.getEvents("s-2")
+    val preview = repository.previewPlan(PLAN) as PlanPreviewResult.Valid
+    val steps = fi.merilainen.treenivalmentaja.domain.trialSteps(preview.sessions.first())
+    var progress = fi.merilainen.treenivalmentaja.domain.TrialProgress()
+    repeat(steps.size) { progress = progress.next(steps) }
+    assertEquals(steps.size, progress.index)
+    assertEquals(before, repository.getSession("s-2"))
+    assertEquals(events, repository.getEvents("s-2"))
+  }
+
   @Test
   fun `run stages persist with an audit event and reject strength and completed runs`() = runTest {
     repository.importPlan(PLAN)

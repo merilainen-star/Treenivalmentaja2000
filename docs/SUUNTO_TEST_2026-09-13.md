@@ -1,5 +1,12 @@
 # Suunto-kokeilu 13.9.2026
 
+Päivitys: sovellukseen on lisätty [ohjelman kokeilu](PROGRAM_TRIAL.md).
+Uudessa versiossa valitse JSONin avaamisen jälkeen **Kokeile**: voit käydä
+vaiheet läpi ja viedä yhden testijuoksun tälle päivälle aktivoimatta ohjelmaa.
+Alla oleva korvaamisvaroitus koskee edelleen **Tuo ohjelmaksi** -polkua.
+Myöhemmän testitilan ehdotus alempana kuvaa alkuperäistä suunnitelmaa;
+toteutetun rajatun kokeilun toiminta ja rajoitukset ovat yllä linkitetyssä ohjeessa.
+
 Tiedostot: `sample-data/suunto-testi-2026-09-13.json` on Treenivalmentajan
 ohjelmatuontiin ja `sample-data/suunto-testi-2026-09-13-intervals.txt` on saman
 harjoituksen teksti Intervals.icu:n harjoituseditoriin. JSON ei ole Suunnon

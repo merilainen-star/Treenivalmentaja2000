@@ -84,6 +84,30 @@ class IntervalsRepository internal constructor(
 
   private val exportMutex = Mutex()
 
+  /** One explicitly requested test, isolated from normal reconciliation and Room. */
+  suspend fun exportTestRun(session: TrainingSession, today: LocalDate): RunExportResult = exportMutex.withLock {
+    val expected = generation.current()
+    try {
+      require(session.type == fi.merilainen.treenivalmentaja.domain.WorkoutType.RUNNING) { "Vain juoksun voi viedä kellotestiin." }
+      val normal = session.copy(scheduledDate = today.toString(), scheduledTime = null).toPlannedRunEvent()
+      val event = normal.copy(
+        externalId = normal.externalId.replace("treenivalmentaja-run-", "treenivalmentaja-test-run-") + "-$today",
+        name = "TESTI · Juoksu · $today",
+      )
+      val uploaded = client.upsertRuns(listOf(event))
+      if (generation.current() != expected) return@withLock RunExportResult.Failure("Intervals.icu-yhteys muuttui. Tarkista kalenteri.")
+      val saved = uploaded.singleOrNull()
+      if (saved?.externalId != event.externalId || saved.workoutDoc?.steps?.size != session.runSteps?.size)
+        return@withLock RunExportResult.Failure("Intervals.icu ei vahvistanut testin vaiheita. Tarkista kalenteri.")
+      if (!saved.pushErrors.isNullOrEmpty()) return@withLock RunExportResult.Failure("Testi tallentui, mutta kellosiirto ilmoitti virheen. Tarkista Suunto-yhteys.")
+      RunExportResult.Success(1, 0)
+    } catch (e: IntervalsException) {
+      RunExportResult.Failure((e.message ?: "Testivienti epäonnistui.") + " Tarkista Intervals.icu-kalenteri ennen uusintaa.")
+    } catch (e: IllegalArgumentException) {
+      RunExportResult.Failure(e.message ?: "Tarkista juoksun vaiheet.")
+    }
+  }
+
   /** Explicit export of today plus six days. Reconcile only this app's runs in this window. */
   suspend fun exportRuns(sessions: List<TrainingSession>, today: LocalDate): RunExportResult = exportMutex.withLock {
     val expected = generation.current()

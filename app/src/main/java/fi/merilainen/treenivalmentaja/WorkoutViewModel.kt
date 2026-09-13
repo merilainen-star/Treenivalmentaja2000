@@ -93,6 +93,7 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -1677,6 +1678,24 @@ class WorkoutViewModel(
     }
     viewModelScope.launch { runImport(rawJson, startToday, confirmed = false) }
   }
+
+  private val _openedPlan = MutableStateFlow<String?>(null)
+  val openedPlan = _openedPlan.asStateFlow()
+  private val _documentFailure = MutableStateFlow<String?>(null)
+  val documentFailure = _documentFailure.asStateFlow()
+  fun documentReadFailed(message: String) { _openedPlan.value = null; _documentFailure.value = message }
+  fun dismissDocumentFailure() { _documentFailure.value = null }
+  fun openPlanDocument(raw: String?) {
+    _documentFailure.value = null
+    if (raw.isNullOrBlank()) { documentReadFailed("Tiedosto tai leikepöytä on tyhjä."); return }
+    _openedPlan.value = raw
+  }
+  fun closePlanDocument() { _openedPlan.value = null }
+  suspend fun previewTrial(raw: String) = withContext(Dispatchers.Default) { repository.previewPlan(raw) }
+  suspend fun exportTrial(session: TrainingSession, today: LocalDate): fi.merilainen.treenivalmentaja.data.repository.RunExportResult =
+    intervalsRepository?.exportTestRun(session, today)
+      ?: fi.merilainen.treenivalmentaja.data.repository.RunExportResult.Failure("Määritä Intervals.icu-yhteys asetuksissa.")
+  fun trialDate(): LocalDate = LocalDate.now(clock)
 
   /**
    * The user has read what the import would do to the plan already stored and said yes.

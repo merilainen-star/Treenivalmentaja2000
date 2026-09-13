@@ -2,6 +2,14 @@ package fi.merilainen.treenivalmentaja
 
 import android.graphics.Color
 import android.os.Bundle
+import android.content.Intent
+import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import fi.merilainen.treenivalmentaja.data.importer.PlanDocumentReader
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -21,9 +29,29 @@ import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
 import fi.merilainen.treenivalmentaja.ui.theme.resolveDarkTheme
 
 class MainActivity : ComponentActivity() {
+  private val documentViewModel: WorkoutViewModel by viewModels { WorkoutViewModel.Factory }
+  private var documentRead: Job? = null
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    openDocument(intent)
+  }
+
+  private fun openDocument(intent: Intent) {
+    val uri = runCatching { PlanDocumentReader.uri(intent) }.getOrNull() ?: return
+    documentRead?.cancel()
+    documentRead = lifecycleScope.launch {
+      val result = withContext(Dispatchers.IO) { runCatching { PlanDocumentReader.read(contentResolver, uri) } }
+      result.onSuccess(documentViewModel::openPlanDocument)
+        .onFailure { documentViewModel.documentReadFailed("Tiedostoa ei voitu lukea. Tarkista lukuoikeus ja enintään 4 Mt:n koko, ja avaa se uudelleen tiedostonvalitsimella.") }
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     installSplashScreen()
     super.onCreate(savedInstanceState)
+    if (savedInstanceState == null) openDocument(intent)
     enableEdgeToEdge()
     setContent {
       // The ViewModel is built here rather than inside TreenivalmentajaApp because the theme is
