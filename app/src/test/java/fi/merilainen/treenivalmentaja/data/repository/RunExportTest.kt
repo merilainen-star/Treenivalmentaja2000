@@ -98,13 +98,13 @@ class RunExportTest {
     assertEquals("Run", event["type"])
     assertEquals("2026-09-13T00:30:00", event["start_date_local"])
     val description = event["description"] as String
-    assertTrue(description, description.contains("- \"Lämmittely\" 600s"))
-    assertTrue(description, description.contains("- \"Veto\" 1000mtr 5:00/km Pace"))
-    assertTrue(description, description.contains("- \"Palautus\" 120s"))
+    assertTrue(description, description.contains("- Lämmittely <!> 600s"))
+    assertTrue(description, description.contains("- Veto <!> 1000mtr 5:00/km Pace"))
+    assertTrue(description, description.contains("- Palautus <!> 120s"))
     assertTrue(writes.single().first.endsWith("/events/bulk?upsert=true"))
   }
 
-  @Test fun `watch cue stays on each bullet and numeric instructions stay quoted`() = runTest {
+  @Test fun `watch cue retains full instructions without surrounding quotation marks`() = runTest {
     val session = run().copy(runSteps = listOf(
       RunStep("Kiihdytys 1/3 - rento, ei sprintti", durationSec = 15),
       RunStep("Veto 1/6 - 400 m, tavoite 1:44-1:46", distanceMeters = 400, paceSecPerKm = 265),
@@ -112,9 +112,9 @@ class RunExportTest {
     ))
     assertEquals(RunExportResult.Success(1, 0), repository.exportTestRun(session, today))
     assertEquals(listOf(
-      "- \"Kiihdytys 1/3 - rento, ei sprintti\" 15s",
-      "- \"Veto 1/6 - 400 m, tavoite 1:44-1:46\" 400mtr 4:25/km Pace",
-      "- \"Palautus - 'kevyt'\" 90s",
+      "- Kiihdytys 1/3 - rento, ei sprintti <!> 15s",
+      "- Veto 1/6 - 400 m, tavoite 1:44-1:46 <!> 400mtr 4:25/km Pace",
+      "- Palautus - 'kevyt' <!> 90s",
     ), (events.values.single()["description"] as String).lines().filter { it.isNotBlank() })
   }
 

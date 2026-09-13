@@ -1,5 +1,33 @@
 # Suunto-kokeilu 13.9.2026
 
+## Lainausmerkkien poisto pitkistä ohjeista
+
+Käyttäjän seuraava kellokuva vahvisti, että Suunto näyttää lainausmerkit
+kirjaimellisesti. Pitkä vaiheohje näkyy aloitusruudussa hyvin, joten ohjeita
+ei lyhennetä eikä JSONin nimiä muuteta. Viejä ei enää lisää ympäröiviä
+lainausmerkkejä. Tekstin ja varsinaisten mittatavoitteiden välissä käytetään
+Intervals.icu:n `<!>`-erotinta, jotta esimerkiksi ohjeen `400 m` ei päädy
+keston tulkintaan. Tämä korvaa aiemman oletuksen lainausmerkkien suojauksesta.
+Nimen sisältämä erotin tai tekstikehotteen `^` neutraloidaan; ohjeen pituus
+ja tavallinen sanallinen sisältö säilytetään.
+
+```text
+- Palautus 1/2 - kävele tai hölkkää <!> 45s
+- Veto 1/6 - 400 m, tavoite 1:44-1:46 <!> 400mtr 4:25/km Pace
+```
+
+Erotin on viennin syntaksia, ei tarkoitettu kellolla näkyväksi tekstiksi.
+Käyttäjän on vielä tarkistettava uusi Suunto-synkronointi; paikallinen
+HTTP-testi varmistaa lähetysmuodon, ei palvelun parseria tai kellon näyttöä.
+Kellon yläreunan rajallista otsikkotilaa ei yritetä korjata leikkaamalla
+aloitusruudun hyödyllistä ohjetta. APK-päivityksen jälkeen vie sama testijuoksu
+uudelleen ja synkronoi Suunto-sovellus sekä kello. Nykyinen JSON kelpaa.
+
+Lähteet: [tekstin ja tavoitteen erotin](https://forum.intervals.icu/t/workout-builder-syntax-quick-guide/123701),
+[tekstikehotteiden siirto myös Suuntoon](https://forum.intervals.icu/t/text-events-are-now-supported-in-the-workout-builder/96016).
+
+Seuraava osio kuvaa edellistä korjausta ja sen mittaushetken oletuksia.
+
 ## Korjaus kellon puuttuvaan vaiheohjeeseen
 
 Käyttäjän Suunto 5 -kuvassa näkyi vain `15s`. Vienti kirjoitti vaiheiden nimet

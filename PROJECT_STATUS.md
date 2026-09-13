@@ -1,5 +1,36 @@
 # Project status
 
+## Last verified build — 13 September 2026, unquoted full watch cues
+
+The user's physical Suunto photos show that surrounding quotes are displayed
+literally, while the full instruction is useful on the transition screen.
+Removed the exporter-added quotes, preserving full cues and the JSON unchanged.
+The Intervals.icu text/target separator replaces the earlier assumed quote guard;
+reserved separator and text-event syntax inside names is neutralized. No cue
+shortening, database, UI layout or build configuration change.
+
+Measured: **920/0/0 JVM tests**, lint **0 errors / 10 warnings**,
+debug APK **22,213,234 bytes = 22.213234 MB**. The combined build succeeded.
+The actual PlanJson/PlanValidator/exporter regenerated and verified all 18 sample
+TXT steps. Local HTTP export assertions require full unquoted cues and retain
+the separate 400 m / 4:25 per km target. These do not execute the remote parser.
+No emulator/device test was run for this serializer-only change; none was started.
+The updated physical Suunto rendering remains to be verified by re-export/sync.
+
+Exact commands:
+
+```powershell
+$env:JAVA_HOME='C:/Users/mimer/.jdks/jdk-21.0.12+8'
+./gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest --offline
+./.scratch/validate_today_run.ps1 --write
+python .scratch/report_unquoted_cues.py
+git diff --check
+```
+
+JUnit root counts are summed; APK MB is bytes / 1,000,000. Existing nonfatal KSP/AWT
+diagnostic appeared. Earlier measured blocks and their superseded assumptions remain below.
+See [watch correction and sources](docs/SUUNTO_TEST_2026-09-13.md).
+
 ## Last verified build — 13 September 2026, watch step cues
 
 Fixed the user-reported Suunto screen showing only `15s`: the exporter now puts
