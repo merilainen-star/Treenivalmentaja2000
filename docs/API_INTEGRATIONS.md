@@ -436,3 +436,27 @@ is a question about which one wins.
 extension a required path parameter; the plain form is what the app sends. A `404` there would mean
 trying `.json`. The sync catches this fetch separately, so a wrong guess costs the analysis its load
 section and nothing else.
+## Planned run export (SuuntoPlus Guides)
+
+`IntervalsRepository.exportRuns` receives the active plan snapshot from the ViewModel and
+exports today through today+6 in the active plan's local calendar. Only RUNNING sessions in
+PLANNED, NOTIFIED or REPLACED_WITH_LIGHTER_VERSION are eligible. The UI exposes the complete
+prescription and requires explicit export. It never exports strength sessions.
+
+`GET /api/v1/athlete/0/events?oldest=...&newest=...` identifies stale app-owned future runs.
+`PUT /api/v1/athlete/0/events/bulk-delete` removes only matching app-prefixed external IDs
+whose returned date, category and sport fit the reconciliation window.
+`POST /api/v1/athlete/0/events/bulk?upsert=true` sends WORKOUT / Run events with
+`start_date_local` and the native workout-builder `description` syntax. `external_id` is
+`treenivalmentaja-run-` plus SHA-256 of plan ID, a NUL separator and session ID. A retry
+updates rather than duplicates; rescheduling to a new session removes the old export.
+
+All stages must validate before any writes. Native descriptions encode timed and distance
+steps and optional absolute pace, rather than supplying `workout_doc` as input. The response
+must contain each requested external ID and nonempty `workout_doc.steps`; downstream
+`push_errors` are surfaced without echoing arbitrary server text. The same encrypted API key
+and safe error handling serve reads and writes. Requests are serialized within the repository;
+connection generation changes stop subsequent requests. In-flight writes may already have
+reached the service when a connection is cleared. Calendar writes are not a transaction, so
+failures tell the user to inspect/retry. No actual account or watch sync is asserted by mocked
+HTTP tests. Setup instructions are in [INTERVALS_SETUP.md](INTERVALS_SETUP.md).

@@ -23,6 +23,9 @@ import fi.merilainen.treenivalmentaja.domain.GuidedProgress
 import fi.merilainen.treenivalmentaja.domain.SessionEvent
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
+import fi.merilainen.treenivalmentaja.domain.RunStep
+import fi.merilainen.treenivalmentaja.domain.isWatchRun
+import fi.merilainen.treenivalmentaja.domain.validRunSteps
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalTime
@@ -157,6 +160,22 @@ class TrainingRepository(
     planDao.getActivePlan()?.let { runCatching { ZoneId.of(it.timeZone) }.getOrNull() }
       ?: clock.zone
 
+  /** Called only after the user confirms the complete ordered list in the editor. */
+  suspend fun saveRunSteps(sessionId: String, steps: List<RunStep>): Boolean = db.withTransaction {
+    if (!steps.validRunSteps()) return@withTransaction false
+    val entity = sessionDao.getById(sessionId) ?: return@withTransaction false
+    if (entity.planId != planDao.getActivePlanId() || !entity.toDomain().isWatchRun()) return@withTransaction false
+    val now = clock.millis()
+    sessionDao.update(entity.copy(runStepsJson = PlanJson.encodeRunSteps(steps), updatedAt = now))
+    eventDao.insert(SessionEventEntity(
+      id = idGenerator(), sessionId = sessionId, timestampUtc = now,
+      fromStatus = entity.status, toStatus = entity.status, source = EventSource.USER,
+      note = "Juoksun kellovaiheet päivitetty",
+      payloadJson = "{\"runSteps\":" + PlanJson.encodeRunSteps(steps) + "}",
+    ))
+    true
+  }
+
   // ---------------------------------------------------------------- status transitions
 
   /**
@@ -275,6 +294,7 @@ class TrainingRepository(
       val lightened =
         if (lighter != null) {
           entity.copy(
+            runStepsJson = PlanJson.encodeRunSteps(lighter.runSteps),
             durationMin = lighter.durationMin ?: entity.durationMin,
             distanceKm = lighter.distanceKm ?: entity.distanceKm,
             intensity = lighter.intensity?.name ?: entity.intensity,
@@ -286,6 +306,7 @@ class TrainingRepository(
           )
         } else {
           entity.copy(
+            runStepsJson = null,
             durationMin = entity.durationMin?.let { (it * 0.6).toInt().coerceAtLeast(1) },
             distanceKm = entity.distanceKm?.let { it * 0.6 },
             rounds = entity.rounds?.let { (it - 1).coerceAtLeast(1) },

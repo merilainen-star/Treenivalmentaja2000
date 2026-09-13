@@ -88,6 +88,7 @@ data class LighterAlternative(
   val rounds: Int? = null,
   val roundsMin: Int? = null,
   val roundsMax: Int? = null,
+  val runSteps: List<RunStep>? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
   val roundRestSec: Int? = null,
@@ -117,6 +118,7 @@ data class TrainingSession(
   val rounds: Int? = null,
   val roundsMin: Int? = null,
   val roundsMax: Int? = null,
+  val runSteps: List<RunStep>? = null,
   val targetPace: String? = null,
   val warmupSec: Int? = null,
   /** Pause after a completed circuit round. Separate from each movement's [Exercise.restSec]. */

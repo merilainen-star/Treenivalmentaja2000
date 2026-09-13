@@ -25,6 +25,15 @@ object PlanJson {
   private val exerciseListAdapter: JsonAdapter<List<Exercise>> =
     moshi.adapter(Types.newParameterizedType(List::class.java, Exercise::class.java))
 
+  private val runStepsAdapter: JsonAdapter<List<fi.merilainen.treenivalmentaja.domain.RunStep>> =
+    moshi.adapter(Types.newParameterizedType(List::class.java, fi.merilainen.treenivalmentaja.domain.RunStep::class.java))
+
+  fun encodeRunSteps(steps: List<fi.merilainen.treenivalmentaja.domain.RunStep>?): String? =
+    steps?.let(runStepsAdapter::toJson)
+
+  fun decodeRunSteps(json: String?): List<fi.merilainen.treenivalmentaja.domain.RunStep>? =
+    json?.let { runStepsAdapter.fromJson(it) }
+
   private val lighterAdapter: JsonAdapter<LighterAlternative> =
     moshi.adapter(LighterAlternative::class.java)
 

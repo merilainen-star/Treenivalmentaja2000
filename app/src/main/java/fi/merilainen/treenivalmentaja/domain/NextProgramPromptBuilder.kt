@@ -242,6 +242,13 @@ class NextProgramPromptBuilder {
     - Kirjoita `description`-kentät suomeksi, lyhyesti ja konkreettisesti.
     - Anna juoksuille `distanceKm` ja `targetPace`, jotta kehitystä voi seurata seuraavallakin
       kerralla. Käytä tahtina sitä tasoa jolla käyttäjä oikeasti juoksee.
+    - Juoksut tehdään Suunto 5 -kellolla. Anna jokaiselle juoksulle `runSteps`: järjestetty lista
+      vaiheita, myös lämmittely, vedot, palautukset ja loppuverryttely. Jokaisella vaiheella on
+      `name` sekä joko `durationSec` tai `distanceMeters` (positiivinen kokonaisluku, ei molempia).
+      Valinnainen `paceSecPerKm` on tavoitevauhti sekunteina/km (60..1800). Toista veto/palautus
+      listassa jokaiselle toistolle; enintään 100 vaihetta. Myös tasainen juoksu tarvitsee yhden
+      vaiheen. Esimerkki: "runSteps": [{"name":"Kevyt juoksu","distanceMeters":5000,"paceSecPerKm":360}].
+      Jos annat kevyemmän vaihtoehdon, määritä sille omat kevyemmät `runSteps`.
     - Anna voimaharjoituksille `exercises` toistoineen — pelkkä kuvaus ei riitä ohjattuun tilaan.
     - Pidä viikkorakenne toistettavana: samat viikonpäivät läpi jakson, ellei ole syytä poiketa.
     """

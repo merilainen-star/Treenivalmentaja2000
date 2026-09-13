@@ -9,6 +9,7 @@ import fi.merilainen.treenivalmentaja.domain.LighterAlternative
 import fi.merilainen.treenivalmentaja.domain.SessionStatus
 import fi.merilainen.treenivalmentaja.domain.TrainingSession
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
+import fi.merilainen.treenivalmentaja.domain.validRunSteps
 import java.time.DateTimeException
 import java.time.LocalDate
 import java.time.LocalTime
@@ -266,14 +267,23 @@ object PlanValidator {
     val exercises = validateExercises(session.exercises, "$path.exercises", errors)
     if (exercises == null) usable = false
 
+    if (session.runSteps != null &&
+      (type != WorkoutType.RUNNING || (session.runSteps.any { it == null } || !session.runSteps.filterNotNull().validRunSteps()))) {
+      errors += ImportError("$path.runSteps", "juoksun vaiheissa tarvitaan nimi ja joko positiivinen kesto sekunteina tai matka metreinä; tarkista myös tavoitevauhti")
+      usable = false
+    }
+    if (session.lighterAlternative?.runSteps != null && type != WorkoutType.RUNNING) {
+      errors += ImportError("$path.lighterAlternative.runSteps", "vaiheet kuuluvat vain juoksuun")
+      usable = false
+    }
     val hasWork =
-      session.durationMin != null || session.distanceKm != null || !exercises.isNullOrEmpty()
+      session.durationMin != null || session.distanceKm != null || !exercises.isNullOrEmpty() || !session.runSteps.isNullOrEmpty()
     if (!hasWork) {
       errors +=
         ImportError(
           path,
           "harjoituksessa on oltava vähintään yksi seuraavista: durationMin, distanceKm tai " +
-            "exercises",
+            "exercises tai runSteps",
         )
       usable = false
     }
@@ -305,6 +315,7 @@ object PlanValidator {
       rounds = session.rounds,
       roundsMin = session.roundsMin,
       roundsMax = session.roundsMax,
+      runSteps = session.runSteps?.filterNotNull(),
       targetPace = session.targetPace,
       warmupSec = session.warmupSec,
       roundRestSec = session.roundRestSec,
@@ -505,8 +516,12 @@ object PlanValidator {
     val exercises = validateExercises(dto.exercises, "$path.exercises", errors)
     if (exercises == null) ok = false
 
+    if (dto.runSteps != null && (dto.runSteps.any { it == null } || !dto.runSteps.filterNotNull().validRunSteps())) {
+      errors += ImportError("$path.runSteps", "juoksun vaiheet ovat virheelliset")
+      ok = false
+    }
     val empty =
-      dto.durationMin == null &&
+      dto.runSteps == null && dto.durationMin == null &&
         dto.distanceKm == null &&
         dto.intensity == null &&
         dto.rounds == null &&
@@ -526,6 +541,7 @@ object PlanValidator {
       rounds = dto.rounds,
       roundsMin = dto.roundsMin,
       roundsMax = dto.roundsMax,
+      runSteps = dto.runSteps?.filterNotNull(),
       targetPace = dto.targetPace,
       warmupSec = dto.warmupSec,
       roundRestSec = dto.roundRestSec,

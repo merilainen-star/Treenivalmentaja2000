@@ -335,3 +335,30 @@ If the error list is non-empty, **nothing** is written to Room.
 ## Versiointi
 
 - **v1**: Ensimmäinen versio. `timeIsFixed` ja valinnainen `time` lisättiin taaksepäin yhteensopivasti. Huom. vanhat buildit hylkäävät ajattoman dokumentin.
+## Juoksun kellovaiheet (`runSteps`)
+
+Schema v1 accepts an optional `runSteps` array on RUNNING sessions and their
+`lighterAlternative`. This ordered list is the authority for watch guidance; descriptive
+prose is never parsed into intervals. Existing duration/distance summary fields remain plan
+estimates. Imported steps are shown in the workout details and in Settings → Juoksut Suuntoon.
+
+```json
+"runSteps": [
+  {"name": "Lämmittely", "durationSec": 600},
+  {"name": "Veto 1", "distanceMeters": 1000, "paceSecPerKm": 300},
+  {"name": "Palautus", "durationSec": 120},
+  {"name": "Veto 2", "distanceMeters": 1000, "paceSecPerKm": 300},
+  {"name": "Loppuverryttely", "durationSec": 600}
+]
+```
+
+There must be 1–100 steps, each with a nonblank single-line `name` of at most 80 characters,
+and exactly one of `durationSec` (1–86400) or `distanceMeters` (1–200000). Optional
+`paceSecPerKm` is a single absolute target of 60–1800 seconds/km. Repeats are explicit ordered
+steps; no implicit final recovery is added. A simple run uses one step. A session may use
+`runSteps` as its work prescription without a summary duration or distance.
+
+Kevennys uses the lighter alternative's steps, if supplied. Otherwise it clears the original
+steps so old hard intervals cannot be exported as a light workout; the user must define new
+steps before export. Next-program generation asks for steps for all runs. Existing plans
+can be completed with the in-app step editor without re-importing the whole programme.

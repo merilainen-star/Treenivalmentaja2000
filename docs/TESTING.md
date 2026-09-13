@@ -129,3 +129,17 @@ become idle, so their infinite animation is cancelled at its initial frame; fini
 still settle. Production animations are unchanged. This addresses the hang in
 `ComponentScreenshotTest.updateCard_installStates` rather than excluding that test.
 Measured outcomes and exact commands belong in [PROJECT_STATUS.md](../PROJECT_STATUS.md).
+## Suunto planned running workouts
+
+`RunExportTest` uses a local HTTP server and the real repository/client. It covers ordered
+timed/distance/pace steps, local dates, exclusion of strength/past/closed sessions, stable
+upserts, scoped cleanup after rescheduling, empty-window cleanup, validation before writes,
+authentication failure, parser rejection and downstream push errors. These fixtures test
+the request/response contract, not the real service's parser or a physical watch.
+
+`TrainingRepositoryTest` covers import → Room → readback → reschedule, explicit stage saves
+with audit events, rejection of edits to strength/completed sessions, invalid/null stage
+imports, and clearing hard stages on lightening. `MigrationTest.migrate15To16PreservesSessionsAndAddsAbsentRunSteps`
+checks the generated additive migration on a device. `WatchRunsUiTest` exercises the actual
+stage editor's validity checks, explicit save and cancellation, and the export button's
+missing-stage guard. It also captures the editor for visual inspection.

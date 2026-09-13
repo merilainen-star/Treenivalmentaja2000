@@ -119,6 +119,9 @@ fun WorkoutDetails(
             }
         }
 
+        workout.runSteps.forEachIndexed { index, step ->
+            Text("${index + 1}. ${step.summary()}", style = MaterialTheme.typography.bodyMedium)
+        }
         if (workout.appliedLighterVariant) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(

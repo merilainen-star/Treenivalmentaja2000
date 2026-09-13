@@ -18,11 +18,21 @@ import fi.merilainen.treenivalmentaja.domain.PlannedSession
 import fi.merilainen.treenivalmentaja.domain.RunSplit
 import fi.merilainen.treenivalmentaja.domain.heartRateZones
 import fi.merilainen.treenivalmentaja.domain.kilometreSplits
+import fi.merilainen.treenivalmentaja.data.intervals.toPlannedRunEvent
+import fi.merilainen.treenivalmentaja.domain.TrainingSession
+import fi.merilainen.treenivalmentaja.domain.isWatchRun
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+
+sealed interface RunExportResult {
+  data class Success(val uploaded: Int, val removed: Int) : RunExportResult
+  data class Failure(val message: String) : RunExportResult
+}
 
 /** What an intervals.icu sync did, in the terms the screen that asked for it needs. */
 sealed interface IntervalsSyncResult {
@@ -71,6 +81,45 @@ class IntervalsRepository internal constructor(
   private val matcher: MatchOuraWorkoutsUseCase = MatchOuraWorkoutsUseCase(),
   private val generation: ConnectionGeneration = ConnectionGeneration(),
 ) {
+
+  private val exportMutex = Mutex()
+
+  /** Explicit export of today plus six days. Reconcile only this app's runs in this window. */
+  suspend fun exportRuns(sessions: List<TrainingSession>, today: LocalDate): RunExportResult = exportMutex.withLock {
+    val expected = generation.current()
+    val until = today.plusDays(6)
+    try {
+      // Validate the whole request before changing anything remotely.
+      val candidates = sessions.filter { it.isWatchRun() && LocalDate.parse(it.scheduledDate) in today..until }
+      val runs = candidates.map { it.toPlannedRunEvent() }
+      val expectedSteps = runs.zip(candidates).associate { (event, session) -> event.externalId to session.runSteps!!.size }
+      val desired = runs.map { it.externalId }.toSet()
+      val existing = client.calendarEvents(today, until)
+      val stale = existing.filter { event ->
+        event.category == "WORKOUT" && event.type == "Run" &&
+          event.externalId?.matches(Regex("treenivalmentaja-run-[0-9a-f]{64}")) == true &&
+          event.externalId !in desired &&
+          runCatching { LocalDate.parse(event.startDateLocal?.take(10)) in today..until }.getOrDefault(false)
+      }.mapNotNull { it.externalId }
+      if (generation.current() != expected) return@withLock RunExportResult.Failure("Intervals.icu-yhteys on muuttunut. Yritä uudelleen.")
+      val removed = client.deleteRuns(stale)
+      if (generation.current() != expected) return@withLock RunExportResult.Failure("Intervals.icu-yhteys on muuttunut. Yritä uudelleen.")
+      val uploaded = client.upsertRuns(runs)
+      if (generation.current() != expected) return@withLock RunExportResult.Failure("Intervals.icu-yhteys on muuttunut. Tarkista kalenteri ennen uutta vientiä.")
+      if (uploaded.size != runs.size || uploaded.mapNotNull { it.externalId }.toSet() != desired ||
+        uploaded.any { it.workoutDoc?.steps?.size != expectedSteps[it.externalId] }) {
+        return@withLock RunExportResult.Failure("Intervals.icu ei vahvistanut kaikkia harjoitusvaiheita. Tarkista kalenteri ja yritä uudelleen.")
+      }
+      if (uploaded.any { !it.pushErrors.isNullOrEmpty() }) {
+        return@withLock RunExportResult.Failure("Harjoitukset vietiin Intervals.icu:hun, mutta kellosiirrossa ilmoitettiin virhe. Tarkista Suunto-yhteys Intervals.icu:ssa.")
+      }
+      RunExportResult.Success(runs.size, removed)
+    } catch (e: IntervalsException) {
+      RunExportResult.Failure((e.message ?: "Vienti epäonnistui.") + " Osa muutoksista on voinut tallentua. Viennin voi uusia.")
+    } catch (e: IllegalArgumentException) {
+      RunExportResult.Failure(e.message ?: "Tarkista juoksun vaiheet.")
+    }
+  }
 
   /** Reads intervals.icu between two dates and writes what came back. */
   suspend fun sync(from: LocalDate, to: LocalDate, zone: ZoneId): IntervalsSyncResult {

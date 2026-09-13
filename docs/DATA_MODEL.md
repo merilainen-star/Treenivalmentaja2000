@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 15 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 16 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -417,3 +417,12 @@ Before installing a build that bumps the version, take a copy of the device data
   "not known".
 - **Lifecycle:** Written by the ordinary intervals.icu sync, whose failure it cannot cause (it is
   caught separately). Cleared when the user removes the API key. Added at schema v12.
+## Schema 16 — planned running steps
+
+Room auto-migration 15→16 adds nullable `workout_sessions.runStepsJson`. Existing sessions
+retain their data and have no watch prescription until one is imported or explicitly saved.
+KSP generates the schema JSON. `PlanJson` serializes the typed `RunStep` list; mappers keep
+Room entities inside the data layer. Rescheduling copies the steps to the new session.
+The editor writes only after **Tallenna vaiheet**, through `TrainingRepository.saveRunSteps`,
+with a USER event containing the saved list. No status transition is implied by this event.
+Kevennys clears original steps unless the explicit lighter alternative supplies replacements.

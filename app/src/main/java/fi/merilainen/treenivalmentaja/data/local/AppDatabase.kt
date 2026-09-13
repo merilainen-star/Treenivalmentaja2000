@@ -39,7 +39,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       IntervalsRunSplitEntity::class,
       IntervalsSplitFetchEntity::class,
     ],
-  version = 15,
+  version = 16,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -97,6 +97,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 12, to = 13),
       AutoMigration(from = 13, to = 14),
       AutoMigration(from = 14, to = 15),
+      AutoMigration(from = 15, to = 16),
     ],
 )
 @TypeConverters(Converters::class)

@@ -54,6 +54,7 @@ import fi.merilainen.treenivalmentaja.domain.InstallUpdateUseCase
 import fi.merilainen.treenivalmentaja.domain.Intensity
 import fi.merilainen.treenivalmentaja.domain.UpcomingAnalysisInput
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
+import fi.merilainen.treenivalmentaja.domain.isWatchRun
 import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
 import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.CompletedSessionMetrics
@@ -127,6 +128,7 @@ data class Workout(
    * these instead.
    */
   val exercises: List<Exercise> = emptyList(),
+  val runSteps: List<fi.merilainen.treenivalmentaja.domain.RunStep> = emptyList(),
   /** Circuit rounds the whole exercise list is repeated for, when the plan says so. */
   val rounds: Int = 1,
   val roundRestSec: Int? = null,
@@ -531,6 +533,44 @@ class WorkoutViewModel(
 
   fun dismissOuraFailure() {
     viewModelScope.launch { ouraConnection.dismissFailure() }
+  }
+
+  val watchRuns = combine(repository.observeSessions(), currentDate) { sessions, today ->
+    sessions.filter { it.isWatchRun() && LocalDate.parse(it.scheduledDate) in today..today.plusDays(6) }
+      .sortedWith(compareBy({ it.scheduledDate }, { it.scheduledTime }))
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+  private val _runExportBusy = MutableStateFlow(false)
+  val runExportBusy = _runExportBusy.asStateFlow()
+  private val _runExportMessage = MutableStateFlow<String?>(null)
+  val runExportMessage = _runExportMessage.asStateFlow()
+
+  fun saveRunSteps(sessionId: String, steps: List<fi.merilainen.treenivalmentaja.domain.RunStep>) {
+    if (_runExportBusy.value) return
+    _runExportBusy.value = true
+    viewModelScope.launch {
+      try {
+        _runExportMessage.value = if (repository.saveRunSteps(sessionId, steps))
+          "Vaiheet tallennettu. Vie juoksut päivittääksesi kellon harjoitukset."
+        else "Vaiheita ei tallennettu: harjoitus on muuttunut tai vaiheet ovat virheelliset."
+      } finally { _runExportBusy.value = false }
+    }
+  }
+
+  fun exportWatchRuns() {
+    val remote = intervalsRepository ?: return
+    if (_runExportBusy.value) return
+    _runExportBusy.value = true
+    viewModelScope.launch {
+      try {
+        val today = LocalDate.now(clock.withZone(repository.activePlanTimeZone()))
+        _runExportMessage.value = when (val result = remote.exportRuns(repository.getSessions(), today)) {
+          is fi.merilainen.treenivalmentaja.data.repository.RunExportResult.Success ->
+            "Intervals.icu: ${result.uploaded} juoksua viety, ${result.removed} vanhentunutta vientiä poistettu. Synkronoi Suunto-sovellus ja kello."
+          is fi.merilainen.treenivalmentaja.data.repository.RunExportResult.Failure -> result.message
+        }
+      } finally { _runExportBusy.value = false }
+    }
   }
 
   // ------------------------------------------------------------------ intervals.icu
@@ -1797,6 +1837,7 @@ class WorkoutViewModel(
             appliedLighterVariant = session.appliedLighterVariant,
             movedHere = session.originalSessionId != null,
             exercises = session.exercises.orEmpty(),
+            runSteps = session.runSteps.orEmpty(),
             rounds = (session.rounds ?: session.roundsMin ?: 1).coerceAtLeast(1),
             roundRestSec = session.roundRestSec,
             intensity = session.intensity,

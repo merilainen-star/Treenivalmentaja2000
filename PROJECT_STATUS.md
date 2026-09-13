@@ -1,5 +1,62 @@
 # Project status
 
+## Last verified build — 13 September 2026, planned runs for Suunto
+
+Measured on the working tree based on `26b7779`, Windows, Temurin 21.0.12+8.
+
+- JVM tests: **911/0/0** tests/failures/errors, 0 skipped (62 JUnit XML reports).
+- Targeted device tests: **16/0/0**, 0 skipped, actually run on `treeni-test`, Android 16:
+  `WatchRunsUiTest` and the complete `MigrationTest` class, including 15→16.
+- The editor save test was repeated directly with adb for its screenshot: **1/0/0**.
+  This repeats one of the 16 tests; it is not an additional distinct test.
+- Debug lint: **0 errors, 10 warnings**. The combined Gradle invocation succeeded.
+- Debug APK: **22,181,143 bytes = 22.181143 MB** (decimal), at
+  `app/build/outputs/apk/debug/app-debug.apk`.
+- Cold launch on the emulator returned `Status: ok`, `TotalTime: 6718` ms; the process remained
+  running. Navigated to Settings → Juoksut Suuntoon and opened an existing run's editor.
+  Inspected screenshots of the settings card and editor, including the explicit save/cancel buttons.
+- No real Intervals.icu account export or physical Suunto 5 sync was performed. The HTTP tests
+  use a local server; downstream watch delivery still requires the user's connected services.
+- No full device suite or Roborazzi baseline comparison was run. KSP printed its existing
+  AWT background-thread exception; the final build and tests succeeded.
+- No previous defensive guard was removed. Lightening now clears newly introduced original
+  watch stages unless the lighter alternative supplies replacements, to avoid exporting hard
+  intervals under a light prescription.
+
+Exact final verification commands (PowerShell):
+
+```powershell
+$env:JAVA_HOME='C:/Users/mimer/.jdks/jdk-21.0.12+8'
+./gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=fi.merilainen.treenivalmentaja.WatchRunsUiTest,fi.merilainen.treenivalmentaja.data.local.MigrationTest' --offline
+python .scratch/report_watch_checks.py
+git diff --check
+```
+
+The measurement helper sums `tests`, `failures`, `errors`, and `skipped` on the root of each
+`TEST-*.xml` in `app/build/test-results/testDebugUnitTest` and
+`app/build/outputs/androidTest-results/connected/debug`. Device XML's root already totals its
+nested suites, so they are not counted again. It counts severity attributes in
+`app/build/reports/lint-results-debug.xml`, and reads the APK byte length (MB = bytes / 1,000,000).
+The helper is a throwaway script under git-ignored `.scratch/`; no generated Room JSON was edited.
+
+Exact screenshot and launch commands (Gradle's device runner removed its test installations,
+so adb reinstalled the same built APKs for this inspection):
+
+```powershell
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' install -r app/build/outputs/apk/debug/app-debug.apk
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' shell am instrument -w -e class fi.merilainen.treenivalmentaja.WatchRunsUiTest#editorRequiresValidStagesAndExplicitSave fi.merilainen.treenivalmentaja.test/androidx.test.runner.AndroidJUnitRunner
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' pull /sdcard/Android/data/fi.merilainen.treenivalmentaja/files/watch-editor.png .scratch/watch-editor.png
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' shell pidof fi.merilainen.treenivalmentaja
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' shell screencap -p /sdcard/watch-settings.png
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' pull /sdcard/watch-settings.png .scratch/watch-settings.png
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' shell screencap -p /sdcard/watch-editor-live.png
+& 'C:/Users/mimer/Android/Sdk/platform-tools/adb.exe' pull /sdcard/watch-editor-live.png .scratch/watch-editor-live.png
+```
+
+## Measurement history
+
 ## Last verified build — 12 September 2026, programme request timeouts
 
 Measured on the working tree based on `c94e152`, Windows, Temurin 21.0.12+8.

@@ -64,6 +64,51 @@ class TrainingRepositoryTest {
     db.close()
   }
 
+  @Test
+  fun `run stages persist with an audit event and reject strength and completed runs`() = runTest {
+    repository.importPlan(PLAN)
+    val steps = listOf(fi.merilainen.treenivalmentaja.domain.RunStep("Veto", durationSec = 180))
+    assertFalse(repository.saveRunSteps("s-1", steps))
+    assertTrue(repository.saveRunSteps("s-2", steps))
+    assertEquals(steps, repository.getSession("s-2")!!.runSteps)
+    assertTrue(repository.getEvents("s-2").any { it.note == "Juoksun kellovaiheet päivitetty" && it.payloadJson!!.contains("runSteps") })
+    repository.transition("s-2", SessionStatus.COMPLETED)
+    assertFalse(repository.saveRunSteps("s-2", listOf(fi.merilainen.treenivalmentaja.domain.RunStep("Toinen", durationSec = 60))))
+    assertEquals(steps, repository.getSession("s-2")!!.runSteps)
+  }
+
+  @Test
+  fun `lightening clears hard watch intervals unless alternative supplies its own`() = runTest {
+    repository.importPlan(PLAN)
+    repository.saveRunSteps("s-2", listOf(fi.merilainen.treenivalmentaja.domain.RunStep("Kova veto", durationSec = 300)))
+    repository.applyLighterVersion("s-2")
+    assertNull(repository.getSession("s-2")!!.runSteps)
+  }
+
+  @Test
+  fun `import roundtrips run stages and reschedule preserves them`() = runTest {
+    val plan = PLAN.replace("\"distanceKm\": 5.0,", "\"distanceKm\": 5.0, \"runSteps\": [{\"name\":\"Juoksu\",\"distanceMeters\":5000,\"paceSecPerKm\":360}],")
+    assertTrue(repository.importPlan(plan) is ImportResult.Success)
+    val steps = repository.getSession("s-2")!!.runSteps
+    assertEquals(5000, steps!!.single().distanceMeters)
+    repository.reschedule("s-2", LocalDate.parse("2026-08-12"), null)
+    assertEquals(steps, repository.getSessions().single { it.originalSessionId == "s-2" }.runSteps)
+  }
+
+  @Test
+  fun `invalid run stages fail plan import`() = runTest {
+    val invalid = PLAN.replace("\"distanceKm\": 5.0,", "\"distanceKm\": 5.0, \"runSteps\": [{\"name\":\"Veto\",\"durationSec\":0}],")
+    assertFalse(repository.importPlan(invalid) is ImportResult.Success)
+    assertTrue(repository.getSessions().isEmpty())
+  }
+
+  @Test
+  fun `null stage fails import without crashing`() = runTest {
+    val invalid = PLAN.replace("\"distanceKm\": 5.0,", "\"distanceKm\": 5.0, \"runSteps\": [null],")
+    assertFalse(repository.importPlan(invalid) is ImportResult.Success)
+    assertTrue(repository.getSessions().isEmpty())
+  }
+
   // ------------------------------------------------------------------ import
 
   @Test

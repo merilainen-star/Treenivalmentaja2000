@@ -61,6 +61,9 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val rawLoading by viewModel.rawLoading.collectAsState()
     val rawError by viewModel.rawError.collectAsState()
     val rawActivities by viewModel.rawActivityRefs.collectAsState()
+    val watchRuns by viewModel.watchRuns.collectAsState()
+    val runExportBusy by viewModel.runExportBusy.collectAsState()
+    val runExportMessage by viewModel.runExportMessage.collectAsState()
     val backfillProgress by viewModel.backfillProgress.collectAsState()
     val backfillResult by viewModel.backfillResult.collectAsState()
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
@@ -198,6 +201,11 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
         onClearIntervalsApiKey = viewModel::clearIntervalsApiKey,
         onDismissIntervalsFailure = viewModel::dismissIntervalsFailure,
         onOpenIntervalsRawData = { rawDataOpen = true },
+        watchRuns = watchRuns,
+        runExportBusy = runExportBusy,
+        runExportMessage = runExportMessage,
+        onSaveRunSteps = viewModel::saveRunSteps,
+        onExportWatchRuns = viewModel::exportWatchRuns,
         intervalsBackfillProgress = backfillProgress,
         intervalsBackfillResult = backfillResult,
         onIntervalsBackfill = viewModel::backfillIntervals,
@@ -288,6 +296,11 @@ fun SettingsScreenContent(
     onClearIntervalsApiKey: () -> Unit = {},
     onDismissIntervalsFailure: () -> Unit = {},
     onOpenIntervalsRawData: () -> Unit = {},
+    watchRuns: List<fi.merilainen.treenivalmentaja.domain.TrainingSession> = emptyList(),
+    runExportBusy: Boolean = false,
+    runExportMessage: String? = null,
+    onSaveRunSteps: (String, List<fi.merilainen.treenivalmentaja.domain.RunStep>) -> Unit = { _, _ -> },
+    onExportWatchRuns: () -> Unit = {},
     intervalsBackfillProgress: Int? = null,
     intervalsBackfillResult: IntervalsBackfillResult? = null,
     onIntervalsBackfill: () -> Unit = {},
@@ -418,6 +431,15 @@ fun SettingsScreenContent(
             backfillResult = intervalsBackfillResult,
             onBackfill = onIntervalsBackfill,
             onDismissBackfillResult = onDismissIntervalsBackfillResult,
+        )
+
+        WatchRunsCard(
+            runs = watchRuns,
+            connected = intervalsState != IntervalsConnectionState.NotConfigured,
+            busy = runExportBusy,
+            message = runExportMessage,
+            onSave = onSaveRunSteps,
+            onExport = onExportWatchRuns,
         )
 
         AnalysisCard(

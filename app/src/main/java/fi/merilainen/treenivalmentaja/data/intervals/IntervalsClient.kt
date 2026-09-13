@@ -17,6 +17,9 @@ import okhttp3.Call
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 
 /**
@@ -128,6 +131,28 @@ internal class IntervalsClient(
         .addQueryParameter("types", STREAM_TYPES)
         .build()
     return decodeList(get(url), streamAdapter)
+  }
+
+  suspend fun calendarEvents(from: LocalDate, to: LocalDate): List<CalendarEvent> =
+    decodeList(get("$baseUrl/api/v1/athlete/$SELF/events".toHttpUrl().newBuilder()
+      .addQueryParameter("oldest", from.toString())
+      .addQueryParameter("newest", to.toString()).build()), calendarAdapter)
+
+  suspend fun upsertRuns(events: List<PlannedRunEvent>): List<CalendarEvent> {
+    if (events.isEmpty()) return emptyList()
+    val body = plannedRunAdapter.toJson(events).toRequestBody("application/json".toMediaType())
+    return decodeList(request("$baseUrl/api/v1/athlete/$SELF/events/bulk?upsert=true".toHttpUrl(), "POST", body), calendarAdapter)
+  }
+
+  suspend fun deleteRuns(externalIds: List<String>): Int {
+    if (externalIds.isEmpty()) return 0
+    require(externalIds.all { it.matches(Regex("treenivalmentaja-run-[0-9a-f]{64}")) })
+    val body = moshi.adapter(Any::class.java)
+      .toJson(externalIds.map { mapOf("external_id" to it) })
+      .toRequestBody("application/json".toMediaType())
+    return request("$baseUrl/api/v1/athlete/$SELF/events/bulk-delete".toHttpUrl(), "PUT", body)
+      .trim().toIntOrNull()?.takeIf { it in 0..externalIds.size }
+      ?: throw IntervalsUnavailableException(UNREADABLE)
   }
 
   private fun activitiesUrl(): HttpUrl = "$baseUrl/api/v1/athlete/$SELF/activities".toHttpUrl()
@@ -247,12 +272,15 @@ internal class IntervalsClient(
    * The status is checked before the body is trusted, because a failing service is under no
    * obligation to answer in JSON.
    */
-  private suspend fun get(url: HttpUrl): String {
+  private suspend fun get(url: HttpUrl): String = request(url)
+
+  private suspend fun request(url: HttpUrl, method: String = "GET", body: RequestBody? = null): String {
     val key = apiKeys.apiKey()?.takeIf { it.isNotBlank() } ?: throw IntervalsNotConfiguredException()
     return withContext(Dispatchers.IO) {
       val request =
         Request.Builder()
           .url(url)
+          .method(method, body)
           .header("Authorization", basic(key))
           .header("Accept", "application/json")
           .build()
@@ -349,6 +377,11 @@ internal class IntervalsClient(
 
     private val streamAdapter: JsonAdapter<List<IntervalsStreamDto?>> =
       moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsStreamDto::class.java))
+
+    private val calendarAdapter: JsonAdapter<List<CalendarEvent?>> =
+      moshi.adapter(Types.newParameterizedType(List::class.java, CalendarEvent::class.java))
+    private val plannedRunAdapter: JsonAdapter<List<PlannedRunEvent>> =
+      moshi.adapter(Types.newParameterizedType(List::class.java, PlannedRunEvent::class.java))
 
     private val wellnessAdapter: JsonAdapter<List<IntervalsWellnessDto?>> =
       moshi.adapter(Types.newParameterizedType(List::class.java, IntervalsWellnessDto::class.java))

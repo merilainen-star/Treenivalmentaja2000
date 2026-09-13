@@ -135,3 +135,37 @@ or logged.
   `MANUAL`, …) but never filters on it. A run you uploaded yourself is still that run.
 - See [PRIVACY.md](PRIVACY.md) for what leaves the device, and
   [API_INTEGRATIONS.md](API_INTEGRATIONS.md) § Intervals.icu for the endpoint itself.
+# Juoksujen vienti Suunto 5:een
+
+Asetukset → **Juoksut Suuntoon** näyttää tämän päivän ja seuraavien kuuden päivän
+aktiiviset juoksut. Voimaharjoituksia ja hiihtoa ei viedä. Juoksun voi tehdä kellolla;
+suorituksen nykyinen tuonti ja kohdistus Intervals.icu:sta säilyy ennallaan.
+
+1. Tallenna oma API-avain sovelluksen Intervals.icu-asetuksiin, jos sitä ei vielä ole.
+2. Yhdistä Intervals.icu:n Settings → Suunto ja salli **Upload planned workouts**.
+   Valitse lajiksi Run. Päivitä Suunto 5:n ohjelmisto tarvittaessa.
+3. Tarkista sovelluksessa juoksun vaiheet. Vanhoille tekstipohjaisille harjoituksille
+   paina **Muokkaa vaiheita** ja lisää lämmittely, vedot, palautukset ja loppuverryttely
+   järjestyksessä. Tasainen lenkki tarvitsee vain yhden vaiheen. Nimi ja joko kesto
+   sekunteina tai matka metreinä ovat pakolliset; tarkka vauhtitavoite on valinnainen.
+   **Tallenna vaiheet** hyväksyy muutoksen paikalliseen ohjelmaan. Peruuta ei tallenna.
+4. Paina **Vie juoksut Intervals.icu:hun**. Vienti on käyttäjän käynnistämä, ei automaattinen
+   taustatoiminto. Puuttuvat tai virheelliset vaiheet estävät koko viennin.
+5. Synkronoi Suunto-sovellus ja kello. Päivälle ajoitettu SuuntoPlus Guide voidaan ehdottaa
+   juoksua aloittaessa. Sen voi myös valita SuuntoPlus-valikosta ennen aloitusta.
+
+Vie uudelleen aina ohjelman siirron, perumisen, kevennyksen tai vaiheiden muokkauksen jälkeen
+ja ennen seuraavan viikon harjoituksia. Sama tunniste päivittää saman harjoituksen.
+Vienti poistaa vain tämän sovelluksen omat, nyt tarpeettomat juoksuviennit samalta
+seitsemän päivän jaksolta. Menneisiin tapahtumiin ja muiden palvelujen treeneihin ei kosketa.
+Tyhjän jakson vienti siivoaa jakson vanhentuneet viennit. Avaimen poistaminen ei poista
+jo vietyjä harjoituksia Intervals.icu:sta tai kellosta.
+
+Vientiviesti kertoo Intervals.icu:n hyväksynnästä. Se ei todista kellon synkronointia.
+Mahdollinen palvelun palauttama `push_errors` näkyy vientivirheenä. Myöhempi Suunto-siirron
+virhe voi näkyä vasta Intervals.icu:ssa. Verkkovirheen jälkeen viennin voi uusia ilman
+kaksoiskappaleita; edellinen pyyntö on saattanut jo tallentua palveluun.
+
+Lähteet: [Intervals.icun vientirajapinta](https://forum.intervals.icu/t/uploading-planned-workouts-to-intervals-icu/63624),
+[Suunto-siirto](https://forum.intervals.icu/t/upload-workouts-to-suunto-watches/9560),
+[Suunto 5 Guides](https://cms-www.suunto.com/en-au/Support/Product-support/suunto_5/suunto_5/suuntoplus-guides2/).

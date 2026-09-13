@@ -556,4 +556,18 @@ class MigrationTest {
     assertEquals(0, fetches.count)
     fetches.close()
   }
+  @Test
+  fun migrate15To16PreservesSessionsAndAddsAbsentRunSteps() {
+    var db = helper.createDatabase(TEST_DB, 15)
+    db.execSQL("INSERT INTO training_plans (id,name,schemaVersion,timeZone,startDate,createdAt,contentHash,isActive) VALUES ('watch-plan','Plan',1,'Europe/Helsinki','2026-09-13',1,'hash',1)")
+    db.execSQL("INSERT INTO workout_sessions (id,planId,type,weekNumber,scheduledDate,remindAtUtc,timeIsFixed,status,appliedLighterVariant,updatedAt) VALUES ('watch-run','watch-plan','RUNNING',1,'2026-09-13',1,0,'PLANNED',0,1)")
+    db.close()
+    db = helper.runMigrationsAndValidate(TEST_DB, 16, true)
+    db.query("SELECT * FROM workout_sessions WHERE id = 'watch-run'").use {
+      assertTrue(it.moveToFirst())
+      assertEquals("PLANNED", it.getString(it.getColumnIndex("status")))
+      assertEquals("watch-plan", it.getString(it.getColumnIndex("planId")))
+      assertTrue(it.isNull(it.getColumnIndex("runStepsJson")))
+    }
+  }
 }
