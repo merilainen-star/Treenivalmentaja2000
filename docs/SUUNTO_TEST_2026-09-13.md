@@ -1,5 +1,41 @@
 # Suunto-kokeilu 13.9.2026
 
+## Korjaus kellon puuttuvaan vaiheohjeeseen
+
+Käyttäjän Suunto 5 -kuvassa näkyi vain `15s`. Vienti kirjoitti vaiheiden nimet
+otsikkoriveille ja itse vaiheen muodossa `- 15s`, joten kellolle tarkoitettu
+vaiheteksti puuttui. Nyt ohje on samalla vaihe­rivillä ennen kestoa tai matkaa:
+
+```text
+- "Kiihdytys 1/3 - rento, ei sprintti" 15s
+- "Palautus 1/2 - kävele tai hölkkää" 45s
+- "Veto 1/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
+```
+
+ASCII-lainausmerkit suojaavat ohjeen numeroita parserin kesto- ja tavoitetulkinnalta.
+Aiempi erillisen otsikkorivin suojaus korvattiin tällä; numeroiden suojausta ei
+poistettu. Nimen sisäiset lainausmerkit muutetaan heittomerkeiksi.
+JSONin vaiheohjeita täsmennettiin, mutta 18 vaihetta, kestot, matkat, palautusten
+määrä, tunnisteet ja 265 s/km vetotavoite säilyvät. Kiihdytyksille ei keksitä
+numeerista vauhtitavoitetta: niiden tavoite on rento kiihdytys ilman sprinttiä.
+
+Päivitä sovellus ja avaa päivitetty JSON → **Kokeile** → valitse juoksu →
+**Vie testijuoksu kelloon tänään**. Samalla päivällä vienti päivittää saman testin.
+Synkronoi Suunto-sovellus ja kello uudelleen; aiempi kelloon jo ladattu harjoitus
+ei korjaannu pelkällä APK-päivityksellä. Vaihtoehtoisesti korvaa testin teksti
+Intervals.icu-editorissa tämän TXT-tiedoston sisällöllä ja synkronoi.
+
+Tarkista Intervals.icu-esikatselusta vaiheohjeet sekä 400 m / 4:25/km tavoite.
+Fyysisen kellon lopullista näyttöä ei ole vielä varmistettu korjauksen jälkeen.
+Suunto-integraation alkuperäisessä ohjeessa ylärivi näyttää vain 13 merkkiä:
+siksi toiminta on nimessä ensimmäisenä ja varsinainen vauhti erillisessä tavoitteessa.
+
+Lähteet: [vaihetekstin syntaksi](https://forum.intervals.icu/t/workout-builder/1163),
+[ASCII-lainausmerkkien parserikäyttäytyminen](https://forum.intervals.icu/t/workout-builder-step-syntax-parsing-bug/51986),
+[Suunto-näyttö ja tavoitteet](https://forum.intervals.icu/t/upload-workouts-to-suunto-watches/9560).
+
+## Aiempi toteutus ja testiohje
+
 Päivitys: sovellukseen on lisätty [ohjelman kokeilu](PROGRAM_TRIAL.md).
 Uudessa versiossa valitse JSONin avaamisen jälkeen **Kokeile**: voit käydä
 vaiheet läpi ja viedä yhden testijuoksun tälle päivälle aktivoimatta ohjelmaa.

@@ -1,53 +1,35 @@
-Vaihe: Alkuverryttely
-- 720s
+- "Kevyt juoksu - alkuverryttely" 720s
 
-Vaihe: Kiihdytys 1 3
-- 15s
+- "Kiihdytys 1/3 - rento, ei sprintti" 15s
 
-Vaihe: Kevyt palautus 1 2
-- 45s
+- "Palautus 1/2 - kävele tai hölkkää" 45s
 
-Vaihe: Kiihdytys 2 3
-- 15s
+- "Kiihdytys 2/3 - rento, ei sprintti" 15s
 
-Vaihe: Kevyt palautus 2 2
-- 45s
+- "Palautus 2/2 - kävele tai hölkkää" 45s
 
-Vaihe: Kiihdytys 3 3
-- 15s
+- "Kiihdytys 3/3 - rento, ei sprintti" 15s
 
-Vaihe: Veto 1 6
-- 400mtr 4:25/km Pace
+- "Veto 1/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
 
-Vaihe: Palautus 1 5
-- 90s
+- "Palautus 1/5 - kävele tai hölkkää" 90s
 
-Vaihe: Veto 2 6
-- 400mtr 4:25/km Pace
+- "Veto 2/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
 
-Vaihe: Palautus 2 5
-- 90s
+- "Palautus 2/5 - kävele tai hölkkää" 90s
 
-Vaihe: Veto 3 6
-- 400mtr 4:25/km Pace
+- "Veto 3/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
 
-Vaihe: Palautus 3 5
-- 90s
+- "Palautus 3/5 - kävele tai hölkkää" 90s
 
-Vaihe: Veto 4 6
-- 400mtr 4:25/km Pace
+- "Veto 4/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
 
-Vaihe: Palautus 4 5
-- 90s
+- "Palautus 4/5 - kävele tai hölkkää" 90s
 
-Vaihe: Veto 5 6
-- 400mtr 4:25/km Pace
+- "Veto 5/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
 
-Vaihe: Palautus 5 5
-- 90s
+- "Palautus 5/5 - kävele tai hölkkää" 90s
 
-Vaihe: Veto 6 6
-- 400mtr 4:25/km Pace
+- "Veto 6/6 - 400 m, tavoite 1:44-1:46" 400mtr 4:25/km Pace
 
-Vaihe: Loppuverryttely
-- 600s
+- "Kevyt juoksu tai kävely - loppuverryttely" 600s

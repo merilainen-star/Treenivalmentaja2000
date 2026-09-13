@@ -6,7 +6,7 @@
     "timeZone": "Europe/Helsinki",
     "startDate": "2026-09-13",
     "author": "ChatGPT",
-    "description": "Yhden päivän testiohjelma. Kopio alkuperäisen Cooper-ohjelman viikon 1 tiistain juoksusta, siirretty päivälle 13.9.2026 uusilla tunnisteilla. Ei voimaharjoituksia. HUOM: tämän ohjelman aktivointi nykyisessä sovelluksessa korvaa aiemman ohjelman ja poistaa sen harjoituskohtaiset kirjaukset vahvistuksen jälkeen. Tämä tiedosto ei ole eristetty testitila. Kellotestin voi tehdä myös erillisellä Intervals.icu-harjoitustekstillä muuttamatta sovelluksen ohjelmaa."
+    "description": "Yhden päivän kellotesti, alkuperäisen Cooper-ohjelman viikon 1 juoksu. Avaa tiedosto ja valitse Kokeile: nykyinen ohjelma ja kirjaukset säilyvät. Vie testijuoksu erillisellä vahvistuksella. Tuo ohjelmaksi käyttää normaalia ohjelman korvaamisen vahvistusta. Vaiheohjeet täsmennetty; kestot, matkat ja vauhtitavoite ennallaan."
   },
   "weeks": [
     {
@@ -25,81 +25,81 @@
           "description": "Intervallit · 6 × 400 m aikaan 1:44–1:46\n\nAlkuverryttely: 12 min kevyttä juoksua, sitten 3 × 15 s rento kiihdytys. Kiihdytysten välissä 45 s kävelyä tai kevyttä hölkkää, yhteensä kaksi palautusta. Nosta vauhtia asteittain ja hidasta hallitusti; ei sprinttejä. Alkuverryttely yhteensä 14 min 15 s.\n\nPääosuus: 6 × 400 m aikaan 1:44–1:46. Vetojen välissä 90 s kävelyä tai hyvin kevyttä hölkkää, yhteensä viisi palautusta. Viimeisen vedon jälkeen suoraan 10 minuutin loppuverryttelyyn, hyvin kevyttä juoksua tai kävelyä.\n\nKellon vaihekohtainen vauhtitavoite on 4:25/km eli 1:46/400 m, alkuperäisen tavoitealueen hitaampi pää. Nykyinen runSteps-muoto tukee yhtä vauhtilukua vaihetta kohti. Veto päättyy kellon mittaaman 400 metrin kohdalla, ei tavoiteajan umpeutuessa. Lämmittelyllä, kiihdytyksillä ja palautuksilla ei ole numeerista vauhtitavoitetta.\n\nVauhtitavoite koskee vain vetoja. Jos vauhti ei pysy hallittuna, käytä aiemman vastaavan harjoituksen hallittua vauhtia tai valitse kevyt versio. Älä kasaa kovia päiviä peräkkäin. Koko harjoituksen arvio on 43 min. Lämmittely ja loppuverryttely ovat jo runSteps-vaiheissa; niitä ei tehdä uudelleen. Päivän kellonaikaa ei ole lukittu.",
           "runSteps": [
             {
-              "name": "Alkuverryttely",
+              "name": "Kevyt juoksu - alkuverryttely",
               "durationSec": 720
             },
             {
-              "name": "Kiihdytys 1/3",
+              "name": "Kiihdytys 1/3 - rento, ei sprintti",
               "durationSec": 15
             },
             {
-              "name": "Kevyt palautus 1/2",
+              "name": "Palautus 1/2 - kävele tai hölkkää",
               "durationSec": 45
             },
             {
-              "name": "Kiihdytys 2/3",
+              "name": "Kiihdytys 2/3 - rento, ei sprintti",
               "durationSec": 15
             },
             {
-              "name": "Kevyt palautus 2/2",
+              "name": "Palautus 2/2 - kävele tai hölkkää",
               "durationSec": 45
             },
             {
-              "name": "Kiihdytys 3/3",
+              "name": "Kiihdytys 3/3 - rento, ei sprintti",
               "durationSec": 15
             },
             {
-              "name": "Veto 1/6",
+              "name": "Veto 1/6 - 400 m, tavoite 1:44-1:46",
               "distanceMeters": 400,
               "paceSecPerKm": 265
             },
             {
-              "name": "Palautus 1/5",
+              "name": "Palautus 1/5 - kävele tai hölkkää",
               "durationSec": 90
             },
             {
-              "name": "Veto 2/6",
+              "name": "Veto 2/6 - 400 m, tavoite 1:44-1:46",
               "distanceMeters": 400,
               "paceSecPerKm": 265
             },
             {
-              "name": "Palautus 2/5",
+              "name": "Palautus 2/5 - kävele tai hölkkää",
               "durationSec": 90
             },
             {
-              "name": "Veto 3/6",
+              "name": "Veto 3/6 - 400 m, tavoite 1:44-1:46",
               "distanceMeters": 400,
               "paceSecPerKm": 265
             },
             {
-              "name": "Palautus 3/5",
+              "name": "Palautus 3/5 - kävele tai hölkkää",
               "durationSec": 90
             },
             {
-              "name": "Veto 4/6",
+              "name": "Veto 4/6 - 400 m, tavoite 1:44-1:46",
               "distanceMeters": 400,
               "paceSecPerKm": 265
             },
             {
-              "name": "Palautus 4/5",
+              "name": "Palautus 4/5 - kävele tai hölkkää",
               "durationSec": 90
             },
             {
-              "name": "Veto 5/6",
+              "name": "Veto 5/6 - 400 m, tavoite 1:44-1:46",
               "distanceMeters": 400,
               "paceSecPerKm": 265
             },
             {
-              "name": "Palautus 5/5",
+              "name": "Palautus 5/5 - kävele tai hölkkää",
               "durationSec": 90
             },
             {
-              "name": "Veto 6/6",
+              "name": "Veto 6/6 - 400 m, tavoite 1:44-1:46",
               "distanceMeters": 400,
               "paceSecPerKm": 265
             },
             {
-              "name": "Loppuverryttely",
+              "name": "Kevyt juoksu tai kävely - loppuverryttely",
               "durationSec": 600
             }
           ],

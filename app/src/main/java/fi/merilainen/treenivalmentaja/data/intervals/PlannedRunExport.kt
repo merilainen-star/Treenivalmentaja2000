@@ -45,10 +45,12 @@ internal fun TrainingSession.toPlannedRunEvent(): PlannedRunEvent {
     ).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")),
     name = "Juoksu · $scheduledDate",
     description = steps.joinToString("\n\n") { step ->
-      // A label belongs on its own line, so numeric text in it cannot become a target.
-      val label = step.name.replace(Regex("[^\\p{L}\\p{N} ]"), " ").trim()
+      // Step cues must precede duration on the SAME bullet. ASCII quotes protect numeric
+      // instructions (e.g. "400 m in 1:46") from becoming duration/pace parser input.
+      // Neutralize embedded quotes and whitespace so a name cannot escape that cue.
+      val label = step.name.replace('"', '\'').replace(Regex("\\s+"), " ").trim()
       buildString {
-        append("Vaihe: $label\n- ")
+        append("- \"$label\" ")
         append(step.durationSec?.let { "${it}s" } ?: "${step.distanceMeters}mtr")
         step.paceSecPerKm?.let {
           append(" ${it / 60}:${(it % 60).toString().padStart(2, '0')}/km Pace")
