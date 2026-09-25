@@ -1,8 +1,10 @@
 package fi.merilainen.treenivalmentaja.data.intervals
 
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
+import fi.merilainen.treenivalmentaja.domain.RunLap
 import fi.merilainen.treenivalmentaja.domain.RunSplit
 import fi.merilainen.treenivalmentaja.domain.kilometreSplits
 import java.time.Instant
@@ -105,6 +107,19 @@ internal object IntervalsMappers {
         durationSec = it.durationSec,
         avgHeartRate = it.avgHeartRate,
         elevationGainMeters = it.elevationGainMeters,
+      )
+    }
+
+  /** Laps as rows. Pure renaming — the reading happened in [FitLaps]. */
+  fun toLapRows(activityId: String, laps: List<RunLap>): List<IntervalsRunLapEntity> =
+    laps.map {
+      IntervalsRunLapEntity(
+        activityId = activityId,
+        lapIndex = it.index,
+        durationMs = it.durationMs,
+        distanceMeters = it.distanceMeters,
+        avgHeartRate = it.avgHeartRate,
+        maxHeartRate = it.maxHeartRate,
       )
     }
 

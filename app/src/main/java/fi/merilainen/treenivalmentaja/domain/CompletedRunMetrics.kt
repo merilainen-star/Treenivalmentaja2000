@@ -80,6 +80,14 @@ data class CompletedRunMetrics(
    * computed", and every reader treats it as an absence rather than as a flat run.
    */
   val splits: List<RunSplit> = emptyList(),
+  /**
+   * The laps the watch itself recorded, in order — in a SuuntoPlus Guide session, one per planned
+   * stage. Read from the original file, because intervals.icu ignores them.
+   *
+   * Empty when none were read: a run synced before laps were fetched, or one whose file had none.
+   * A single lap is the whole run and says nothing the summary does not.
+   */
+  val laps: List<RunLap> = emptyList(),
 ) {
 
   /**

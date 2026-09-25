@@ -32,6 +32,7 @@ import fi.merilainen.treenivalmentaja.ExerciseGuideSheetContent
 import fi.merilainen.treenivalmentaja.ImportConfirmDialog
 import fi.merilainen.treenivalmentaja.ImportStartDialog
 import fi.merilainen.treenivalmentaja.RecoveryCard
+import fi.merilainen.treenivalmentaja.RunLapsSection
 import fi.merilainen.treenivalmentaja.Workout
 import fi.merilainen.treenivalmentaja.WorkoutCardToday
 import fi.merilainen.treenivalmentaja.WorkoutCardWeek
@@ -61,6 +62,7 @@ import fi.merilainen.treenivalmentaja.domain.NextProgramStrengthShape
 import fi.merilainen.treenivalmentaja.domain.NextProgramSummary
 import fi.merilainen.treenivalmentaja.domain.ProgramReportKind
 import fi.merilainen.treenivalmentaja.domain.ProgramReportState
+import fi.merilainen.treenivalmentaja.domain.RunLap
 import fi.merilainen.treenivalmentaja.domain.WorkoutType
 import fi.merilainen.treenivalmentaja.ui.theme.MyApplicationTheme
 import java.time.LocalDate
@@ -847,5 +849,24 @@ class ComponentScreenshotTest {
                 }
             }
         }
+    }
+
+    /**
+     * The watch's laps, opened — a 6 × 400 m Guide session's eighteen, as the Suunto app lists them.
+     * The figures are the 2026-09-22 session's lap table, which is what this list exists to show.
+     */
+    @Test
+    fun runLapsOpen() = capture("run_laps_open") {
+        val table = listOf(
+            720_000L to 2154.0, 15_000L to 46.3, 45_000L to 124.1, 15_000L to 50.0, 45_000L to 124.5,
+            15_000L to 45.4, 116_600L to 400.0, 90_000L to 239.2, 112_800L to 400.0, 90_000L to 155.3,
+            112_500L to 400.0, 90_000L to 155.7, 110_100L to 400.0, 90_000L to 149.1, 112_100L to 400.0,
+            90_000L to 154.8, 109_500L to 400.0, 620_500L to 1628.0,
+        )
+        val heartRates = listOf(135, 137, 140, 140, 147, 146, 150, 140, 151, 138, 142, 137, 146, 137, 143, 141, 146, 143)
+        RunLapsSection(
+            laps = table.mapIndexed { i, (ms, m) -> RunLap(i + 1, ms, m, avgHeartRate = heartRates[i]) },
+            initiallyOpen = true,
+        )
     }
 }

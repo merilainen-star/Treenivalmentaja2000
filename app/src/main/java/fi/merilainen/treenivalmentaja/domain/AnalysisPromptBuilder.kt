@@ -40,6 +40,11 @@ data class CompletedAnalysisInput(
   val oura: CompletedSessionMetrics? = null,
   /** What the watch recorded, via intervals.icu. Richer than Oura for a run, absent for most else. */
   val run: CompletedRunMetrics? = null,
+  /**
+   * The run's planned stages — what was exported to the watch — so each lap the watch recorded can
+   * be read beside the stage it answers. `null` for a session with no stages.
+   */
+  val runSteps: List<RunStep>? = null,
   /** The mornings around the session, keyed by day. Missing days are genuinely missing. */
   val recoveryByDay: Map<LocalDate, DailyRecovery> = emptyMap(),
 )
@@ -131,6 +136,7 @@ class AnalysisPromptBuilder {
       watch.forEach { appendLine("- $it") }
       appendLine()
       appendZones(r.heartRateZones)
+      appendLaps(r.laps, input.runSteps)
       appendSplits(r.splits)
     }
 
@@ -559,6 +565,75 @@ class AnalysisPromptBuilder {
       appendLine("- $label: ${parts.joinToString(", ")}")
     }
     appendLine()
+  }
+
+  /**
+   * The watch's own laps, each beside the planned stage it answers when the two pair up.
+   *
+   * **This is the section an interval session is judged on.** Kilometre splits cut straight through
+   * 400 m repetitions and average them into the walking between them; an analysis given only those
+   * said, truthfully, that it could not tell whether the repetitions hit their times. In a
+   * SuuntoPlus Guide session the watch writes one lap per stage, so the repetition times are right
+   * there — intervals.icu simply does not pass them on.
+   *
+   * Where a stage set a distance and a pace, its target *time* is written out and so is the
+   * difference, signed. The model is being asked to judge "six repetitions averaging ten seconds
+   * slow", and arithmetic is the one thing it should not be trusted to do for itself.
+   *
+   * Laps that do not pair with the stages one-to-one are still written, unlabelled, with the counts
+   * stated — a lap beside the wrong target is worse than a lap beside none. A single lap is the
+   * whole run and adds nothing, so it is not written at all.
+   */
+  private fun StringBuilder.appendLaps(laps: List<RunLap>, steps: List<RunStep>?) {
+    if (laps.size < 2) return
+    val pairs = pairLapsWithSteps(laps, steps)
+    val paired = pairs.any { it.second != null }
+    if (paired) {
+      appendLine("## Kellon kierrokset suunnitelman vaiheittain (Suunto)")
+      appendLine("Arvioi vedot näistä: kilometrijaot sekoittavat vedot ja palautukset keskenään.")
+    } else {
+      appendLine("## Kellon kierrokset (Suunto)")
+      steps?.takeIf { it.isNotEmpty() }?.let {
+        appendLine(
+          "Kierroksia on ${laps.size}, suunnitelmassa ${it.size} vaihetta, joten niitä ei voi " +
+            "yhdistää vaiheisiin."
+        )
+      }
+    }
+    pairs.forEach { (lap, step) ->
+      val actual = buildList {
+        add(lap.durationText)
+        lap.distanceText?.let { add(it) }
+        lap.paceSecPerKm?.let { add("${it / 60}:${(it % 60).toString().padStart(2, '0')} /km") }
+        lap.avgHeartRate?.let { avg ->
+          add(lap.maxHeartRate?.let { "syke $avg (max $it)" } ?: "syke $avg")
+        }
+      }
+      val label = step?.let { "${lap.index}. ${it.name}" } ?: "${lap.index}. kierros"
+      val planned = step?.let { plannedStage(it, lap) }
+      appendLine(
+        "- $label: ${actual.joinToString(" · ")}" + (planned?.let { " — suunniteltu $it" } ?: "")
+      )
+    }
+    appendLine()
+  }
+
+  /** `400 m, tavoiteaika 1:46,0 (4:25 /km); ero +10,6 s` — the stage in the lap's own terms. */
+  private fun plannedStage(step: RunStep, lap: RunLap): String = buildString {
+    step.distanceMeters?.let { append(if (it < 2000) "$it m" else km(it / 1000.0)) }
+    step.durationSec?.let { append((it * 1000L).formatLapTime().removeSuffix(",0")) }
+    val target = step.targetDurationMs()
+    val pace = step.paceSecPerKm?.let { "${it / 60}:${(it % 60).toString().padStart(2, '0')} /km" }
+    when {
+      target != null -> {
+        append(", tavoiteaika ${target.formatLapTime()} ($pace)")
+        val diffTenths = Math.round((lap.durationMs - target) / 100.0)
+        val sign = if (diffTenths > 0) "+" else if (diffTenths < 0) "−" else "±"
+        val abs = kotlin.math.abs(diffTenths)
+        append("; ero $sign${abs / 10},${abs % 10} s")
+      }
+      pace != null -> append(", tavoitevauhti $pace")
+    }
   }
 
   private fun km(value: Double): String = String.format(FINNISH, "%.2f km", value)

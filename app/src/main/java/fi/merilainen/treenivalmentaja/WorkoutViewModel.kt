@@ -1282,6 +1282,9 @@ class WorkoutViewModel(
             timing = repository.activeWorkoutOutcomeFor(session.id),
             oura = oura,
             run = run,
+            // The session's stages — what the watch export sends — so the laps the watch recorded
+            // can be read against them.
+            runSteps = session.runSteps,
             recoveryByDay = recovery,
           )
         )

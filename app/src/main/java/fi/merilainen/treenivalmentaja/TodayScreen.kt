@@ -642,6 +642,7 @@ fun RunMetricsRow(
                 )
             }
         }
+        RunLapsSection(metrics.laps, style)
     }
 }
 

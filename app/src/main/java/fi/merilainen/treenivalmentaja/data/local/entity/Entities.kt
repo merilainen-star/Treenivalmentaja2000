@@ -284,6 +284,40 @@ data class IntervalsSplitFetchEntity(
   val fetchedAtUtc: Long,
 )
 
+/**
+ * One lap of one recorded run, as the watch wrote it into its own file.
+ *
+ * The counterpart of [IntervalsRunSplitEntity], and kept apart from it because the two answer
+ * different questions: a split is the app cutting the distance at every kilometre, a lap is a
+ * boundary the watch recorded — in a SuuntoPlus Guide session, one per planned stage. They come
+ * from different requests too: the laps from the original FIT file, which intervals.icu stores
+ * but does not interpret (its own interval detection ignores them). Only the lap figures are
+ * kept; the file itself, GPS track and all, is never stored.
+ */
+@Entity(tableName = "intervals_run_laps", primaryKeys = ["activityId", "lapIndex"])
+data class IntervalsRunLapEntity(
+  val activityId: String,
+  /** 1-based, in recording order. */
+  val lapIndex: Int,
+  /** `total_timer_time`, in milliseconds — the figure the watch's lap table shows. */
+  val durationMs: Long,
+  val distanceMeters: Double? = null,
+  val avgHeartRate: Int? = null,
+  val maxHeartRate: Int? = null,
+)
+
+/**
+ * That the laps for an activity were **asked for**, whatever came back — the same role
+ * [IntervalsSplitFetchEntity] plays for the splits, and separate from it so that runs whose splits
+ * were fetched before laps existed are still asked about once.
+ */
+@Entity(tableName = "intervals_lap_fetches")
+data class IntervalsLapFetchEntity(
+  @PrimaryKey val activityId: String,
+  val lapCount: Int,
+  val fetchedAtUtc: Long,
+)
+
 /** See `docs/DATA_MODEL.md` § 5. */
 @Entity(tableName = "oura_workouts", indices = [Index("matchedSessionId"), Index("startTimeUtc")])
 data class OuraWorkoutEntity(

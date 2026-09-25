@@ -965,4 +965,84 @@ class AnalysisPromptBuilderTest {
 
     assertFalse(prompt.contains("Kilometrijaot"))
   }
+
+  /**
+   * The 2026-09-22 session this was built for: a Guide run with a lap per stage, where the analysis
+   * said it could not verify the repetitions. Paired with the stages, each repetition is written
+   * with its target time and the signed difference, so the model does not do the arithmetic.
+   */
+  @Test
+  fun `laps paired with the planned stages carry their targets and the difference`() {
+    val steps =
+      listOf(
+        RunStep(name = "Alkuverryttely", durationSec = 720),
+        RunStep(name = "Veto 1/6", distanceMeters = 400, paceSecPerKm = 265),
+        RunStep(name = "Palautus 1/5", durationSec = 90),
+      )
+    val laps =
+      listOf(
+        RunLap(1, 720_000, 2154.0, avgHeartRate = 135),
+        RunLap(2, 116_600, 400.0, avgHeartRate = 150, maxHeartRate = 160),
+        RunLap(3, 90_000, 239.2, avgHeartRate = 140),
+      )
+
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 9, 22),
+            run = runWithDetail().copy(laps = laps),
+            runSteps = steps,
+          )
+        )
+
+    assertTrue(prompt.contains("## Kellon kierrokset suunnitelman vaiheittain (Suunto)"))
+    assertTrue(prompt, prompt.contains("- 1. Alkuverryttely: 12:00,0 · 2,15 km · 5:34 /km · syke 135 — suunniteltu 12:00"))
+    assertTrue(
+      prompt,
+      prompt.contains(
+        "- 2. Veto 1/6: 1:56,6 · 400 m · 4:52 /km · syke 150 (max 160) — suunniteltu 400 m, " +
+          "tavoiteaika 1:46,0 (4:25 /km); ero +10,6 s"
+      ),
+    )
+    assertTrue(prompt, prompt.contains("- 3. Palautus 1/5: 1:30,0 · 239 m · 6:16 /km · syke 140 — suunniteltu 1:30"))
+    // Part of what was measured, so before the task rather than after it.
+    assertTrue(prompt.indexOf("Kellon kierrokset") < prompt.indexOf("## Tehtävä"))
+  }
+
+  /** A stray manual lap shifts every pairing by one; the laps are then shown without targets. */
+  @Test
+  fun `laps that do not pair with the stages are written without targets`() {
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 9, 22),
+            run = runWithDetail().copy(laps = listOf(RunLap(1, 600_000, 1800.0), RunLap(2, 300_000, 900.0))),
+            runSteps = listOf(RunStep(name = "Juoksu", durationSec = 900, paceSecPerKm = 330)),
+          )
+        )
+
+    assertTrue(prompt.contains("## Kellon kierrokset (Suunto)"))
+    assertTrue(prompt.contains("Kierroksia on 2, suunnitelmassa 1 vaihetta"))
+    assertTrue(prompt.contains("- 1. kierros: 10:00,0 · 1800 m · 5:33 /km"))
+    assertFalse(prompt.contains("tavoite"))
+  }
+
+  @Test
+  fun `a single lap is the whole run and writes no lap section`() {
+    val prompt =
+      AnalysisPromptBuilder()
+        .completed(
+          CompletedAnalysisInput(
+            type = WorkoutType.RUNNING,
+            date = LocalDate.of(2026, 9, 22),
+            run = runWithDetail().copy(laps = listOf(RunLap(1, 2_600_000, 7428.0))),
+          )
+        )
+
+    assertFalse(prompt.contains("Kellon kierrokset"))
+  }
 }

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-09-25
+
+### Added
+- **Kellon kierrokset juoksun tietoihin ja AI-analyysiin.** SuuntoPlus Guide -harjoitus tallentaa
+  jokaisen suunnitellun vaiheen omaksi kierroksekseen, mutta intervals.icu ei välitä kierroksia
+  eteenpäin: 22.9. 6 × 400 m -harjoitus näkyi siellä yhtenä 40 minuutin "Recovery"-intervallina,
+  ja analyysi joutui sanomaan, ettei vetoja voi varmistaa. Sovellus hakee nyt juoksun alkuperäisen
+  FIT-tiedoston (`GET /api/v1/activity/{id}/file`), lukee siitä kierrokset laitteella ja hylkää
+  loput, GPS-reitti mukaan lukien. Analyysipyyntö saa osion *Kellon kierrokset suunnitelman
+  vaiheittain*: kun kierroksia on yhtä monta kuin vaiheita, jokainen kierros on vaiheensa rinnalla,
+  ja matkavaiheille kirjoitetaan tavoiteaika ja ero (`ero +10,6 s`). Juoksun kortissa on
+  avattava *Kierrokset (18)* -lista. Tietokanta 16 → 17 (kaksi uutta taulua, automaattinen
+  migraatio).
+
 ## [Unreleased] - 2026-09-06
 
 ### Added

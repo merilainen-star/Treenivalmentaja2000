@@ -1,6 +1,6 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 16 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 17 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
@@ -279,6 +279,28 @@ The order of priority is:
   splits would hide a run's detail permanently, since the marker is exactly what stops the app
   asking again. Both tables are cleared when the API key is removed.
 
+### `intervals_run_laps` — one lap the watch recorded (schema v17)
+
+- **Purpose:** The laps the watch wrote into its own file — in a SuuntoPlus Guide session, one per
+  planned stage — so an interval session can be judged repetition by repetition. Kilometre splits
+  cut straight through 400 m repetitions and average them into the recoveries; the laps do not.
+  intervals.icu's own interval detection ignores these laps (a 6 × 400 m Guide session on
+  2026-09-22 came back from it as one 40-minute "Recovery" interval), so they are read from the
+  original FIT file instead — see [API_INTEGRATIONS.md](API_INTEGRATIONS.md#the-watchs-laps-from-the-original-file).
+- **Key:** `activityId` + `lapIndex` (1-based, recording order).
+- **Fields:** `durationMs` (Long) — the FIT `total_timer_time`, the figure the watch's lap table
+  shows; `distanceMeters` (Double?); `avgHeartRate` (Int?); `maxHeartRate` (Int?).
+- **Not stored:** the file itself. The GPS track and every other message in it are discarded on the
+  device once the laps are read.
+
+### `intervals_lap_fetches` — that the laps were asked for (schema v17)
+
+- **Purpose and lifecycle:** as `intervals_split_fetches`, and kept separate from it so that runs
+  whose splits were fetched before v17 are still asked for their laps once. `lapCount` of zero is a
+  complete answer — an activity with no original file (`404`), or a file with no lap messages. A
+  failed request (network, 5xx) writes no marker, so the run is asked about again. Both tables are
+  cleared when the API key is removed.
+
 ## Rescheduling and the session chain
 Moving a session never edits `scheduledDate` in place:
 
@@ -426,3 +448,11 @@ Room entities inside the data layer. Rescheduling copies the steps to the new se
 The editor writes only after **Tallenna vaiheet**, through `TrainingRepository.saveRunSteps`,
 with a USER event containing the saved list. No status transition is implied by this event.
 Kevennys clears original steps unless the explicit lighter alternative supplies replacements.
+
+## Schema 17 — the watch's laps
+
+Room auto-migration 16→17 adds two tables, `intervals_run_laps` and `intervals_lap_fetches`
+(described above). Purely additive: existing activities and their kilometre splits are untouched,
+and both new tables start empty. The absence of a lap fetch marker is what makes the next sync read
+the laps for runs synced before v17, within its six-per-sync budget. KSP generated `17.json`;
+`MigrationTest.migrate16To17KeepsSplitsAndAddsEmptyLapTables` covers the step.

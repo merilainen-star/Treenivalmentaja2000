@@ -305,6 +305,42 @@ request per activity rather than per window, so the sync rations them: runs only
 more, newest first, six per sync. Every attempt is recorded whether or not it produced anything —
 otherwise a treadmill run with no distance channel would be re-requested forever.
 
+### The watch's laps, from the original file
+
+Added 2026-09-25, schema v17. The splits above answer "did the run start calmly"; they cannot answer
+"did the 400 m repetitions hit 1:42–1:44", because a kilometre boundary falls wherever it falls and
+averages repetitions into the walking between them. The per-session analysis of a 6 × 400 m session
+on 2026-09-22 said exactly that — it could not verify the repetitions.
+
+The watch had the answer. A SuuntoPlus Guide session writes **one lap per planned stage**, and that
+session's FIT file held eighteen laps for its eighteen stages, the six repetitions among them at
+1:56,6 · 1:52,8 · 1:52,5 · 1:50,1 · 1:52,1 · 1:49,5. **intervals.icu does not pass laps on:** its
+interval view for a Guide run showed a single 40-minute "Recovery" interval (confirmed on the
+owner's account, 2026-09-25), so `GET /api/v1/activity/{id}/intervals` is not a source for them.
+
+So the app asks for the file the watch uploaded, `GET /api/v1/activity/{id}/file`, and reads the
+laps out of it on the device:
+
+| | |
+| --- | --- |
+| Format | A FIT file, possibly gzipped or zipped — all three are unwrapped. The specification says only "Download original activity file"; the response for a Suunto activity has not been captured on the owner's account, which is why all three forms are accepted |
+| Read | `lap` messages (global 19) only: `total_timer_time` (8), `total_distance` (9), `avg_heart_rate` (15), `max_heart_rate` (16). Everything else is skipped by the sizes its definition declares, developer fields and compressed-timestamp headers included |
+| Kept | Per lap: timer time, distance, mean and max heart rate. The file — GPS track and all — is discarded |
+| Guard rails | Files over 16 MB are refused before they are read; a truncated or corrupt file yields the laps that were complete before the damage, never an exception |
+| No file | `404` is an answer — a manual entry has no file — and is recorded, so it is asked once |
+| Budget | As the streams: runs only, newest first, six per sync, one request each |
+
+Verified against the real 2026-09-22 file outside the repository: all eighteen laps match the
+Suunto app's lap table in time, distance and heart rate. Pace differs by at most a second, because
+the app rounds where the Suunto app appears to truncate. The file is not in the repository — it
+carries the GPS track — so the tests build synthetic FIT files byte by byte instead.
+
+**In the prompt**, laps are paired with the session's `runSteps` when there are exactly as many of
+each; a Guide session writes one lap per stage, so equal counts is its signature. A distance stage
+with a pace gets its target time written out and the signed difference (`ero +10,6 s`), so the
+model is not left to do the arithmetic. Any other count — a manual lap mid-run — and the laps are
+written without targets, since pairing by position would put every target beside the wrong lap.
+
 ### The three durations, measured
 
 A real Suunto run on 2026-08-15 settled what the time fields mean. The watch reported 9.52 km,

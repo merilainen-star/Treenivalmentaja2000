@@ -172,9 +172,11 @@ was granted with until you disconnect and reconnect.
 
 ## What the app reads from intervals.icu, and what it does not
 
-The app reads your activities and daily wellness for date ranges, and fetches streams for running
-kilometre splits. Activity fields are explicitly selected; wellness stores CTL/ATL, and streams
-are reduced on the device to split rows and then discarded.
+The app reads your activities and daily wellness for date ranges, fetches streams for running
+kilometre splits, and fetches each run's original watch file for its laps. Activity fields are
+explicitly selected; wellness stores CTL/ATL, streams are reduced on the device to split rows and
+then discarded, and the watch file — which contains the run's GPS track — is reduced on the device
+to lap rows (time, distance, heart rate) and then discarded. No location is stored.
 
 It **never writes anything** to intervals.icu — no activity is created, edited, uploaded or
 deleted, and no note, plan or calendar entry is posted. It does not read your profile, your athlete

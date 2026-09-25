@@ -570,4 +570,28 @@ class MigrationTest {
       assertTrue(it.isNull(it.getColumnIndex("runStepsJson")))
     }
   }
+
+  /**
+   * Version 17 adds the watch's laps: `intervals_run_laps` and `intervals_lap_fetches`. Additive,
+   * so a stored run and its kilometre splits survive untouched, and both new tables arrive empty —
+   * no lap fetch marker is what tells the next sync to read the laps for runs synced before v17,
+   * including ones whose splits were fetched long ago.
+   */
+  @Test
+  fun migrate16To17KeepsSplitsAndAddsEmptyLapTables() {
+    var db = helper.createDatabase(TEST_DB, 16)
+    db.execSQL("INSERT INTO intervals_run_splits (activityId, splitIndex, distanceMeters, durationSec, avgHeartRate, elevationGainMeters) VALUES ('i1', 1, 1000, 337, 137, 9)")
+    db.execSQL("INSERT INTO intervals_split_fetches (activityId, splitCount, fetchedAtUtc) VALUES ('i1', 1, 1)")
+    db.close()
+
+    db = helper.runMigrationsAndValidate(TEST_DB, 17, true)
+
+    db.query("SELECT * FROM intervals_run_splits").use {
+      assertTrue(it.moveToFirst())
+      assertEquals(337, it.getInt(it.getColumnIndex("durationSec")))
+    }
+    db.query("SELECT * FROM intervals_split_fetches").use { assertEquals(1, it.count) }
+    db.query("SELECT * FROM intervals_run_laps").use { assertEquals(0, it.count) }
+    db.query("SELECT * FROM intervals_lap_fetches").use { assertEquals(0, it.count) }
+  }
 }

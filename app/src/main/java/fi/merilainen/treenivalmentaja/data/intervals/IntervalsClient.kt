@@ -133,6 +133,29 @@ internal class IntervalsClient(
     return decodeList(get(url), streamAdapter)
   }
 
+  /**
+   * The file the watch uploaded, unchanged — `GET /api/v1/activity/{id}/file`.
+   *
+   * Asked for only to read the watch's laps out of it (see [FitLaps]); intervals.icu's own
+   * interval detection ignores them. The bytes are returned to the caller and never stored.
+   * `null` for a file larger than [FitLaps.MAX_FILE_BYTES], which is not a run's recording.
+   */
+  suspend fun originalFile(activityId: String): ByteArray? =
+    request("$baseUrl/api/v1/activity/$activityId/file".toHttpUrl(), accept = "*/*") { body ->
+      body.contentLength().takeIf { it > FitLaps.MAX_FILE_BYTES }?.let { return@request null }
+      body.byteStream().use { input ->
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+          val n = input.read(buffer)
+          if (n < 0) break
+          out.write(buffer, 0, n)
+          if (out.size() > FitLaps.MAX_FILE_BYTES) return@request null
+        }
+        out.toByteArray()
+      }
+    }
+
   suspend fun calendarEvents(from: LocalDate, to: LocalDate): List<CalendarEvent> =
     decodeList(get("$baseUrl/api/v1/athlete/$SELF/events".toHttpUrl().newBuilder()
       .addQueryParameter("oldest", from.toString())
@@ -274,7 +297,17 @@ internal class IntervalsClient(
    */
   private suspend fun get(url: HttpUrl): String = request(url)
 
-  private suspend fun request(url: HttpUrl, method: String = "GET", body: RequestBody? = null): String {
+  private suspend fun request(url: HttpUrl, method: String = "GET", body: RequestBody? = null): String =
+    request(url, method, body) { it.string() }
+
+  /** The status handling of every request, with the body read by [read] once it is known good. */
+  private suspend fun <T> request(
+    url: HttpUrl,
+    method: String = "GET",
+    body: RequestBody? = null,
+    accept: String = "application/json",
+    read: (okhttp3.ResponseBody) -> T,
+  ): T {
     val key = apiKeys.apiKey()?.takeIf { it.isNotBlank() } ?: throw IntervalsNotConfiguredException()
     return withContext(Dispatchers.IO) {
       val request =
@@ -282,7 +315,7 @@ internal class IntervalsClient(
           .url(url)
           .method(method, body)
           .header("Authorization", basic(key))
-          .header("Accept", "application/json")
+          .header("Accept", accept)
           .build()
       val response =
         try {
@@ -302,10 +335,13 @@ internal class IntervalsClient(
               it.header("Retry-After")?.trim()?.toLongOrNull()?.takeIf { seconds -> seconds > 0 }
             )
           400, 422 -> throw IntervalsRequestException(code)
+          404 -> throw IntervalsNotFoundException()
           else -> throw IntervalsUnavailableException("Intervals.icu vastasi HTTP $code.")
         }
         try {
-          it.body?.string() ?: throw IntervalsUnavailableException(UNREADABLE)
+          // Read even when it comes back null: `originalFile` answers null for an oversized file,
+          // which is a real answer, not an unreadable body.
+          read(it.body ?: throw IntervalsUnavailableException(UNREADABLE))
         } catch (e: IOException) {
           throw IntervalsUnavailableException(OFFLINE)
         }

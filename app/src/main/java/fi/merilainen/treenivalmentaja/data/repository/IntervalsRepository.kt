@@ -4,10 +4,13 @@ import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
 
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
+import fi.merilainen.treenivalmentaja.data.intervals.IntervalsNotFoundException
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsMappers
 import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
+import fi.merilainen.treenivalmentaja.data.intervals.FitLaps
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
 import fi.merilainen.treenivalmentaja.domain.DailyTrainingLoad
@@ -15,6 +18,7 @@ import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
 import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.RunLap
 import fi.merilainen.treenivalmentaja.domain.RunSplit
 import fi.merilainen.treenivalmentaja.domain.heartRateZones
 import fi.merilainen.treenivalmentaja.domain.kilometreSplits
@@ -156,6 +160,7 @@ class IntervalsRepository internal constructor(
       } ?: return IntervalsSyncResult.Failure("Intervals.icu-yhteys on poistettu.", false)
       syncWellness(from, to, expected)
       syncSplits(rows, expected)
+      syncLaps(rows, expected)
       if (generation.current() != expected) {
         return IntervalsSyncResult.Failure("Intervals.icu-yhteys on poistettu.", false)
       }
@@ -241,6 +246,50 @@ class IntervalsRepository internal constructor(
         dao.replaceSplits(
           activityId = activity.id,
           splits = IntervalsMappers.toSplitRows(activity.id, splits),
+          fetchedAtUtc = clock(),
+        )
+      } ?: return
+    }
+  }
+
+  /**
+   * The watch's own laps for the runs that do not have them yet, read from the original file — and,
+   * like the splits, **a failure here is not a failure of the sync**.
+   *
+   * intervals.icu runs its own interval detection and ignores the laps the watch recorded: a
+   * 6 × 400 m SuuntoPlus Guide session with one lap per planned stage came back from it as a
+   * single 40-minute "Recovery" interval. The laps survive only in the uploaded file, so this asks
+   * for the file, keeps the lap figures [FitLaps] reads out of it, and drops the rest — the GPS
+   * track included — without storing it.
+   *
+   * The same rationing as the splits, for the same reason: one request per run, runs only, newest
+   * first, at most [MAX_LAP_FETCHES_PER_SYNC], and every attempt recorded whatever it produced —
+   * an activity with no original file (a manual entry, say) is asked about once and then left
+   * alone. A file that cannot be read is an empty answer, recorded as one.
+   */
+  private suspend fun syncLaps(activities: List<IntervalsActivityEntity>, expected: Long) {
+    val already = dao.lapFetchedActivityIds().toSet()
+    val candidates =
+      activities
+        .filter { it.id !in already && it.sportType.contains("run", ignoreCase = true) }
+        .sortedByDescending { it.startTimeUtc }
+        .take(MAX_LAP_FETCHES_PER_SYNC)
+    for (activity in candidates) {
+      if (generation.current() != expected) return
+      val laps =
+        try {
+          client.originalFile(activity.id)?.let(FitLaps::read).orEmpty()
+        } catch (e: IntervalsNotFoundException) {
+          // No file for this activity is a complete answer, recorded as one.
+          emptyList()
+        } catch (e: IntervalsException) {
+          // Anything else is not an answer about this run; the rest are picked up next time.
+          return
+        }
+      generation.commit(expected) {
+        dao.replaceLaps(
+          activityId = activity.id,
+          laps = IntervalsMappers.toLapRows(activity.id, laps),
           fetchedAtUtc = clock(),
         )
       } ?: return
@@ -406,13 +455,20 @@ class IntervalsRepository internal constructor(
    * the gym.
    */
   fun observeMatchedRunMetrics(): Flow<Map<String, CompletedRunMetrics>> =
-    combine(dao.observeMatchedActivities(), dao.observeMatchedSplits()) { rows, splitRows ->
+    combine(dao.observeMatchedActivities(), dao.observeMatchedSplits(), dao.observeMatchedLaps()) {
+      rows,
+      splitRows,
+      lapRows ->
       val splitsByActivity = splitRows.groupBy { it.activityId }
+      val lapsByActivity = lapRows.groupBy { it.activityId }
       rows
         .groupBy { it.matchedSessionId!! }
         .mapValues { (_, forSession) ->
           val activity = forSession.maxBy { it.movingTimeSec }
-          activity.toMetrics(splitsByActivity[activity.id].orEmpty())
+          activity.toMetrics(
+            splitsByActivity[activity.id].orEmpty(),
+            lapsByActivity[activity.id].orEmpty(),
+          )
         }
     }
 
@@ -436,6 +492,9 @@ class IntervalsRepository internal constructor(
      */
     const val MAX_SPLIT_FETCHES_PER_SYNC = 6
 
+    /** The laps' budget, the same as the splits' and for the same reason: one request per run. */
+    const val MAX_LAP_FETCHES_PER_SYNC = 6
+
     /** Below a kilometre there is no split to compute, only a tail. */
     const val MINIMUM_METRES_FOR_SPLITS = 1000.0
 
@@ -447,7 +506,8 @@ class IntervalsRepository internal constructor(
 }
 
 private fun IntervalsActivityEntity.toMetrics(
-  splitRows: List<IntervalsRunSplitEntity> = emptyList()
+  splitRows: List<IntervalsRunSplitEntity> = emptyList(),
+  lapRows: List<IntervalsRunLapEntity> = emptyList(),
 ): CompletedRunMetrics =
   CompletedRunMetrics(
     activityId = id,
@@ -483,6 +543,19 @@ private fun IntervalsActivityEntity.toMetrics(
             durationSec = it.durationSec,
             avgHeartRate = it.avgHeartRate,
             elevationGainMeters = it.elevationGainMeters,
+          )
+        },
+    // Sorted for the same reason as the splits: the order is which planned stage a lap answers.
+    laps =
+      lapRows
+        .sortedBy { it.lapIndex }
+        .map {
+          RunLap(
+            index = it.lapIndex,
+            durationMs = it.durationMs,
+            distanceMeters = it.distanceMeters,
+            avgHeartRate = it.avgHeartRate,
+            maxHeartRate = it.maxHeartRate,
           )
         },
   )

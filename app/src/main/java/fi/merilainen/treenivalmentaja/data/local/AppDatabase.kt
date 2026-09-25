@@ -17,6 +17,8 @@ import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
 import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsLapFetchEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsSplitFetchEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
@@ -38,8 +40,10 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       IntervalsWellnessEntity::class,
       IntervalsRunSplitEntity::class,
       IntervalsSplitFetchEntity::class,
+      IntervalsRunLapEntity::class,
+      IntervalsLapFetchEntity::class,
     ],
-  version = 16,
+  version = 17,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -84,6 +88,11 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
   // `daily_readiness.contributors` (ADR-014). Rows written before v14 keep their scores and get
   // nulls, indistinguishable from a day Oura had nothing to say about a contributor for, which is
   // correct either way; the ordinary sync window re-fetches the recent past, so no backfill runs.
+  //
+  // 16→17 adds two tables, `intervals_run_laps` and `intervals_lap_fetches`: the laps the watch
+  // wrote into its own file, read from the original FIT because intervals.icu's interval detection
+  // ignores them. Additive, so Room writes it. A run synced before v17 has no laps and no fetch
+  // marker, so the next sync asks for it once, within the per-sync budget.
   autoMigrations =
     [
       AutoMigration(from = 4, to = 5),
@@ -98,6 +107,7 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 13, to = 14),
       AutoMigration(from = 14, to = 15),
       AutoMigration(from = 15, to = 16),
+      AutoMigration(from = 16, to = 17),
     ],
 )
 @TypeConverters(Converters::class)
