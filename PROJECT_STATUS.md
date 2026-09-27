@@ -1,5 +1,25 @@
 # Project status
 
+## Last verified build — 27 September 2026, final main merge verification
+
+The Oura activity header change and the measured workout timeline work were verified after merging
+the existing `origin/main` watch-lap commit. The merge retained the wider local FIT/lap handling and
+the remote migration coverage without duplicate entities or prompt arguments. The remote lap-list
+screenshot was re-recorded in the current light theme and inspected: all 18 rows, durations,
+distances, paces and heart rates render legibly.
+
+Measured tests/failures/errors: **976/0/0 JVM**, including **81/0/0 screenshots**, and **83/0/0
+device tests** actually run on `treeni-test`, Android 16 / API 36. Debug lint: **0 errors / 48
+warnings**. The final cached build, lint, screenshot verification and device run succeeded in
+**2m 9s**. Debug APK: **22,298,695 bytes = 22.298695 MB** (decimal MB). No failed checks remain.
+
+Exact final command:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:verifyRoborazziDebug :app:connectedDebugAndroidTest --console=plain
+. .scratch/report-gui-verification.ps1
+```
+
 ## Last verified build — 27 September 2026, Oura activity in Today header
 
 The compact Today header now shows Oura's third daily score as **Aktiivisuus**, including its
@@ -408,6 +428,59 @@ navigation, migration and UI interactions were tested on Android. WorkManager ru
 subject to Android/network deferral. Kilometre splits are not claimed to be measured interval laps.
 
 ## Measurement history
+## Last verified build — 25 September 2026, the watch's laps
+
+The per-session analysis of the 6 × 400 m Guide run on 22 September said it could not verify the
+repetitions. The watch had recorded one lap per planned stage, but intervals.icu showed the run as a
+single 40-minute "Recovery" interval (the owner confirmed this on the web interface), so its
+intervals endpoint is no source for them. The app now asks for the original file
+(`GET /api/v1/activity/{id}/file`), reads the FIT `lap` messages on the device, discards the rest
+(GPS track included), and stores lap rows in `intervals_run_laps` (schema 16 → 17, auto migration).
+The analysis prompt pairs laps with `runSteps` when the counts match and writes target time and
+signed difference for distance stages. The run card has a closed-by-default *Kierrokset (N)* list.
+
+Measured in a Linux cloud container (Temurin 21, Android SDK Platform 36.1 installed for the run),
+**not** the owner's Windows machine:
+
+- JVM tests: **935/0/0** tests/failures/errors, 0 skipped. Baseline before the change in the same
+  container: 913/1/0 — the one error was Robolectric failing to download `android-all` (Maven
+  Central answered 429), not a test; its class ran once the jar was cached.
+- Screenshots: `verifyRoborazziDebug --rerun-tasks` **75 comparisons, 0 changed, 0 added,
+  75 unchanged**, including the new `run_laps_open` baseline, recorded here and inspected by eye.
+- Debug lint: **0 errors, 46 warnings**. The same 10 as the previous block, plus 36
+  `GradleDependency`/`NewerVersionAvailable` checks that only run online (previous blocks used
+  `--offline`). None is in a changed file.
+- Debug APK: **22,552,010 bytes = 22.552010 MB**, signed with a throwaway `debug.keystore` generated
+  per `docs/SETUP.md` because the private one is not in the container. Not comparable byte-for-byte
+  with the Windows figures above. An earlier `assembleDebug` in the same session measured
+  21,793,939 bytes; the difference was not investigated.
+- **Device tests: not run.** No emulator in this container. `MigrationTest.migrate16To17…` was
+  written and compiled but not executed; the 16→17 step is unverified on a device.
+- The FIT reader was checked against the real 2026-09-22 file outside the repository (a
+  throwaway test, deleted): 18 laps, matching the Suunto app's table in time, distance and heart
+  rate; pace differs by ≤ 1 s because the app rounds. The file is not committed — it carries GPS.
+- **Not verified:** what intervals.icu's `/file` endpoint returns for a Suunto activity on the
+  owner's account (bare, gzipped or zipped FIT are all accepted), and the end-to-end sync on the
+  phone.
+
+Exact commands (bash):
+
+```bash
+./gradlew :app:assembleDebug :app:lintDebug :app:testDebugUnitTest
+./gradlew :app:verifyRoborazziDebug --rerun-tasks
+./gradlew :app:recordRoborazziDebug --tests '*ComponentScreenshotTest.runLapsOpen'
+```
+
+Counts sum the root `tests`/`failures`/`errors`/`skipped` attributes of
+`app/build/test-results/testDebugUnitTest/TEST-*.xml`; lint counts severities in
+`app/build/reports/lint-results-debug.xml`; APK MB is bytes / 1,000,000. Roborazzi from
+`app/build/test-results/roborazzi/debug/results-summary.json`. Maven Central rate-limited this
+container, so a user-level Gradle init script (outside the repository) redirected it to Google's
+Central mirror; no build file changed.
+
+Nothing deliberate was removed. `IntervalsClient.request` gained a byte-reading overload; the string
+path and its status handling are unchanged. `404` now throws `IntervalsNotFoundException`, still
+`canRetry = true`, so every existing caller behaves as before.
 
 ## Last verified build — 13 September 2026, unquoted full watch cues
 
