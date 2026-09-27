@@ -10,22 +10,25 @@ import fi.merilainen.treenivalmentaja.domain.ThemePreference
 
 private val DarkColorScheme =
   darkColorScheme(
-    primary = BluePrimary,
-    primaryContainer = PrimaryContainerDark,
+    primary = Color(0xFF55D9ED),
+    primaryContainer = Color(0xFF123B49),
     onPrimaryContainer = TextPrimaryDark,
     secondary = GreenAccent,
     secondaryContainer = SecondaryContainerDark,
     onSecondaryContainer = OnSecondaryContainerDark,
     errorContainer = ErrorContainerDark,
     onErrorContainer = OnErrorContainerDark,
-    tertiary = YellowAccent,
-    background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceContainerLow = SurfaceContainerLowDark,
-    surfaceContainer = SurfaceContainerDark,
-    surfaceContainerHigh = SurfaceContainerHighDark,
-    surfaceVariant = SurfaceVariantDark,
-    onPrimary = TextPrimaryDark,
+    tertiary = Color(0xFFC3AAFF),
+    tertiaryContainer = Color(0xFF30264D),
+    onTertiaryContainer = Color(0xFFEADDFF),
+    background = Color(0xFF080F19),
+    surface = Color(0xFF101B29),
+    surfaceContainerLow = Color(0xFF101B29),
+    surfaceContainer = Color(0xFF172536),
+    surfaceContainerHigh = Color(0xFF223247),
+    surfaceVariant = Color(0xFF172536),
+    outline = Color(0xFF8B9DB2),
+    onPrimary = Color(0xFF003640),
     onSecondary = TextPrimaryDark,
     onTertiary = TextPrimaryDark,
     onBackground = TextPrimaryDark,
@@ -35,21 +38,23 @@ private val DarkColorScheme =
 
 private val LightColorScheme =
   lightColorScheme(
-    primary = BluePrimaryDark,
-    primaryContainer = PrimaryContainerLight,
-    onPrimaryContainer = Color(0xFF001B3F),
+    primary = Color(0xFF3D6749),
+    primaryContainer = Color(0xFFD9EBD4),
+    onPrimaryContainer = Color(0xFF183721),
     secondary = GreenAccent,
     secondaryContainer = SecondaryContainerLight,
     onSecondaryContainer = OnSecondaryContainerLight,
     errorContainer = ErrorContainerLight,
     onErrorContainer = OnErrorContainerLight,
-    tertiary = YellowAccent,
-    background = BackgroundLight,
-    surface = SurfaceLight,
-    surfaceContainerLow = SurfaceContainerLowLight,
-    surfaceContainer = SurfaceContainerLight,
-    surfaceContainerHigh = SurfaceContainerHighLight,
-    surfaceVariant = SurfaceVariantLight,
+    tertiary = Color(0xFF6F539F),
+    tertiaryContainer = Color(0xFFEEE3FF),
+    onTertiaryContainer = Color(0xFF33204F),
+    background = Color(0xFFFAFAF5),
+    surface = Color(0xFFFEFEF9),
+    surfaceContainerLow = Color(0xFFF3F5ED),
+    surfaceContainer = Color(0xFFEBEFE4),
+    surfaceContainerHigh = Color(0xFFE1E7DB),
+    surfaceVariant = Color(0xFFEBEFE4),
     onPrimary = Color.White,
     onSecondary = Color.White,
     onTertiary = TextPrimaryLight,
@@ -83,8 +88,8 @@ fun MyApplicationTheme(
   darkTheme: Boolean = theme.resolveDarkTheme(),
   content: @Composable () -> Unit,
 ) {
-  // Deliberately not Material You: the Electric Blue palette is part of the app's identity and
-  // both user-selectable schemes must render the same semantic roles on every supported device.
+  // User-approved sage/lavender and midnight/cyan concepts share semantic roles. Fixed palettes
+  // keep the selected visual design consistent across Android versions and wallpapers.
   val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
   MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)

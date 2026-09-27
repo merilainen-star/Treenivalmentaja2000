@@ -1,7 +1,9 @@
 package fi.merilainen.treenivalmentaja.data.alarm
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import fi.merilainen.treenivalmentaja.TreenivalmentajaApplication
@@ -49,7 +51,14 @@ class ReminderReceiverNoPermissionTest {
         
         val intent = Intent().apply { putExtra("SESSION_ID", "s-no-perm") }
         
-        receiver.onReceive(app, intent)
+        // GrantPermissionRule in other device tests persists for the instrumentation process.
+        // Supply the denied permission at the receiver boundary so this test is order-independent.
+        val deniedContext = object : ContextWrapper(app) {
+            override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
+                if (permission == android.Manifest.permission.POST_NOTIFICATIONS)
+                    PackageManager.PERMISSION_DENIED else super.checkPermission(permission, pid, uid)
+        }
+        receiver.onReceive(deniedContext, intent)
         
         Thread.sleep(1000)
         

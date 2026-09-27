@@ -1,5 +1,414 @@
 # Project status
 
+## Last verified build — 27 September 2026, Oura activity in Today header
+
+The compact Today header now shows Oura's third daily score as **Aktiivisuus**, including its
+measured value: `Palautuminen 85 · Uni 86 · Aktiivisuus 98`. A missing activity score remains
+explicitly unknown as `—`; it is never inferred from readiness or sleep. The obsolete static
+`Päivän vointi` label was removed. The rendered light-theme screenshot was opened and checked:
+all three scores fit on one line at the Pixel 5 test width.
+
+Measured tests/failures/errors: **975/0/0 JVM**, including **80/0/0 screenshots**, and **82/0/0
+device tests** actually run on `treeni-test`, Android 16 / API 36, `emulator-5554`. The two new
+device assertions cover both a measured activity score and missing activity data. Debug lint:
+**0 errors / 48 warnings**. Combined build, lint, screenshot recording and tests succeeded in
+**5m 55s**. Debug APK: **22,298,695 bytes = 22.298695 MB** (decimal MB). No failed checks remain.
+
+Exact command:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:recordRoborazziDebug :app:connectedDebugAndroidTest --console=plain
+. .scratch/report-gui-verification.ps1
+```
+
+## Last verified build — 27 September 2026, measured pace and chart controls
+
+Published **1.0-gui-20260927-timeline2** at
+[timeline2](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/gui-preview-20260927-timeline2)
+and the rolling `test-build` location. Adds a measured min/km curve alongside HR, a separate
+right-hand pace axis and independent **Vaiheet / Syke / Vauhti** toggles. Selected phases now show
+their measured lap-average pace from active timer time and distance, the same source used in AI
+lap analysis. The requested everyday pairing/bar-height explanation was deliberately removed;
+the underlying pairing, missing-data and overlap guards remain. See [details](docs/RUN_TIMELINE.md).
+
+FIT standard/enhanced speed fields share the HR timestamp origin, including compressed rollover.
+Invalid measurements stay null; enhanced speed takes precedence when valid. Stops and missing
+samples break the pace curve. Room remains **v19**; JSON cache format v2 triggers bounded speed
+backfill for old HR-only traces. Failed requests remain retryable; a missing original file preserves
+existing HR and lap metrics. No raw speed series is sent to AI. No deliberate preservation guard
+was removed; existing trace preservation was extended to the new backfill.
+
+Measured tests/failures/errors: **975/0/0 JVM**, including **80/0/0 screenshots**; **80/0/0 device**
+tests actually run on `treeni-test`, Android 16 / API 36, `emulator-5554`. The initial combined run
+took **3m 26s** and completed all device tests, but failed unit-test compilation on a missing
+`assertFalse` import. After fixing that import, recording plus lint passed in **3m**, final screenshot
+verification in **1m 6s**, and personal build/lint in **3m 8s**. Debug and personal lint each report
+**0 errors / 48 warnings**. No failed checks remain. Six changed screenshot baselines (four run
+reviews and two standalone charts) were rendered and visually inspected in both themes; all other
+baseline hashes stayed unchanged. FIT/screenshot fixtures are synthetic; the user's watch file was
+not available for testing. Coverage includes cache upgrade/retry/preservation, FIT field scaling and
+precedence in both endian modes, compressed timestamps, signal gaps/stops, lap averages and the
+actual completed card's layer toggles/selected average.
+
+Personal APK: **14,953,266 bytes = 14.953266 MB**; debug: **22,298,687 bytes = 22.298687 MB**
+(decimal MB). Personal SHA-256:
+`aa5e289f32b86875eb5bfafa4a35ba44b62e2959d255715cd60d81b9d2e99f6a`.
+Non-debuggable, versionCode 1, unchanged signer; generated credentials checked as placeholders
+without printing values. Installed retained timeline1, then timeline2 over it without clearing data.
+Cold launch **1775 ms**, process alive, no AndroidRuntime errors, same program still visible in the
+inspected startup screenshots. Anonymous preview/rolling downloads matched the exact size/hash,
+and public `latest.json` matched timeline2. Release notes disclose the local uncommitted working
+tree build: the tag's base-commit source archive does not reproduce this APK.
+
+Exact verification/publication commands (same JDK/SDK as the preceding measurement):
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:recordRoborazziDebug :app:connectedDebugAndroidTest --console=plain
+.\gradlew.bat :app:recordRoborazziDebug :app:lintDebug --console=plain
+.\gradlew.bat :app:verifyRoborazziDebug --console=plain
+. .scratch/report-gui-verification.ps1
+.\gradlew.bat :app:assemblePersonal :app:lintPersonal -PversionSuffix=-gui-20260927-timeline2 --console=plain
+adb -s emulator-5554 install .scratch/timeline-release/Treenivalmentaja-test.apk
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb -s emulator-5554 install -r app/build/outputs/apk/personal/app-personal.apk
+adb -s emulator-5554 shell am force-stop fi.merilainen.treenivalmentaja
+adb -s emulator-5554 logcat -c
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb -s emulator-5554 shell pidof fi.merilainen.treenivalmentaja
+adb -s emulator-5554 logcat -d -s AndroidRuntime
+adb -s emulator-5554 shell screencap -p /sdcard/pace-startup.png
+adb -s emulator-5554 pull /sdcard/pace-startup.png .scratch/pace-startup.png
+Get-Item app/build/outputs/apk/personal/app-personal.apk
+Get-FileHash app/build/outputs/apk/personal/app-personal.apk -Algorithm SHA256
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/aapt.exe' dump badging app/build/outputs/apk/personal/app-personal.apk
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/apksigner.bat' verify --print-certs app/build/outputs/apk/personal/app-personal.apk
+gh release create gui-preview-20260927-timeline2 .scratch/pace-release/Treenivalmentaja-test.apk --repo merilainen-star/Treenivalmentaja2000 --target 9e3be95c40d94013e0fb3c0bd9bf890abd8f73ea --title 'Vauhtikäyrä ja osuuden keskivauhti – timeline2' --notes-file .scratch/pace-release/notes.md --prerelease --latest=false
+gh release upload test-build .scratch/pace-release/Treenivalmentaja-test.apk .scratch/pace-release/latest.json --repo merilainen-star/Treenivalmentaja2000 --clobber
+gh release edit test-build --repo merilainen-star/Treenivalmentaja2000 --notes-file .scratch/pace-release/notes.md --prerelease
+```
+
+Download verification used `Invoke-WebRequest -Uri <preview or rolling APK URL> -OutFile
+.scratch/pace-release/<preview or rolling>-download.apk`, `Get-Item`, `Get-FileHash` and
+`Invoke-RestMethod` for rolling `latest.json`. Older measurements below remain historical evidence.
+
+## Last verified build — 27 September 2026, proportional timeline and HR overlay
+
+Published **1.0-gui-20260927-timeline1** at
+[timeline1](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/gui-preview-20260927-timeline1)
+and the rolling `test-build` location. Phase widths now use duration (distance × target pace
+when needed, explicitly estimated), with a 220 dp recorded HR overlay after the run. Both HR
+timestamps and elapsed lap boundaries come from the same FIT file; pauses retain their width.
+Missing HR breaks the curve. Ordered lap/stage counts must match for labelled association,
+otherwise the chart shows neutral laps or HR alone. See [implementation and limits](docs/RUN_TIMELINE.md).
+
+Room **v19** adds only `intervals_run_traces`, generated by KSP with an 18→19 auto-migration.
+Both earlier v17 migrations, lap summaries and analyses remain intact. Missing trace rows are
+backfilled, and a missing original file does not erase previously cached laps. No deliberate
+data-preservation guard was removed. HR JSON decoding uses an injected background dispatcher;
+the scheduler-driven tests now inject theirs too. No raw HR series is added to AI prompts.
+
+Measured tests/failures/errors: **969/0/0 JVM**, including **80/0/0 screenshots**, and **79/0/0
+device tests** actually run on `treeni-test`, Android 16 / API 36, `emulator-5554`. Combined final
+verification succeeded in **3m 30s**; personal build/lint in **3m 29s**. Debug and personal lint
+each report **0 errors / 48 warnings**. The initial checks exposed a touch-test compile error,
+a lint symbol-pointer crash and one scheduler race in `EasyRunDriftWiringTest`; all are resolved
+in the final checks, without disabling lint rules. No failed checks remain.
+
+All four before/after light/dark screenshots and both standalone chart screenshots were opened
+and visually checked. Only the four run-review baselines changed; two chart baselines were added.
+Fixtures use synthetic HR/FIT data, including signal gaps, elapsed pauses and compressed timestamp
+rollover. The user's original watch file was not available for verification.
+
+Personal APK: **14,953,266 bytes = 14.953266 MB**; debug APK: **22,449,120 bytes = 22.449120 MB**
+(decimal MB). Personal SHA-256:
+`af3200f9cb3c4eaa74f33c85b843091978dc0fba4feee6c04f453e44432c7c4e`.
+Non-debuggable, versionCode 1, same signer as fix2; generated credentials checked as placeholders
+without printing values. Installed the retained fix2 APK and launched it, then installed timeline1
+over it **without clearing data**. Cold launch: **2029 ms**; process remained alive, no AndroidRuntime
+errors, and the same program was visible in the inspected before/after screenshots. Device migration
+tests also assert nonempty lap/history preservation through v16, both v17 variants and v18 to v19.
+
+Anonymous downloads of both preview and rolling APKs match the size/hash above; public `latest.json`
+reports timeline1 and the same hash. Source changes remain in the local working tree; release notes
+explicitly disclose that the tag's base-commit source archive does not reproduce this APK.
+
+Exact commands (JDK `C:/Users/mimer/dev/jdk-21.0.12+8`, SDK `C:/Users/mimer/Android/Sdk`):
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest --console=plain
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:recordRoborazziDebug :app:connectedDebugAndroidTest --console=plain
+.\gradlew.bat :app:assembleDebug :app:recordRoborazziDebug :app:connectedDebugAndroidTest --console=plain
+# Final successful verification after fixes and visual inspection:
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:verifyRoborazziDebug --console=plain
+. .scratch/report-gui-verification.ps1
+.\gradlew.bat :app:assemblePersonal :app:lintPersonal -PversionSuffix=-gui-20260927-timeline1 --console=plain
+adb -s emulator-5554 install .scratch/lap-fix-release/Treenivalmentaja-test.apk
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb -s emulator-5554 install -r app/build/outputs/apk/personal/app-personal.apk
+adb -s emulator-5554 shell am force-stop fi.merilainen.treenivalmentaja
+adb -s emulator-5554 logcat -c
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb -s emulator-5554 shell pidof fi.merilainen.treenivalmentaja
+adb -s emulator-5554 logcat -d -s AndroidRuntime
+adb -s emulator-5554 shell screencap -p /sdcard/timeline-startup.png
+adb -s emulator-5554 pull /sdcard/timeline-startup.png .scratch/timeline-startup.png
+Get-Item app/build/outputs/apk/personal/app-personal.apk
+Get-FileHash app/build/outputs/apk/personal/app-personal.apk -Algorithm SHA256
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/aapt.exe' dump badging app/build/outputs/apk/personal/app-personal.apk
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/apksigner.bat' verify --print-certs app/build/outputs/apk/personal/app-personal.apk
+gh release create gui-preview-20260927-timeline1 .scratch/timeline-release/Treenivalmentaja-test.apk --repo merilainen-star/Treenivalmentaja2000 --target 9e3be95c40d94013e0fb3c0bd9bf890abd8f73ea --title 'Juoksun aikajana ja sykekäyrä – timeline1' --notes-file .scratch/timeline-release/notes.md --prerelease --latest=false
+gh release upload test-build .scratch/timeline-release/Treenivalmentaja-test.apk .scratch/timeline-release/latest.json --repo merilainen-star/Treenivalmentaja2000 --clobber
+gh release edit test-build --repo merilainen-star/Treenivalmentaja2000 --notes-file .scratch/timeline-release/notes.md --prerelease
+```
+
+Download verification used `Invoke-WebRequest -Uri <preview or rolling APK URL> -OutFile
+.scratch/timeline-release/<preview or rolling>-download.apk`, `Get-Item`, `Get-FileHash` and
+`Invoke-RestMethod` for the rolling `latest.json`. Instrumentation had uninstalled its test target;
+two attempted emulator uninstalls therefore returned `DELETE_FAILED_INTERNAL_ERROR` before the
+successful fix2 baseline install. No uninstall/clear was performed between fix2 and timeline1.
+
+## Measurement history
+
+## Last verified build — 27 September 2026, watch-lap analysis fix2
+
+Published **1.0-gui-20260927-fix2** at
+[fix2](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/gui-preview-20260927-fix2)
+and the rolling `test-build` location. Restores the FIT lap reader, cache, measured-lap prompt
+section and lap list from `45fad49`, which the GUI working tree had omitted. The prior startup
+repair preserved those tables but did not use them. See [restoration details](docs/WATCH_LAP_ANALYSIS.md).
+
+Manual analysis now fetches its matched run's missing laps before the provider call, including
+older runs outside the current sync window. A temporary failure leaves no billing receipt and
+shows a retryable message. Automatic analysis waits for the lap fetch. Stored results are not
+automatically regenerated. No data-preservation guard was removed; Room stays at **v18**, with
+the same generated identity `b5d34287030c51a2ba871fd7fed5cfd8` and both v17 migrations retained.
+The privacy description now includes lap-file processing and corrects its outdated claim that
+the app never writes calendar entries; the already-authorized workout exporter was unchanged.
+
+Measured tests/failures/errors: **958/0/0 JVM**, including **78/0/0 screenshots**; **75/0/0 device**
+tests actually run on `treeni-test`, Android 16 / API 36, `emulator-5554`. The new tests exercise
+HTTP→FIT→Room→provider prompt for manual and automatic analysis, retry-before-billing, the twelve
+stages of a synthetic 3 × 6 minute run, and the completed card's expandable lap list. The user's
+actual FIT file and a paid provider request were not exercised. Debug and personal lint each
+report **0 errors / 48 warnings**. Combined verification succeeded in **6m 25s**; personal build
+and lint in **3m 39s**. No failed checks remain.
+
+Personal APK: **14,936,882 bytes = 14.936882 MB**; debug APK: **22,275,581 bytes = 22.275581 MB**
+(decimal MB). Personal SHA-256:
+`34c2b91c05cddf6937cc8913ffa6df07c6723d76d5eb2b36c6739b72c6d7a78b`.
+Personal is non-debuggable and retains the earlier signer certificate. Generated credential
+values were checked as empty/placeholders without printing them. Installed fix1 as the upgrade
+baseline, then installed fix2 without clearing data. Fix2 cold-launched in **1539 ms**, showed the
+retained program, and produced no AndroidRuntime errors; its screenshot was opened and inspected.
+
+Anonymous downloads of the fix2 and rolling APKs match the exact size/hash above. Public
+`latest.json` reports fix2 and the same hash. Source changes remain in the local working tree;
+release notes explicitly state that the tag's base-commit source archive does not reproduce this
+APK. Older release measurements below remain historical evidence, not the current rolling binary.
+
+Exact commands:
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:verifyRoborazziDebug --console=plain
+. .scratch/report-gui-verification.ps1
+.\gradlew.bat :app:assemblePersonal :app:lintPersonal -PversionSuffix=-gui-20260927-fix2 --console=plain
+adb install -r .scratch/gui-fix-release/Treenivalmentaja-test.apk
+adb install -r app/build/outputs/apk/personal/app-personal.apk
+adb shell am force-stop fi.merilainen.treenivalmentaja
+adb logcat -c
+adb shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb shell pidof fi.merilainen.treenivalmentaja
+adb logcat -d -s AndroidRuntime
+adb shell screencap -p /sdcard/lap-fix-startup.png
+adb pull /sdcard/lap-fix-startup.png .scratch/lap-fix-startup.png
+Get-Item app/build/outputs/apk/personal/app-personal.apk
+Get-FileHash app/build/outputs/apk/personal/app-personal.apk -Algorithm SHA256
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/aapt.exe' dump badging app/build/outputs/apk/personal/app-personal.apk
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/apksigner.bat' verify --print-certs app/build/outputs/apk/personal/app-personal.apk
+gh release create gui-preview-20260927-fix2 .scratch/lap-fix-release/Treenivalmentaja-test.apk --repo merilainen-star/Treenivalmentaja2000 --target 9e3be95c40d94013e0fb3c0bd9bf890abd8f73ea --title 'Kierrokset takaisin AI-analyysiin – fix2' --notes-file .scratch/lap-fix-release/notes.md --prerelease --latest=false
+gh release upload test-build .scratch/lap-fix-release/Treenivalmentaja-test.apk .scratch/lap-fix-release/latest.json --repo merilainen-star/Treenivalmentaja2000 --clobber
+gh release edit test-build --repo merilainen-star/Treenivalmentaja2000 --notes-file .scratch/lap-fix-release/notes.md --prerelease
+```
+
+The ignored measurement helper sums JUnit XML root counts; its paths/methodology remain in the
+fix1 block below. Public-download checks used `Invoke-WebRequest -Uri <release APK URL> -OutFile
+<scratch APK>` for both tags and `Get-FileHash -Algorithm SHA256`; metadata used
+`Invoke-RestMethod -Uri https://github.com/merilainen-star/Treenivalmentaja2000/releases/download/test-build/latest.json`.
+
+## Last verified build — 27 September 2026, startup compatibility fix1
+
+Version **1.0-gui-20260927-fix1** repairs the startup crash reproduced when the GUI APK is
+installed over the previously published `1.0-45fad49`. Both had independently assigned Room v17
+to different schemas. Version 18 preserves the lap tables and the analysis table and explicitly
+migrates either v17 shape. See [cause and correction](docs/STARTUP_SCHEMA_FIX.md).
+
+Measured: **941/0/0 JVM tests**, including **78/0/0 screenshot tests**; **74/0/0 device tests**
+actually run on `treeni-test`, Android 16 / API 36, `emulator-5554`. Both legacy-v17 migrations,
+the v16→18 chain, and configured startup/recreation passed. Debug and personal lint each report
+**0 errors / 48 warnings**. The combined build/lint/test command succeeded in **5m 34s**;
+personal build/lint succeeded in **3m**. No checks remain failing.
+
+The personal APK is **14,920,498 bytes = 14.920498 MB** (decimal). SHA-256:
+`1727c851c2b59bc69f28a8786a557928baab1fa219fedc81523434c48636964a`.
+It is non-debuggable and signed by the same certificate as the preceding release. The corrected
+personal APK was installed directly over the reproduced crashing installation **without clearing
+data**, cold-launched in **957 ms**, and displayed the retained training program. Its screenshot
+was opened and inspected; AndroidRuntime contained no errors. Debug APK: **23,318,934 bytes =
+23.318934 MB**. This verifies the emulator upgrade path, not a run on the user's physical phone.
+
+[Fix1 release](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/gui-preview-20260927-fix1)
+is public. Both earlier download locations (`gui-preview-20260927` and `test-build`) now also
+serve fix1, with matching `latest.json`. Anonymous downloads from all three URLs produced the
+exact size and SHA-256 above. The earlier measurements below describe the binaries as published
+at that time, including the incomplete upgrade verification which this incident exposed.
+
+The released v17 schema was restored byte-for-byte from its generated artifact; the GUI-v17
+artifact is retained as a regression-test fixture. KSP generated v18. No destructive fallback or
+previous data-preservation guard was removed. The fix retains old lap data but does not merge the
+separate upstream FIT-reading implementation into the uncommitted GUI work. Release notes
+identify the local working-tree build; no source commit or push was made.
+
+Exact build, verification and measurement commands:
+
+```powershell
+.\gradlew.bat :app:assemblePersonal :app:lintPersonal -PversionSuffix=-gui-20260927-fix1 --console=plain
+adb install -r app/build/outputs/apk/personal/app-personal.apk
+adb shell am force-stop fi.merilainen.treenivalmentaja
+adb logcat -c
+adb shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb shell pidof fi.merilainen.treenivalmentaja
+adb logcat -d -s AndroidRuntime
+adb shell screencap -p /sdcard/crash-fix-startup.png
+adb pull /sdcard/crash-fix-startup.png .scratch/crash-fix-startup.png
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:verifyRoborazziDebug --console=plain
+. .scratch/report-gui-verification.ps1
+Get-Item app/build/outputs/apk/personal/app-personal.apk
+Get-FileHash app/build/outputs/apk/personal/app-personal.apk -Algorithm SHA256
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/aapt.exe' dump badging app/build/outputs/apk/personal/app-personal.apk
+& 'C:/Users/mimer/Android/Sdk/build-tools/36.1.0/apksigner.bat' verify --print-certs app/build/outputs/apk/personal/app-personal.apk
+```
+
+The ignored measurement helper sums `tests`, `failures` and `errors` from JUnit XML root
+elements in `app/build/test-results/testDebugUnitTest` and
+`app/build/outputs/androidTest-results/connected/debug`; the screenshot subset selects
+`*ScreenshotTest*`. Lint counts come from `lint-results-debug.xml` and `lint-results-personal.xml`.
+Generated credentials were checked as empty/placeholders without printing their values.
+
+Exact publication commands (notes and staged binaries under ignored `.scratch/`):
+
+```powershell
+gh release create gui-preview-20260927-fix1 .scratch/gui-fix-release/Treenivalmentaja-test.apk --repo merilainen-star/Treenivalmentaja2000 --target 9e3be95c40d94013e0fb3c0bd9bf890abd8f73ea --title 'Käynnistymiskorjaus – testiversio 27.9.2026' --notes-file .scratch/gui-fix-release/notes.md --prerelease --latest=false
+gh release upload test-build .scratch/gui-fix-release/Treenivalmentaja-test.apk .scratch/gui-fix-release/latest.json --repo merilainen-star/Treenivalmentaja2000 --clobber
+gh release edit test-build --repo merilainen-star/Treenivalmentaja2000 --notes-file .scratch/gui-fix-release/notes.md --prerelease
+gh release upload gui-preview-20260927 .scratch/gui-fix-release/Treenivalmentaja-test.apk --repo merilainen-star/Treenivalmentaja2000 --clobber
+gh release edit gui-preview-20260927 --repo merilainen-star/Treenivalmentaja2000 --title 'GUI ja automatiikka – korjattu fix1 27.9.2026' --notes-file .scratch/gui-fix-release/notes.md --prerelease
+```
+
+## Measurement history
+
+## Last verified build — 27 September 2026, downloadable GUI preview
+
+Published at the user's explicit request: [GUI preview](https://github.com/merilainen-star/Treenivalmentaja2000/releases/tag/gui-preview-20260927).
+The rolling `test-build` APK and `latest.json` also serve this build so the in-app updater agrees.
+Version **1.0-gui-20260927**, personal APK **14,920,490 bytes = 14.920490 MB**; non-debuggable.
+SHA-256: `eed759f69828a8457d540e6fa9fb8e5127f372aa492aeda88fca24bb008c0922`.
+
+Personal build and lint succeeded (**0 errors / 48 warnings**). No source behavior changed in this
+publishing step: the preceding **941/0/0 JVM**, including **78/0/0 screenshot**, and **71/0/0 device**
+results apply to the same application sources; those suites were not rerun just for packaging.
+The actual personal APK upgraded the emulator installation successfully and cold-launched in
+**1249 ms**. Its screenshot was opened and inspected. Signing certificate SHA-256 matches the
+previous APK downloaded from GitHub: `ed6498c93b60af7582cece4b4ad480cc5b1897ccf96a52285224e677a87810c0`.
+Generated client credentials were checked as empty/placeholders without printing values.
+
+Both published APK URLs were downloaded anonymously with `Invoke-WebRequest -Uri <URL> -OutFile
+<local APK>`; their SHA-256 and byte sizes match the local file and public `latest.json` exactly.
+Release notes explicitly identify the local working-tree build and its base commit; GitHub's tag
+source archive does not include the still-uncommitted GUI changes. No source files were pushed.
+
+Exact build/publication commands (scratch notes and assets are ignored local helpers):
+
+```powershell
+.\gradlew.bat :app:assemblePersonal :app:lintPersonal -PversionSuffix=-gui-20260927 --console=plain
+gh release create gui-preview-20260927 .scratch/gui-release/Treenivalmentaja-test.apk --repo merilainen-star/Treenivalmentaja2000 --target 9e3be95c40d94013e0fb3c0bd9bf890abd8f73ea --title 'GUI ja automatiikka – testiversio 27.9.2026' --notes-file .scratch/gui-release-notes.md --prerelease --latest=false
+gh release upload test-build .scratch/gui-release/Treenivalmentaja-test.apk .scratch/gui-release/latest.json --repo merilainen-star/Treenivalmentaja2000 --clobber
+gh release edit test-build --repo merilainen-star/Treenivalmentaja2000 --notes-file .scratch/gui-release-notes.md --prerelease
+adb -s emulator-5554 install -r app/build/outputs/apk/personal/app-personal.apk
+adb -s emulator-5554 shell am force-stop fi.merilainen.treenivalmentaja
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+Get-FileHash app/build/outputs/apk/personal/app-personal.apk -Algorithm SHA256
+```
+
+## Last verified build — 27 September 2026, run review and automation
+
+Implemented the approved light sage/lavender and dark midnight/cyan themes, structured run-stage
+bars, compact post-run results with prominent AI analysis, optional completion/analysis/export
+automation, durable analysis receipts/results and notification navigation. Exercise lookup retains
+the program's notes and resolves decorated Finnish names. See [behavior and limits](docs/TRAINING_AUTOMATION.md).
+
+Measured on the final workspace: **941/0/0 JVM tests**, including **78/0/0 screenshot tests**;
+**71/0/0 instrumented tests actually run** on `treeni-test` / Android 16, `emulator-5554`.
+Lint: **0 errors / 48 warnings** (39 dependency/update notices, 9 other existing warnings).
+Debug APK: **23,318,934 bytes = 23.318934 MB** (decimal MB, bytes / 1,000,000).
+The final combined Gradle command succeeded in **3m 36s**. Screenshot baselines were generated
+by Roborazzi and the four new before/after light/dark renders were opened for visual inspection.
+
+The user's supplied JSON was also run through the actual compiled `PlanJson`, `PlanValidator`
+and watch exporter: **40 sessions, 24 runs, 16 strength workouts, 174 run stages, 24 successful
+local exports, 12 distance-only runs**. No remote calendar was written by this audit.
+
+Exact successful verification commands (PowerShell, Gradle wrapper):
+
+```powershell
+.\gradlew.bat :app:assembleDebug :app:connectedDebugAndroidTest :app:lintDebug :app:recordRoborazziDebug --console=plain
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:verifyRoborazziDebug --console=plain
+.\.scratch\audit-imported-program.ps1
+.\.scratch\report-gui-verification.ps1
+git -c core.safecrlf=false diff --check
+adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 shell am force-stop fi.merilainen.treenivalmentaja
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity
+adb -s emulator-5554 shell screencap -p /sdcard/treeni-launch.png
+adb -s emulator-5554 pull /sdcard/treeni-launch.png C:/antigravity/Treenivalmentaja/.scratch/treeni-launch.png
+adb -s emulator-5554 shell am force-stop fi.merilainen.treenivalmentaja
+adb -s emulator-5554 shell am start -W -n fi.merilainen.treenivalmentaja/.MainActivity --es analysis_session_id notification-launch-check -d treenivalmentaja://analysis/notification-launch-check
+adb -s emulator-5554 shell screencap -p /sdcard/treeni-analysis-launch.png
+adb -s emulator-5554 pull /sdcard/treeni-analysis-launch.png C:/antigravity/Treenivalmentaja/.scratch/treeni-analysis-launch.png
+adb -s emulator-5554 logcat -d -s AndroidRuntime:E
+```
+
+APK installation returned Success; ordinary cold launch was **2,288 ms**, analysis-route cold
+launch **2,259 ms**. Both screens were opened and inspected; AndroidRuntime error output was empty.
+The emulator displayed a System UI unresponsive dialog after the suite; choosing Wait cleared it,
+and the subsequent app and analysis captures were unobstructed. This was the emulator's System UI,
+not an app crash. Cold-route smoke testing used an intentionally absent analysis id; the device
+notification test separately posted and opened the actual pending intent in a running app.
+
+Measurement methodology: the helper sums root JUnit XML attributes (`testsuite` for JVM,
+`testsuites` for device output), so nested suite totals are not double counted. Screenshot tests
+are a subset of the 941 JVM tests. APK size is `Get-Item ...app-debug.apk`.Length. Java is the local
+Temurin 21.0.12+8 installation. Logs and throwaway audit/report helpers remain in ignored `.scratch/`.
+
+Earlier attempts caught and resolved stale migration-test schema assets, order-dependent
+notification permission assumptions and ActivityScenario teardown after a changed launch URI.
+The asset merge now depends on KSP; **v17 JSON and migration were generated, never handwritten**.
+An initial lint internal exception did not recur in subsequent successful lint runs; no detector
+was disabled. Distance-only completion and preservation of the lighter-workout label have explicit
+regression coverage. No remaining failing checks.
+
+Deliberate behavior changes authorized by the user: analysis is now prominent and persistent
+instead of hidden/volatile, Suunto completion can be automatic and explicitly undone, and UI export
+covers 14 days instead of 7. The old palettes were replaced with the approved concepts. Provider
+key clearing, strict explicit guide references, missing-data handling, export ownership guards and
+confirmation of AI plan edits remain. No supplied training program was rewritten.
+
+Live SuuntoGuide identity, physical watch delivery and a paid AI provider call were **not** tested.
+The integration test uses a local HTTP server and fake analysis client; actual notification delivery,
+navigation, migration and UI interactions were tested on Android. WorkManager runs every 15 minutes
+subject to Android/network deferral. Kilometre splits are not claimed to be measured interval laps.
+
+## Measurement history
+
 ## Last verified build — 13 September 2026, unquoted full watch cues
 
 The user's physical Suunto photos show that surrounding quotes are displayed

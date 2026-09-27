@@ -90,6 +90,11 @@ fun ExerciseGuideSheetContent(
             fontWeight = FontWeight.Bold,
         )
 
+        state.planNotes?.takeIf { it.isNotBlank() }?.let {
+            Text("Oman ohjelman suoritusohje", style = MaterialTheme.typography.titleMedium)
+            Text(it, style = MaterialTheme.typography.bodyLarge)
+            HorizontalDivider()
+        }
         when (state) {
             is ExerciseGuideState.Loading -> LoadingBody()
             is ExerciseGuideState.Loaded -> LoadedBody(state, animation)

@@ -4,10 +4,15 @@ import fi.merilainen.treenivalmentaja.data.security.ConnectionGeneration
 
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsException
+import fi.merilainen.treenivalmentaja.data.intervals.IntervalsNotFoundException
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsMappers
 import fi.merilainen.treenivalmentaja.data.local.dao.IntervalsDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
+import fi.merilainen.treenivalmentaja.data.intervals.FitLaps
+import fi.merilainen.treenivalmentaja.data.intervals.RunTraceJson
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsTraceEntity
 import fi.merilainen.treenivalmentaja.domain.CompletedRunMetrics
 import fi.merilainen.treenivalmentaja.domain.CompletedWorkout
 import fi.merilainen.treenivalmentaja.domain.DailyTrainingLoad
@@ -15,6 +20,7 @@ import fi.merilainen.treenivalmentaja.domain.IntervalsActivityRef
 import fi.merilainen.treenivalmentaja.domain.IntervalsRawResponse
 import fi.merilainen.treenivalmentaja.domain.MatchOuraWorkoutsUseCase
 import fi.merilainen.treenivalmentaja.domain.PlannedSession
+import fi.merilainen.treenivalmentaja.domain.RunLap
 import fi.merilainen.treenivalmentaja.domain.RunSplit
 import fi.merilainen.treenivalmentaja.domain.heartRateZones
 import fi.merilainen.treenivalmentaja.domain.kilometreSplits
@@ -28,6 +34,8 @@ import java.time.ZoneId
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 
 sealed interface RunExportResult {
   data class Success(val uploaded: Int, val removed: Int) : RunExportResult
@@ -80,6 +88,7 @@ class IntervalsRepository internal constructor(
   private val clock: () -> Long = System::currentTimeMillis,
   private val matcher: MatchOuraWorkoutsUseCase = MatchOuraWorkoutsUseCase(),
   private val generation: ConnectionGeneration = ConnectionGeneration(),
+  private val metricsDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.Default,
 ) {
 
   private val exportMutex = Mutex()
@@ -109,9 +118,10 @@ class IntervalsRepository internal constructor(
   }
 
   /** Explicit export of today plus six days. Reconcile only this app's runs in this window. */
-  suspend fun exportRuns(sessions: List<TrainingSession>, today: LocalDate): RunExportResult = exportMutex.withLock {
+  suspend fun exportRuns(sessions: List<TrainingSession>, today: LocalDate, days: Long = 7): RunExportResult = exportMutex.withLock {
     val expected = generation.current()
-    val until = today.plusDays(6)
+    require(days in 1..366)
+    val until = today.plusDays(days - 1)
     try {
       // Validate the whole request before changing anything remotely.
       val candidates = sessions.filter { it.isWatchRun() && LocalDate.parse(it.scheduledDate) in today..until }
@@ -156,6 +166,7 @@ class IntervalsRepository internal constructor(
       } ?: return IntervalsSyncResult.Failure("Intervals.icu-yhteys on poistettu.", false)
       syncWellness(from, to, expected)
       syncSplits(rows, expected)
+      syncLaps(rows, expected)
       if (generation.current() != expected) {
         return IntervalsSyncResult.Failure("Intervals.icu-yhteys on poistettu.", false)
       }
@@ -243,6 +254,57 @@ class IntervalsRepository internal constructor(
           splits = IntervalsMappers.toSplitRows(activity.id, splits),
           fetchedAtUtc = clock(),
         )
+      } ?: return
+    }
+  }
+
+  /**
+   * The watch's own laps for the runs that do not have them yet, read from the original file — and,
+   * like the splits, **a failure here is not a failure of the sync**.
+   *
+   * intervals.icu runs its own interval detection and ignores the laps the watch recorded: a
+   * 6 × 400 m SuuntoPlus Guide session with one lap per planned stage came back from it as a
+   * single 40-minute "Recovery" interval. The laps survive only in the uploaded file, so this asks
+   * for the file, keeps the lap figures [FitLaps] reads out of it, and drops the rest — the GPS
+   * track included — without storing it.
+   *
+   * The same rationing as the splits, for the same reason: one request per run, runs only, newest
+   * first, at most [MAX_LAP_FETCHES_PER_SYNC], and every attempt recorded whatever it produced —
+   * an activity with no original file (a manual entry, say) is asked about once and then left
+   * alone. A file that cannot be read is an empty answer, recorded as one.
+   */
+  private suspend fun syncLaps(activities: List<IntervalsActivityEntity>, expected: Long) {
+    val already = dao.lapFetchedActivityIds().toSet()
+    val cachedTraces = dao.tracesForActivities(activities.map { it.id }).associateBy { it.activityId }
+    val traces = cachedTraces.values.filter { RunTraceJson.isCurrent(it.traceJson) }.map { it.activityId }.toSet()
+    val candidates =
+      activities
+        .filter { (it.id !in already || it.id !in traces) && it.sportType.contains("run", ignoreCase = true) }
+        .sortedByDescending { it.startTimeUtc }
+        .take(MAX_LAP_FETCHES_PER_SYNC)
+    for (activity in candidates) {
+      if (generation.current() != expected) return
+      val recording =
+        try {
+          client.originalFile(activity.id)?.let(FitLaps::readRecording) ?: FitLaps.Recording()
+        } catch (e: IntervalsNotFoundException) {
+          // No file for this activity is a complete answer, recorded as one.
+          FitLaps.Recording()
+        } catch (e: IntervalsException) {
+          // Anything else is not an answer about this run; the rest are picked up next time.
+          return
+        }
+      generation.commit(expected) {
+        // A trace backfill must not erase existing lap summaries if the source file disappeared.
+        if (recording.laps.isNotEmpty() || activity.id !in already) dao.replaceLaps(
+          activityId = activity.id,
+          laps = IntervalsMappers.toLapRows(activity.id, recording.laps),
+          fetchedAtUtc = clock(),
+        )
+        val trace = if (recording.trace.heartRate.isEmpty() && recording.trace.laps.isEmpty() && recording.trace.speed.isEmpty())
+          cachedTraces[activity.id]?.let { RunTraceJson.decode(it.traceJson) }?.copy(formatVersion = RunTraceJson.CURRENT_VERSION)
+            ?: recording.trace else recording.trace
+        dao.upsertTrace(IntervalsTraceEntity(activity.id, RunTraceJson.encode(trace), clock()))
       } ?: return
     }
   }
@@ -406,15 +468,44 @@ class IntervalsRepository internal constructor(
    * the gym.
    */
   fun observeMatchedRunMetrics(): Flow<Map<String, CompletedRunMetrics>> =
-    combine(dao.observeMatchedActivities(), dao.observeMatchedSplits()) { rows, splitRows ->
+    combine(dao.observeMatchedActivities(), dao.observeMatchedSplits(), dao.observeMatchedLaps(), dao.observeMatchedTraces()) {
+      rows,
+      splitRows,
+      lapRows, traceRows ->
       val splitsByActivity = splitRows.groupBy { it.activityId }
+      val lapsByActivity = lapRows.groupBy { it.activityId }
+      val tracesByActivity = traceRows.associateBy { it.activityId }
       rows
         .groupBy { it.matchedSessionId!! }
         .mapValues { (_, forSession) ->
           val activity = forSession.maxBy { it.movingTimeSec }
-          activity.toMetrics(splitsByActivity[activity.id].orEmpty())
+          activity.toMetrics(
+            splitsByActivity[activity.id].orEmpty(),
+            lapsByActivity[activity.id].orEmpty(),
+          ).copy(trace = tracesByActivity[activity.id]?.let { RunTraceJson.decode(it.traceJson) })
         }
+    }.flowOn(metricsDispatcher) // Decode potentially long HR series away from the UI dispatcher.
+
+  suspend fun recordedRuns(fromUtc: Long, toUtc: Long): List<fi.merilainen.treenivalmentaja.domain.RecordedRun> =
+    dao.getActivitiesBetween(fromUtc, toUtc).filter { it.sportType in setOf("Run", "TrailRun", "VirtualRun") }.map {
+      fi.merilainen.treenivalmentaja.domain.RecordedRun(it.id, it.startTimeUtc,
+        it.movingTimeSec, it.distanceMeters, it.source, it.matchedSessionId)
     }
+
+  suspend fun hasFetchedRunDetail(activityId: String): Boolean = activityId in dao.splitFetchedActivityIds()
+
+  suspend fun hasFetchedRunLaps(activityId: String): Boolean = activityId in dao.lapFetchedActivityIds()
+
+  /** A manual analysis of an older run must not depend on the current sync window or UI state. */
+  suspend fun fetchLapsForSession(sessionId: String): Boolean {
+    val activity = dao.observeMatchedActivities().first()
+      .filter { it.matchedSessionId == sessionId }
+      .maxByOrNull { it.movingTimeSec } ?: return true
+    if (!activity.sportType.contains("run", ignoreCase = true)) return true
+    val expected = generation.current()
+    syncLaps(listOf(activity), expected)
+    return generation.current() == expected && hasFetchedRunLaps(activity.id)
+  }
 
   /** `internal` rather than private so the sync budget is a constant the tests can name. */
   internal companion object {
@@ -436,6 +527,9 @@ class IntervalsRepository internal constructor(
      */
     const val MAX_SPLIT_FETCHES_PER_SYNC = 6
 
+    /** The laps' budget, the same as the splits' and for the same reason: one request per run. */
+    const val MAX_LAP_FETCHES_PER_SYNC = 6
+
     /** Below a kilometre there is no split to compute, only a tail. */
     const val MINIMUM_METRES_FOR_SPLITS = 1000.0
 
@@ -447,7 +541,8 @@ class IntervalsRepository internal constructor(
 }
 
 private fun IntervalsActivityEntity.toMetrics(
-  splitRows: List<IntervalsRunSplitEntity> = emptyList()
+  splitRows: List<IntervalsRunSplitEntity> = emptyList(),
+  lapRows: List<IntervalsRunLapEntity> = emptyList(),
 ): CompletedRunMetrics =
   CompletedRunMetrics(
     activityId = id,
@@ -483,6 +578,19 @@ private fun IntervalsActivityEntity.toMetrics(
             durationSec = it.durationSec,
             avgHeartRate = it.avgHeartRate,
             elevationGainMeters = it.elevationGainMeters,
+          )
+        },
+    // Sorted for the same reason as the splits: the order is which planned stage a lap answers.
+    laps =
+      lapRows
+        .sortedBy { it.lapIndex }
+        .map {
+          RunLap(
+            index = it.lapIndex,
+            durationMs = it.durationMs,
+            distanceMeters = it.distanceMeters,
+            avgHeartRate = it.avgHeartRate,
+            maxHeartRate = it.maxHeartRate,
           )
         },
   )

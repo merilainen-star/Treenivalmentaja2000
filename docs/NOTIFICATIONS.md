@@ -1,5 +1,8 @@
 # Notifications
 
+The `workout_analyses` channel announces a saved AI analysis and opens its specific session.
+See [Training automation](TRAINING_AUTOMATION.md#durable-analysis) for scheduling and persistence.
+
 *(Status: **implemented**. `RescheduleAlarmsUseCase` keeps a 7-day sliding window of alarms,
 `BootReceiver` re-arms them after a reboot, a reinstall or a timezone change, and Settings
 checks the notification permission. Nothing Oura reports changes a notification: the recovery

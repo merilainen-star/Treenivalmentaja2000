@@ -17,6 +17,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -56,6 +61,24 @@ fun WorkoutDetails(
     val fromText = workout.type == WorkoutType.STRENGTH && parsed.exercises.isNotEmpty()
 
     Column(modifier = modifier) {
+        if (workout.type == WorkoutType.RUNNING && workout.runSteps.isNotEmpty()) {
+            if (workout.appliedLighterVariant) {
+                Text("Kevennetty versio käytössä.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary)
+            }
+            RunProfileCard(workout.runSteps)
+            var fullInstructions by rememberSaveable(workout.id) { mutableStateOf(false) }
+            TextButton(onClick = { fullInstructions = !fullInstructions }) {
+                Text(if (fullInstructions) "Sulje koko ohje" else "Avaa koko ohje")
+            }
+            if (fullInstructions) {
+                Text(workout.description, style = MaterialTheme.typography.bodyLarge)
+                workout.runSteps.forEachIndexed { index, step ->
+                    Text("${index + 1}. ${step.summary()}", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            return@Column
+        }
         if (!fromPlan && !fromText) {
             Text(text = workout.description, style = MaterialTheme.typography.bodyLarge)
         } else {

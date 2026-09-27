@@ -103,6 +103,8 @@ fun TodayScreen(
     val analysisConfigured by viewModel.analysisConfigured.collectAsState()
     val analysisModel by viewModel.analysisModel.collectAsState()
     val missedProposal by viewModel.missedSessionsProposal.collectAsState()
+    val autoCompletedIds by viewModel.autoCompletedIds.collectAsState()
+    val autoExportMessage by viewModel.autoExportMessage.collectAsState()
 
     // On every **resume**, not merely on first composition.
     //
@@ -119,6 +121,9 @@ fun TodayScreen(
     }
 
     TodayScreenContent(
+        autoCompletedIds = autoCompletedIds,
+        onUndoAutoCompletion = viewModel::undoAutoCompletion,
+        autoExportMessage = autoExportMessage,
         workouts = workouts,
         guideState = guideState,
         onSickClicked = viewModel::markSick,
@@ -164,6 +169,9 @@ fun TodayScreen(
 @Composable
 fun TodayScreenContent(
     workouts: List<Workout>,
+    autoCompletedIds: List<String> = emptyList(),
+    onUndoAutoCompletion: (String) -> Unit = {},
+    autoExportMessage: String? = null,
     guideState: ExerciseGuideState? = null,
     onSickClicked: () -> Unit = {},
     onRecoveredClicked: () -> Unit = {},
@@ -216,7 +224,15 @@ fun TodayScreenContent(
             fontWeight = FontWeight.Bold
         )
 
-        RecoveryCard(
+        var expandRecovery by rememberSaveable { mutableStateOf(false) }
+        if (todayWorkouts.isNotEmpty()) {
+            androidx.compose.material3.TextButton(onClick = { expandRecovery = !expandRecovery }) {
+                Text(if (expandRecovery) "Tiivistä palautuminen" else
+                    "Palautuminen ${recovery?.readiness ?: "—"} · Uni ${recovery?.sleep ?: "—"} · " +
+                        "Aktiivisuus ${recovery?.activity ?: "—"}")
+            }
+        }
+        if (todayWorkouts.isEmpty() || expandRecovery) RecoveryCard(
             onSickClicked = onSickClicked,
             onRecoveredClicked = onRecoveredClicked,
             recovery = recovery,
@@ -256,6 +272,8 @@ fun TodayScreenContent(
             todayWorkouts.forEach { workout ->
                 WorkoutCardToday(
                     workout = workout,
+                    autoCompleted = workout.id in autoCompletedIds,
+                    onUndoAutoCompletion = { onUndoAutoCompletion(workout.id) },
                     onStatusChange = { newStatus -> onStatusChange(workout.id, newStatus) },
                     onGuidedProgressChange = { progress ->
                         onGuidedProgressChange(workout.id, progress)
@@ -290,6 +308,19 @@ fun TodayScreenContent(
             }
         }
 
+        workouts.filter { it.dayOffset > 0 && it.status.isOpen }.minByOrNull { it.dayOffset }?.let { next ->
+            Card {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Seuraava harjoitus", style = MaterialTheme.typography.titleMedium)
+                    Text(buildList {
+                        add(next.type.title)
+                        if (next.durationMin > 0) add("${next.durationMin} min")
+                        add("${next.dayOffset} päivän päästä")
+                    }.joinToString(" · "))
+                    autoExportMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+            }
+        }
         // What Oura recorded that no session claims. Listed rather than dropped: otherwise a
         // workout the matcher could not place is indistinguishable from one never fetched.
         if (unmatchedWorkouts.isNotEmpty()) {
@@ -642,6 +673,7 @@ fun RunMetricsRow(
                 )
             }
         }
+        RunLapsSection(metrics.laps, style)
     }
 }
 
@@ -663,7 +695,16 @@ fun WorkoutCardToday(
     onRequestPlanProposal: (String?) -> Unit = {},
     onApplyPlanProposal: () -> Unit = {},
     onDismissPlanProposal: () -> Unit = {},
+    autoCompleted: Boolean = false,
+    onUndoAutoCompletion: () -> Unit = {},
 ) {
+    if (workout.status == SessionStatus.COMPLETED || run != null) {
+        CompletedWorkoutCard(workout, run, completed, analysis, analysisConfigured,
+            onRequestAnalysis, onDismissAnalysis, onExerciseClick, planProposal,
+            onRequestPlanProposal, onApplyPlanProposal, onDismissPlanProposal,
+            autoCompleted, onUndoAutoCompletion, { onStatusChange(SessionStatus.COMPLETED) })
+        return
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),

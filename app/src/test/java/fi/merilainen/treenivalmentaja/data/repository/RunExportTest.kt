@@ -22,6 +22,14 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class RunExportTest {
+  @Test fun `fourteen day window includes next week and reconciles without duplicates`() = runTest {
+    val nextWeek = run("next-week").copy(scheduledDate = today.plusDays(13).toString())
+    val outside = run("outside").copy(scheduledDate = today.plusDays(14).toString())
+    assertEquals(RunExportResult.Success(2, 0), repository.exportRuns(listOf(run(), nextWeek, outside), today, 14))
+    assertEquals(RunExportResult.Success(2, 0), repository.exportRuns(listOf(run(), nextWeek, outside), today, 14))
+    assertEquals(2, events.size)
+    assertEquals(RunExportResult.Success(1, 1), repository.exportRuns(listOf(run()), today, 14))
+  }
   private lateinit var db: AppDatabase
   private lateinit var server: HttpServer
   private lateinit var repository: IntervalsRepository

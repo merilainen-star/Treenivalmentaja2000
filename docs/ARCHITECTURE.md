@@ -1,5 +1,8 @@
 # Architecture
 
+The September 2026 [training automation](TRAINING_AUTOMATION.md) adds a shared analysis repository,
+Room-backed results and a WorkManager coordinator for completion, analysis and 14-day export.
+
 This document outlines the architecture for the Treenivalmentaja Android application. 
 *(This architecture is implemented. Oura and intervals.icu sync and matching run on-device. The
 optional AI flows include workout analysis, confirmed MOVE/LIGHTEN proposals, whole-programme

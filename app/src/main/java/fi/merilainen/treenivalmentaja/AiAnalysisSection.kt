@@ -86,7 +86,7 @@ fun AiAnalysisSection(
   showTriggers: Boolean = true,
   modifier: Modifier = Modifier,
 ) {
-  if (kind == null || !configured) return
+  if (kind == null || (!configured && state !is AiAnalysisState.Loaded)) return
 
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     when {

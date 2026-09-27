@@ -17,6 +17,8 @@ import fi.merilainen.treenivalmentaja.data.local.dao.SessionEventDao
 import fi.merilainen.treenivalmentaja.data.local.dao.TrainingPlanDao
 import fi.merilainen.treenivalmentaja.data.local.dao.WorkoutSessionDao
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsLapFetchEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsSplitFetchEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
@@ -38,8 +40,12 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       IntervalsWellnessEntity::class,
       IntervalsRunSplitEntity::class,
       IntervalsSplitFetchEntity::class,
+      AnalysisRecord::class,
+      IntervalsRunLapEntity::class,
+      IntervalsLapFetchEntity::class,
+      fi.merilainen.treenivalmentaja.data.local.entity.IntervalsTraceEntity::class,
     ],
-  version = 16,
+  version = 19,
   exportSchema = true,
   // 4→5 added three nullable columns on `oura_workouts` and 5→6 added a whole table, both purely
   // additive. 6→7 is the one that removes something: `strava_activities` goes and
@@ -98,6 +104,8 @@ import fi.merilainen.treenivalmentaja.data.local.entity.WorkoutSessionEntity
       AutoMigration(from = 13, to = 14),
       AutoMigration(from = 14, to = 15),
       AutoMigration(from = 15, to = 16),
+      AutoMigration(from = 16, to = 17),
+      AutoMigration(from = 18, to = 19),
     ],
 )
 @TypeConverters(Converters::class)
@@ -107,6 +115,7 @@ abstract class AppDatabase : RoomDatabase() {
   abstract fun sessionEventDao(): SessionEventDao
   abstract fun ouraDao(): OuraDao
   abstract fun intervalsDao(): IntervalsDao
+  abstract fun analysisDao(): AnalysisDao
 
   /**
    * Declares that `strava_activities` is meant to disappear at version 7.
@@ -120,6 +129,19 @@ abstract class AppDatabase : RoomDatabase() {
 
   companion object {
     private const val DB_NAME = "treenivalmentaja.db"
+
+    /**
+     * Two different v17 schemas escaped into APKs: 45fad49 had watch laps, the GUI preview
+     * had persistent analyses. Both must migrate without deleting either kind of history.
+     * Auto-migration alone cannot describe two starting schemas sharing one version number.
+     */
+    val MIGRATION_17_18 = object : Migration(17, 18) {
+      override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `intervals_run_laps` (`activityId` TEXT NOT NULL, `lapIndex` INTEGER NOT NULL, `durationMs` INTEGER NOT NULL, `distanceMeters` REAL, `avgHeartRate` INTEGER, `maxHeartRate` INTEGER, PRIMARY KEY(`activityId`, `lapIndex`))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `intervals_lap_fetches` (`activityId` TEXT NOT NULL, `lapCount` INTEGER NOT NULL, `fetchedAtUtc` INTEGER NOT NULL, PRIMARY KEY(`activityId`))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `session_analyses` (`sessionId` TEXT NOT NULL, `kind` TEXT NOT NULL, `state` TEXT NOT NULL, `text` TEXT NOT NULL, `prompt` TEXT NOT NULL, `model` TEXT NOT NULL, `createdAtUtc` INTEGER NOT NULL, PRIMARY KEY(`sessionId`, `kind`), FOREIGN KEY(`sessionId`) REFERENCES `workout_sessions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)")
+      }
+    }
 
     
     val MIGRATION_3_4 = object : Migration(3, 4) {
@@ -230,7 +252,7 @@ abstract class AppDatabase : RoomDatabase() {
     @VisibleForTesting
     internal fun builder(context: Context, name: String): RoomDatabase.Builder<AppDatabase> =
       Room.databaseBuilder(context, AppDatabase::class.java, name)
-        .addMigrations(MIGRATION_3_4)
+        .addMigrations(MIGRATION_3_4, MIGRATION_17_18)
         .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
   }
 }

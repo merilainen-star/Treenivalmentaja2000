@@ -25,6 +25,8 @@ enum class EventSource {
   ALARM,
   /** A background Oura sync matched or updated the session. */
   OURA_SYNC,
+  /** User-enabled automatic completion of an unambiguous watch run. */
+  INTERVALS_SYNC,
   /** Plan import or seeding created the session. */
   IMPORT,
   /** A user-approved AI advisor proposal. */

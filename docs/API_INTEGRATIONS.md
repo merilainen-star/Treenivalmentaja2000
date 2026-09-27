@@ -305,6 +305,13 @@ request per activity rather than per window, so the sync rations them: runs only
 more, newest first, six per sync. Every attempt is recorded whether or not it produced anything —
 otherwise a treadmill run with no distance channel would be re-requested forever.
 
+### Watch laps from the original file
+
+Watch-lap summaries are additionally read from `GET /api/v1/activity/{id}/file`, using the restored
+FIT reader from release `45fad49`. Normal sync caches up to six running files per pass; manual
+analysis can fetch its specific missing file before sending the prompt. See
+[watch-lap analysis](WATCH_LAP_ANALYSIS.md) for caching, failure handling and planned-stage comparison.
+
 ### The three durations, measured
 
 A real Suunto run on 2026-08-15 settled what the time fields mean. The watch reported 9.52 km,

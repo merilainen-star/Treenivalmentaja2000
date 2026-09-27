@@ -4,10 +4,9 @@ package fi.merilainen.treenivalmentaja.domain
  * What one session's analysis card is showing.
  *
  * Held per session id rather than as a single screen-wide value, so scrolling the week list does not
- * lose an open analysis and more than one card can be open at once. Nothing here reaches the
- * database: an analysis lives exactly as long as the ViewModel that holds it, which is the other
- * half of "this feature changes nothing" — there is no stored verdict to go stale, and no history of
- * machine opinions accumulating beside the training log.
+ * lose an open analysis and more than one card can be open at once. SessionAnalysisRepository
+ * now persists the exact prompt and response for foreground and background requests. These UI
+ * states also represent interrupted persisted requests; see docs/TRAINING_AUTOMATION.md.
  */
 sealed interface AiAnalysisState {
 

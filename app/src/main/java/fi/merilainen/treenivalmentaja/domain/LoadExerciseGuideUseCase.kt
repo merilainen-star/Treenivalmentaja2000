@@ -18,8 +18,9 @@ sealed interface ExerciseGuideState {
 
   /** The movement as the *plan* named it. Always the sheet's title, whatever the source says. */
   val exerciseName: String
+  val planNotes: String? get() = null
 
-  data class Loading(override val exerciseName: String) : ExerciseGuideState
+  data class Loading(override val exerciseName: String, override val planNotes: String? = null) : ExerciseGuideState
 
   /**
    * @param suggested true when this is a name-search hit the user picked rather than a reference
@@ -30,18 +31,21 @@ sealed interface ExerciseGuideState {
     override val exerciseName: String,
     val guide: ExerciseGuide,
     val suggested: Boolean = false,
+    override val planNotes: String? = null,
   ) : ExerciseGuideState
 
   /** Name-search hits, offered as a question. Never adopted on the app's own initiative. */
   data class Suggestions(
     override val exerciseName: String,
     val matches: List<ExerciseGuide>,
+    override val planNotes: String? = null,
   ) : ExerciseGuideState
 
   data class Unavailable(
     override val exerciseName: String,
     val message: String,
     val canRetry: Boolean,
+    override val planNotes: String? = null,
   ) : ExerciseGuideState
 }
 
@@ -74,17 +78,28 @@ class LoadExerciseGuideUseCase(private val providers: List<ExerciseGuideProvider
     }
 
   suspend fun execute(exercise: Exercise): ExerciseGuideState {
+    // Cache guide content only. A reused reference must retain THIS exercise's title and notes.
+    val state = resolve(exercise)
+    return when (state) {
+      is ExerciseGuideState.Loaded -> state.copy(exerciseName = exercise.name, planNotes = exercise.notes)
+      is ExerciseGuideState.Suggestions -> state.copy(exerciseName = exercise.name, planNotes = exercise.notes)
+      is ExerciseGuideState.Unavailable -> state.copy(exerciseName = exercise.name, planNotes = exercise.notes)
+      is ExerciseGuideState.Loading -> state.copy(exerciseName = exercise.name, planNotes = exercise.notes)
+    }
+  }
+
+  private suspend fun resolve(exercise: Exercise): ExerciseGuideState {
     val key = cacheKey(exercise) ?: return unknownProvider(exercise)
     mutex.withLock { cache[key] }?.let { return it }
 
     val state =
       try {
-        val reference = exercise.guide
+        val reference = exercise.guide ?: ExerciseNames.reference(exercise.name)
         if (reference != null) {
           val provider =
             providers.firstOrNull { it.id == reference.provider }
               ?: return unknownProvider(exercise)
-          ExerciseGuideState.Loaded(exercise.name, provider.byId(reference.id))
+          ExerciseGuideState.Loaded(exercise.name, provider.byId(reference.id), suggested = exercise.guide == null)
         } else {
           searchEverywhere(exercise.name)
         }
@@ -118,7 +133,11 @@ class LoadExerciseGuideUseCase(private val providers: List<ExerciseGuideProvider
   private suspend fun searchEverywhere(name: String): ExerciseGuideState = coroutineScope {
     val outcomes =
       providers
-        .map { provider -> async { runCatching { provider.search(name) } } }
+        .map { provider -> async {
+          try { Result.success(provider.search(ExerciseNames.query(name))) }
+          catch (e: kotlinx.coroutines.CancellationException) { throw e }
+          catch (e: Exception) { Result.failure(e) }
+        } }
         .map { it.await() }
 
     val failure = outcomes.mapNotNull { it.exceptionOrNull() }.firstOrNull()

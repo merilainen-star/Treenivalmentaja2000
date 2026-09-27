@@ -200,6 +200,12 @@
   `TreenivalmentajaApplication.kt`, `AUTHENTICATION.md`, `SETUP.md`, `SECURITY.md`
 
 ## ADR-010: On-demand AI workout analysis, called directly from the app with a user-supplied key
+
+**27 September 2026 amendment:** the user approved optional automatic run analysis, durable
+results and a prominent post-run action. Production inputs now come from a shared repository,
+not ViewModel subscriptions. The key/provider boundary and explicit confirmation for AI plan
+changes remain. See [training automation](TRAINING_AUTOMATION.md) for the replacement behavior;
+the original decision below records why the earlier on-demand-only design existed.
 - **Status:** Accepted (2026-08-17), and built. Implements the "AI coach comments, read-only
   (Phase B)" item in `ROADMAP.md`, which this ADR makes concrete. Governed by
   [ADR-005](#adr-005-ai-advisor-as-proposal-only) — this feature returns prose, never a plan edit —

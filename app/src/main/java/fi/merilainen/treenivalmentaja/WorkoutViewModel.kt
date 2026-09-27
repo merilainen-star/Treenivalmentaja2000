@@ -191,6 +191,9 @@ class WorkoutViewModel(
   private val analysisConnection: AnalysisConnection? = null,
   private val analysisClients: Map<AnalysisProvider, AnalysisClient> = emptyMap(),
   private val analysisSettingsStore: AnalysisSettingsStore? = null,
+  private val sessionAnalyses: fi.merilainen.treenivalmentaja.data.repository.SessionAnalysisRepository? = null,
+  private val automationStore: fi.merilainen.treenivalmentaja.data.settings.AutomationSettingsStore? = null,
+  private val requestAutomation: () -> Unit = {},
   private val analysisPromptBuilder: AnalysisPromptBuilder = AnalysisPromptBuilder(),
   private val programReportPromptBuilder: ProgramReportPromptBuilder = ProgramReportPromptBuilder(),
   private val nextProgramPromptBuilder: NextProgramPromptBuilder = NextProgramPromptBuilder(),
@@ -537,7 +540,7 @@ class WorkoutViewModel(
   }
 
   val watchRuns = combine(repository.observeSessions(), currentDate) { sessions, today ->
-    sessions.filter { it.isWatchRun() && LocalDate.parse(it.scheduledDate) in today..today.plusDays(6) }
+    sessions.filter { it.isWatchRun() && LocalDate.parse(it.scheduledDate) in today..today.plusDays(13) }
       .sortedWith(compareBy({ it.scheduledDate }, { it.scheduledTime }))
   }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -552,7 +555,7 @@ class WorkoutViewModel(
     viewModelScope.launch {
       try {
         _runExportMessage.value = if (repository.saveRunSteps(sessionId, steps))
-          "Vaiheet tallennettu. Vie juoksut päivittääksesi kellon harjoitukset."
+          "Vaiheet tallennettu. Automaattinen vienti päivittää ne, jos se on käytössä."
         else "Vaiheita ei tallennettu: harjoitus on muuttunut tai vaiheet ovat virheelliset."
       } finally { _runExportBusy.value = false }
     }
@@ -565,7 +568,7 @@ class WorkoutViewModel(
     viewModelScope.launch {
       try {
         val today = LocalDate.now(clock.withZone(repository.activePlanTimeZone()))
-        _runExportMessage.value = when (val result = remote.exportRuns(repository.getSessions(), today)) {
+        _runExportMessage.value = when (val result = remote.exportRuns(repository.getSessions(), today, days = 14)) {
           is fi.merilainen.treenivalmentaja.data.repository.RunExportResult.Success ->
             "Intervals.icu: ${result.uploaded} juoksua viety, ${result.removed} vanhentunutta vientiä poistettu. Synkronoi Suunto-sovellus ja kello."
           is fi.merilainen.treenivalmentaja.data.repository.RunExportResult.Failure -> result.message
@@ -593,6 +596,7 @@ class WorkoutViewModel(
     val connection = intervalsConnection ?: return
     viewModelScope.launch {
       if (connection.saveApiKey(key) == CredentialSaveResult.Success) {
+        automationStore?.markExported("")
         // Tested immediately rather than at the next sync. A key pasted with a character missing
         // would otherwise look accepted and then quietly fetch nothing.
         connection.testKey()
@@ -647,6 +651,7 @@ class WorkoutViewModel(
         }
       matchIntervalsActivities(today)
       _intervalsSyncing.value = false
+      requestAutomation()
     }
   }
 
@@ -927,7 +932,25 @@ class WorkoutViewModel(
    * accumulating a history of machine verdicts beside the training log.
    */
   private val _aiAnalyses = MutableStateFlow<Map<String, AiAnalysisState>>(emptyMap())
-  val aiAnalyses: StateFlow<Map<String, AiAnalysisState>> = _aiAnalyses.asStateFlow()
+  private val hiddenAnalyses = MutableStateFlow<Set<String>>(emptySet())
+  val aiAnalyses: StateFlow<Map<String, AiAnalysisState>> = combine(
+    sessionAnalyses?.states ?: MutableStateFlow(emptyMap<String, AiAnalysisState>()), _aiAnalyses, hiddenAnalyses,
+  ) { saved, current, hidden -> (saved + current).filterKeys { it !in hidden } }
+    .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+  val automationSettings = (automationStore?.settings ?: MutableStateFlow(fi.merilainen.treenivalmentaja.data.settings.AutomationSettings()))
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), fi.merilainen.treenivalmentaja.data.settings.AutomationSettings())
+  val autoExportMessage = (automationStore?.lastExport ?: MutableStateFlow<String?>(null))
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+  val autoCompletedIds = repository.observeAutoCompletedIds()
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+  fun setAutomationSettings(settings: fi.merilainen.treenivalmentaja.data.settings.AutomationSettings) {
+    viewModelScope.launch { automationStore?.set(settings); requestAutomation() }
+  }
+  fun undoAutoCompletion(id: String) { viewModelScope.launch { repository.undoAutoCompletion(id) } }
+  val pendingAnalysisSession = MutableStateFlow<String?>(null)
+  fun openAnalysisSession(id: String) { hiddenAnalyses.update { it - id }; pendingAnalysisSession.value = id }
+  fun analysisNavigationHandled() { pendingAnalysisSession.value = null }
 
   /**
    * The whole-programme report, and there is only ever one — a plan has one report open at a time,
@@ -977,6 +1000,7 @@ class WorkoutViewModel(
 
   /** Closes one card. The next tap asks again — nothing is cached to re-show. */
   fun dismissAiAnalysis(sessionId: String) {
+    hiddenAnalyses.update { it + sessionId }
     _aiAnalyses.update { it - sessionId }
   }
 
@@ -1198,6 +1222,20 @@ class WorkoutViewModel(
    * depend on which screen is in front.
    */
   fun requestAiAnalysis(sessionId: String) {
+    hiddenAnalyses.update { it - sessionId }
+    if (sessionAnalyses != null) {
+      viewModelScope.launch {
+        val session = repository.getSession(sessionId) ?: return@launch
+        val date = LocalDate.parse(session.scheduledDate)
+        val hasRun = intervalsRepository?.observeMatchedRunMetrics()?.first()?.containsKey(sessionId) == true
+        val hasOura = ouraRepository.observeMatchedMetrics().first().containsKey(sessionId)
+        val kind = AiAnalysisAvailability.kindFor(session.status,
+          ChronoUnit.DAYS.between(currentDate.value, date).toInt(), hasRun || hasOura) ?: return@launch
+        val model = analysisSettingsStore?.modelFlow?.first() ?: analysisModel.value
+        sessionAnalyses.analyse(sessionId, kind, model)
+      }
+      return
+    }
     // The selected model decides which client answers. Read at request time rather than captured,
     // so changing the model in Settings takes effect on the next tap and not the next launch.
     val model = analysisModel.value
@@ -1274,6 +1312,7 @@ class WorkoutViewModel(
             description = session.description,
             plannedRounds = session.rounds,
             exercises = session.exercises.orEmpty(),
+            runSteps = session.runSteps.orEmpty(),
             // Read from the completion event, not from this class's own map: the analysis can be
             // asked for days later, from a screen that never held the counter.
             guided = repository.guidedProgressFor(session.id),
@@ -1425,7 +1464,7 @@ class WorkoutViewModel(
   /** Opens the guide sheet for one movement and starts the lookup. */
   fun openExerciseGuide(exercise: Exercise) {
     guideExercise = exercise
-    _guideState.value = ExerciseGuideState.Loading(exercise.name)
+    _guideState.value = ExerciseGuideState.Loading(exercise.name, exercise.notes)
     viewModelScope.launch {
       // A sheet closed or reopened while the request was in flight must not be overwritten by
       // the answer to the previous question.
@@ -1446,7 +1485,7 @@ class WorkoutViewModel(
    */
   fun selectGuideSuggestion(guide: ExerciseGuide) {
     val name = _guideState.value?.exerciseName ?: return
-    _guideState.value = ExerciseGuideState.Loaded(name, guide, suggested = true)
+    _guideState.value = ExerciseGuideState.Loaded(name, guide, suggested = true, planNotes = guideExercise?.notes)
   }
 
   fun closeExerciseGuide() {
@@ -1832,6 +1871,9 @@ class WorkoutViewModel(
           analysisConnection = application.analysisConnection,
           analysisClients = application.analysisClients,
           analysisSettingsStore = application.analysisSettingsStore,
+          sessionAnalyses = application.sessionAnalysisRepository,
+          automationStore = application.automationSettingsStore,
+          requestAutomation = { fi.merilainen.treenivalmentaja.data.automation.TrainingAutomationWorker.request(application) },
           analysisPromptBuilder = application.analysisPromptBuilder,
           advisorSettingsStore = application.advisorSettingsStore,
           activeWorkoutProgressStore = application.activeWorkoutProgressStore,

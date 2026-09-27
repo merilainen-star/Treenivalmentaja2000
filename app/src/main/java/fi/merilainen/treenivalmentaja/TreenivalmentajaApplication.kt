@@ -224,7 +224,7 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
     IntervalsConnection(
       store = intervalsApiKeyStore,
       client = intervalsClient,
-      onKeyCleared = { db.intervalsDao().clearCachedIntervalsData() },
+      onKeyCleared = { db.intervalsDao().clearCachedIntervalsData(); automationSettingsStore.markExported("") },
       generation = intervalsGeneration,
     )
   }
@@ -268,6 +268,26 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
 
   val analysisSettingsStore: AnalysisSettingsStore by lazy { AnalysisSettingsStore(this) }
 
+  val automationSettingsStore by lazy { fi.merilainen.treenivalmentaja.data.settings.AutomationSettingsStore(this) }
+  val sessionAnalysisRepository by lazy {
+    fi.merilainen.treenivalmentaja.data.repository.SessionAnalysisRepository(
+      db.analysisDao(), repository, ouraRepository, intervalsRepository, analysisClients, analysisPromptBuilder)
+  }
+  val trainingAutomation by lazy {
+    fi.merilainen.treenivalmentaja.data.automation.TrainingAutomation(repository, intervalsRepository,
+      sessionAnalysisRepository, automationSettingsStore, analysisSettingsStore,
+      configured = { analysisConnection.configured.value },
+      connected = { intervalsConnection.state.value == fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState.Configured ||
+        intervalsConnection.state.value is fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState.Verified },
+      notifyAnalysis = { fi.merilainen.treenivalmentaja.data.notification.AnalysisNotification.show(this, it) },
+      refreshRecovery = {
+        if (ouraConnection.state.value == OuraConnectionState.Connected) {
+          val today = java.time.LocalDate.now(repository.activePlanTimeZone())
+          ouraRepository.sync(today.minusDays(AnalysisPromptBuilder.TREND_DAYS_BACK), today)
+        }
+      })
+  }
+
   val advisorSettingsStore: AdvisorSettingsStore by lazy { AdvisorSettingsStore(this) }
 
   /** The light/dark/system choice, read by `MainActivity` before the first frame is themed. */
@@ -283,6 +303,17 @@ class TreenivalmentajaApplication : Application(), ImageLoaderFactory {
   override fun onCreate() {
     super.onCreate()
     NotificationChannels.createChannels(this)
+    applicationScope.launch {
+      kotlinx.coroutines.flow.combine(intervalsConnection.state, automationSettingsStore.settings,
+        repository.observeSessions()) { connection, settings, sessions -> Triple(connection, settings, sessions) }
+        .collect { (connection, settings, _) ->
+          val enabled = (connection == fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState.Configured ||
+            connection is fi.merilainen.treenivalmentaja.data.intervals.IntervalsConnectionState.Verified) &&
+            (settings.completeRuns || settings.analyseRuns || settings.exportRuns)
+          fi.merilainen.treenivalmentaja.data.automation.TrainingAutomationWorker.schedule(this@TreenivalmentajaApplication, enabled)
+          if (enabled) fi.merilainen.treenivalmentaja.data.automation.TrainingAutomationWorker.request(this@TreenivalmentajaApplication)
+        }
+    }
     applicationScope.launch {
       // Settings must be able to say whether Oura is connected the moment it is opened, and the
       // answer is on disk behind a Keystore decryption rather than in memory.

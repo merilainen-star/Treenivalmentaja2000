@@ -83,6 +83,7 @@ class EasyRunDriftWiringTest {
         // A port nothing listens on: the rule reads the database and never the network.
         client = IntervalsClient(apiKeys = { "test-key" }, baseUrl = "http://127.0.0.1:1"),
         dao = db.intervalsDao(),
+        metricsDispatcher = dispatcher,
       )
   }
 

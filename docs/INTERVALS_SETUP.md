@@ -1,5 +1,9 @@
 # Intervals.icu setup
 
+The September 2026 review update adds user-configurable automatic completion, AI analysis and
+14-day exports. The base matcher below still only links activities; the separate automation rule
+can mark an unambiguous run complete. See [Training automation](TRAINING_AUTOMATION.md).
+
 How the Suunto watch's own recordings reach this app, and the one thing you do to enable it.
 
 ## The data flow

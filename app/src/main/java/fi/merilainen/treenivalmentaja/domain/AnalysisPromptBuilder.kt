@@ -19,6 +19,7 @@ data class CompletedAnalysisInput(
    * there is nothing structured to render.
    */
   val exercises: List<Exercise> = emptyList(),
+  val runSteps: List<RunStep> = emptyList(),
   /**
    * What the guided workout recorded: which of those movements were actually ticked off.
    *
@@ -97,6 +98,11 @@ class AnalysisPromptBuilder {
     appendLine()
 
     appendProgramme(input.exercises, input.plannedRounds)
+    if (input.runSteps.isNotEmpty()) {
+      appendLine("## Suunnitellut juoksuvaiheet (ei toteutunut mittaus)")
+      input.runSteps.forEachIndexed { index, step -> appendLine("${index + 1}. ${step.summary()}") }
+      appendLine("Kilometriväliajat eivät ole vetokohtaisia kierroksia. Älä väitä vetojen tai sprinttien toteutuneen suunnitellusti ilman vastaavaa mittausta. Kerro mitä tiedoista voi ja ei voi päätellä.")
+    }
     appendGuided(input.guided, input.exercises)
     appendTiming(input.timing, input.exercises)
 
@@ -131,6 +137,7 @@ class AnalysisPromptBuilder {
       watch.forEach { appendLine("- $it") }
       appendLine()
       appendZones(r.heartRateZones)
+      appendLaps(r.laps, input.runSteps)
       appendSplits(r.splits)
     }
 
@@ -559,6 +566,54 @@ class AnalysisPromptBuilder {
       appendLine("- $label: ${parts.joinToString(", ")}")
     }
     appendLine()
+  }
+
+  /** Watch laps are measured stages; kilometre splits mix efforts and recoveries. */
+  private fun StringBuilder.appendLaps(laps: List<RunLap>, steps: List<RunStep>) {
+    if (laps.size < 2) return
+    val pairs = pairLapsWithSteps(laps, steps)
+    val paired = pairs.any { it.second != null }
+    if (paired) {
+      appendLine("## Kellon kierrokset suunnitelman vaiheittain (Suunto)")
+      appendLine("Arvioi vedot näistä: kilometrijaot sekoittavat vedot ja palautukset keskenään.")
+      appendLine("Vaiheet on kohdistettu järjestyksen ja saman lukumäärän perusteella. Tarkista myös kestojen ja matkojen vastaavuus; sama lukumäärä ei yksin todista, että Guide-ohjelma suoritettiin.")
+    } else {
+      appendLine("## Kellon kierrokset (Suunto)")
+      if (steps.isNotEmpty()) appendLine(
+        "Kierroksia on ${laps.size}, suunnitelmassa ${steps.size} vaihetta, joten niitä ei voi yhdistää vaiheisiin."
+      )
+    }
+    pairs.forEach { (lap, step) ->
+      val actual = buildList {
+        add(lap.durationText)
+        lap.distanceText?.let { add(it) }
+        lap.paceSecPerKm?.let { add("${it / 60}:${(it % 60).toString().padStart(2, '0')} /km") }
+        lap.avgHeartRate?.let { avg ->
+          add(lap.maxHeartRate?.let { "syke $avg (max $it)" } ?: "syke $avg")
+        }
+      }
+      val label = step?.let { "${lap.index}. ${it.name}" } ?: "${lap.index}. kierros"
+      val planned = step?.let { plannedStage(it, lap) }
+      appendLine("- $label: ${actual.joinToString(" · ")}" + (planned?.let { " — suunniteltu $it" } ?: ""))
+    }
+    appendLine()
+  }
+
+  private fun plannedStage(step: RunStep, lap: RunLap): String = buildString {
+    step.distanceMeters?.let { append(if (it < 2000) "$it m" else km(it / 1000.0)) }
+    step.durationSec?.let { append((it * 1000L).formatLapTime().removeSuffix(",0")) }
+    val target = step.targetDurationMs()
+    val pace = step.paceSecPerKm?.let { "${it / 60}:${(it % 60).toString().padStart(2, '0')} /km" }
+    when {
+      target != null -> {
+        append(", tavoiteaika ${target.formatLapTime()} ($pace)")
+        val diffTenths = Math.round((lap.durationMs - target) / 100.0)
+        val sign = if (diffTenths > 0) "+" else if (diffTenths < 0) "−" else "±"
+        val abs = kotlin.math.abs(diffTenths)
+        append("; ero $sign${abs / 10},${abs % 10} s")
+      }
+      pace != null -> append(", tavoitevauhti $pace")
+    }
   }
 
   private fun km(value: Double): String = String.format(FINNISH, "%.2f km", value)

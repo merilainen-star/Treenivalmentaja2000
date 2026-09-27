@@ -32,13 +32,20 @@ class MainActivity : ComponentActivity() {
   private val documentViewModel: WorkoutViewModel by viewModels { WorkoutViewModel.Factory }
   private var documentRead: Job? = null
 
+  private fun openAnalysis(intent: Intent) {
+    intent.getStringExtra(fi.merilainen.treenivalmentaja.data.notification.AnalysisNotification.SESSION_EXTRA)
+      ?.takeIf { it.isNotBlank() }?.let(documentViewModel::openAnalysisSession)
+  }
+
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
+    openAnalysis(intent)
     openDocument(intent)
   }
 
   private fun openDocument(intent: Intent) {
+    if (intent.hasExtra(fi.merilainen.treenivalmentaja.data.notification.AnalysisNotification.SESSION_EXTRA)) return
     val uri = runCatching { PlanDocumentReader.uri(intent) }.getOrNull() ?: return
     documentRead?.cancel()
     documentRead = lifecycleScope.launch {
@@ -51,6 +58,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     installSplashScreen()
     super.onCreate(savedInstanceState)
+    if (savedInstanceState == null) openAnalysis(intent)
     if (savedInstanceState == null) openDocument(intent)
     enableEdgeToEdge()
     setContent {

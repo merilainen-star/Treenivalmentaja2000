@@ -57,3 +57,11 @@ class IntervalsRequestException(code: Int) :
 
 /** No network, a 5xx, or a body that could not be read as the documented JSON. */
 class IntervalsUnavailableException(message: String) : IntervalsException(message, canRetry = true)
+
+/**
+ * `404`. Retryable as before for every existing caller — to them it is one more way the service
+ * did not answer — but distinguishable, because for an activity's original file it is a complete
+ * answer: that activity has no file (a manual entry, say), and asking again will not change it.
+ */
+class IntervalsNotFoundException :
+  IntervalsException("Intervals.icu vastasi HTTP 404.", canRetry = true)

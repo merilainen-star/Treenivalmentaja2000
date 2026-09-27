@@ -119,6 +119,37 @@ class TrainingRepository(
 
   suspend fun getSession(id: String): TrainingSession? = sessionDao.getById(id)?.toDomain()
 
+  fun observeAutoCompletedIds(): Flow<List<String>> = eventDao.observeAutoCompletedIds()
+
+  suspend fun autoCompleteRun(expected: TrainingSession, activityId: String): Boolean = db.withTransaction {
+    val sessionId = expected.id
+    val entity = sessionDao.getById(sessionId) ?: return@withTransaction false
+    if (entity.toDomain() != expected || expected.type != fi.merilainen.treenivalmentaja.domain.WorkoutType.RUNNING ||
+      !entity.status.canTransitionTo(SessionStatus.COMPLETED)) return@withTransaction false
+    // An undo is durable: the same or reimported recording may never re-complete this session.
+    val events = eventDao.getForSession(sessionId)
+    if (events.any { it.source == EventSource.INTERVALS_SYNC }) return@withTransaction false
+    val now = maxOf(clock.millis(), (events.maxOfOrNull { it.timestampUtc } ?: 0L) + 1)
+    sessionDao.update(entity.copy(status = SessionStatus.COMPLETED, updatedAt = now))
+    eventDao.insert(SessionEventEntity(idGenerator(), sessionId, now, entity.status, SessionStatus.COMPLETED,
+      EventSource.INTERVALS_SYNC, "Automaattinen suoritusmerkintä · Intervals.icu $activityId"))
+    true
+  }
+
+  suspend fun undoAutoCompletion(sessionId: String): Boolean = db.withTransaction {
+    val entity = sessionDao.getById(sessionId) ?: return@withTransaction false
+    if (entity.status != SessionStatus.COMPLETED) return@withTransaction false
+    val events = eventDao.getForSession(sessionId)
+    val completed = events.lastOrNull { it.source == EventSource.INTERVALS_SYNC } ?: return@withTransaction false
+    if (events.any { it.source == EventSource.USER && it.timestampUtc >= completed.timestampUtc }) return@withTransaction false
+    val target = completed.fromStatus ?: SessionStatus.PLANNED
+    val now = maxOf(clock.millis(), completed.timestampUtc + 1)
+    sessionDao.update(entity.copy(status = target, updatedAt = now))
+    eventDao.insert(SessionEventEntity(idGenerator(), sessionId, now, entity.status, target,
+      EventSource.USER, "Automaattinen suoritusmerkintä peruttu"))
+    true
+  }
+
   /**
    * Everything the whole-programme report needs out of this database, in one call.
    *

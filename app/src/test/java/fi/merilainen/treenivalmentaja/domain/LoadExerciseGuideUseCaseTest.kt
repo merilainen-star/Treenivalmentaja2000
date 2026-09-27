@@ -13,6 +13,29 @@ import org.junit.Test
 
 /** Every state the guide sheet can be in, driven by a fake provider. */
 class LoadExerciseGuideUseCaseTest {
+  @Test fun `Finnish decorated exercise is searched with equipment intact`() = runTest {
+    var query = ""
+    val provider = FakeProvider(onSearch = { query = it; emptyList() })
+    val state = LoadExerciseGuideUseCase(provider).execute(Exercise(
+      "Romanialainen maastaveto kahvakuulalla · sarja 2/3", notes = "Pidä selkä vakaana."))
+    assertEquals("kettlebell romanian deadlift", query)
+    assertEquals("Pidä selkä vakaana.", state.planNotes)
+  }
+  @Test fun `cached reference retains each sets own name and notes`() = runTest {
+    val provider = FakeProvider(onById = { guide(it, "push-up") })
+    val useCase = LoadExerciseGuideUseCase(provider)
+    useCase.execute(Exercise("Punnerrus · sarja 1/3", notes = "Ensimmäinen", guide = GuideRef("exercisedb", "same")))
+    val second = useCase.execute(Exercise("Punnerrus · sarja 2/3", notes = "Toinen", guide = GuideRef("exercisedb", "same")))
+    assertEquals("Punnerrus · sarja 2/3", second.exerciseName)
+    assertEquals("Toinen", second.planNotes)
+    assertEquals(1, provider.byIdCalls)
+  }
+  @Test fun `offline guide still carries plan instructions`() = runTest {
+    val provider = FakeProvider(onById = { throw GuideUnavailableException("offline") })
+    val state = LoadExerciseGuideUseCase(provider).execute(Exercise("Dead bug · sarja 1/2", notes = "Oman ohjelman ohje"))
+    assertTrue(state is ExerciseGuideState.Unavailable)
+    assertEquals("Oman ohjelman ohje", state.planNotes)
+  }
 
   private fun guide(id: String, name: String, source: String = "ExerciseDB") =
     ExerciseGuide(
@@ -108,11 +131,11 @@ class LoadExerciseGuideUseCaseTest {
       onSearch = { listOf(guide("a", "front plank with twist"), guide("b", "side plank")) }
     )
 
-    val state = LoadExerciseGuideUseCase(provider).execute(exercise("Lankku"))
+    val state = LoadExerciseGuideUseCase(provider).execute(exercise("Plank"))
 
     val suggestions = state as ExerciseGuideState.Suggestions
     assertEquals(2, suggestions.matches.size)
-    assertEquals("Lankku", suggestions.exerciseName)
+    assertEquals("Plank", suggestions.exerciseName)
   }
 
   /** A single hit is shown outright — and still labelled a suggestion, because it is one. */
@@ -120,7 +143,7 @@ class LoadExerciseGuideUseCaseTest {
   fun `one hit is shown but stays marked as a suggestion`() = runTest {
     val provider = FakeProvider(onSearch = { listOf(guide("a", "side plank")) })
 
-    val state = LoadExerciseGuideUseCase(provider).execute(exercise("Lankku"))
+    val state = LoadExerciseGuideUseCase(provider).execute(exercise("Plank"))
 
     val loaded = state as ExerciseGuideState.Loaded
     assertEquals("side plank", loaded.guide.name)
@@ -129,7 +152,7 @@ class LoadExerciseGuideUseCaseTest {
 
   @Test
   fun `no hits asks for a guide reference instead of guessing`() = runTest {
-    val state = LoadExerciseGuideUseCase(FakeProvider()).execute(exercise("Kissa-lehmä"))
+    val state = LoadExerciseGuideUseCase(FakeProvider()).execute(exercise("Unknown movement"))
 
     val unavailable = state as ExerciseGuideState.Unavailable
     assertTrue(unavailable.message.contains("guide"))

@@ -1,5 +1,8 @@
 # Exercise Guide
 
+September 2026: decorated Finnish names now resolve through curated aliases and search terms,
+and the plan's own notes remain available offline. See [Training automation](TRAINING_AUTOMATION.md#exercise-lookup).
+
 *(Status: **implemented** on 2026-08-09. Sections 1–6 are the design and describe what was built;
 ["As built"](#as-built) at the end records where reality differed from the plan and why. Findings
 depend on a third party's terms and should be re-checked before this feature is changed.)*

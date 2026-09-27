@@ -6,6 +6,7 @@ import android.content.Context
 
 object NotificationChannels {
     const val WORKOUT_REMINDERS = "workout_reminders"
+    const val ANALYSES = "workout_analyses"
 
     /**
      * Separate from [WORKOUT_REMINDERS] on purpose. Turning off training reminders is a thing
@@ -32,5 +33,6 @@ object NotificationChannels {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(reminders)
         notificationManager.createNotificationChannel(updates)
+        notificationManager.createNotificationChannel(NotificationChannel(ANALYSES, "AI-analyysit", NotificationManager.IMPORTANCE_DEFAULT))
     }
 }

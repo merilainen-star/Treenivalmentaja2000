@@ -1,9 +1,24 @@
 # Data Model
 
-*(Status: **implemented**. `AppDatabase` is at schema version 16 with `exportSchema = true`;
+*(Status: **implemented**. `AppDatabase` is at schema version 19 with `exportSchema = true`;
 schemas are written by KSP to `app/schemas/`. See "Schema versions and migrations" below.)*
 
 Room is the single source of truth ([ADR-003](DECISIONS.md#adr-003-local-offline-first-source-of-truth)).
+
+Version 19 adds `intervals_run_traces`, containing relative-time HR samples and elapsed lap
+boundaries as JSON plus the successful fetch timestamp. Empty traces distinguish missing data
+from a pending fetch. KSP generates the additive 18→19 auto-migration; all v18 tables and the
+explicit two-shape 17→18 compatibility migration remain. See [timeline behavior](RUN_TIMELINE.md).
+
+Version 18 reconciles two shipped version-17 schemas: release `45fad49` stored
+`intervals_run_laps` / `intervals_lap_fetches`, while the GUI preview stored `session_analyses`.
+The explicit 17→18 migration creates only missing tables, retaining all existing records. Both
+v17 variants and the 16→18 path have device migration tests. The checked-in v17 schema is the
+original release's KSP output; the GUI variant's exact generated schema is a test asset. No
+destructive fallback is enabled. See also [the crash correction](STARTUP_SCHEMA_FIX.md).
+
+`session_analyses` holds durable analysis receipts and results; see
+[Training automation](TRAINING_AUTOMATION.md#durable-analysis). The additive migration is KSP-generated.
 The schema below is implemented in `fi.merilainen.treenivalmentaja.data.local`.
 
 ## Entity Relationship Diagram

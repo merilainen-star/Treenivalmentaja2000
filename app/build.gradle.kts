@@ -13,6 +13,12 @@ ksp {
   arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+// Migration tests package the schemas KSP produces in this build. Without this dependency,
+// asset merging can race KSP and package yesterday's schema alongside today's migration.
+tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach {
+  dependsOn("kspDebugKotlin")
+}
+
 android {
   namespace = "fi.merilainen.treenivalmentaja"
   compileSdk { version = release(36) { minorApiLevel = 1 } }

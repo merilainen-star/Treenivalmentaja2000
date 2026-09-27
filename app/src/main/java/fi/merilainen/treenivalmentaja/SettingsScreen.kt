@@ -71,6 +71,8 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     val analysisModel by viewModel.analysisModel.collectAsState()
     val advisorConstraints by viewModel.advisorConstraints.collectAsState()
     val themePreference by viewModel.themePreference.collectAsState()
+    val automationSettings by viewModel.automationSettings.collectAsState()
+    val autoExportMessage by viewModel.autoExportMessage.collectAsState()
 
     /** Whether the raw-data sheet is open. Screen state, so it lives on the screen. */
     var rawDataOpen by rememberSaveable { mutableStateOf(false) }
@@ -169,6 +171,9 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
     }
 
     SettingsScreenContent(
+        automationSettings = automationSettings,
+        onAutomationChange = viewModel::setAutomationSettings,
+        autoExportMessage = autoExportMessage,
         settings = settings,
         updateStatus = updateStatus,
         ouraState = ouraState,
@@ -262,6 +267,9 @@ fun SettingsScreen(viewModel: WorkoutViewModel) {
 /** Settings, as a function of what it is given. */
 @Composable
 fun SettingsScreenContent(
+    automationSettings: fi.merilainen.treenivalmentaja.data.settings.AutomationSettings = fi.merilainen.treenivalmentaja.data.settings.AutomationSettings(),
+    onAutomationChange: (fi.merilainen.treenivalmentaja.data.settings.AutomationSettings) -> Unit = {},
+    autoExportMessage: String? = null,
     settings: NotificationSettings,
     updateStatus: UpdateStatus = UpdateStatus.Idle,
     ouraState: OuraConnectionState = OuraConnectionState.NotConfigured,
@@ -392,6 +400,7 @@ fun SettingsScreenContent(
         }
 
         ThemeCard(selected = themePreference, onSelect = onThemePreferenceChange)
+        AutomationCard(automationSettings, onAutomationChange, autoExportMessage)
 
         OuraCard(
             state = ouraState,

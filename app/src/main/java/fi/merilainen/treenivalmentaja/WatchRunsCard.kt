@@ -42,7 +42,7 @@ fun WatchRunsCard(
   Card(Modifier.fillMaxWidth()) {
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
       Text("Juoksut Suuntoon", style = MaterialTheme.typography.titleLarge)
-      Text("Tänään ja seuraavat 6 päivää. Tarkista vaiheet ennen vientiä. Voimaharjoituksia ei viedä.")
+      Text("Seuraavat 14 päivää. Tarkista vaiheet ennen vientiä. Voimaharjoituksia ei viedä.")
       Text("Ota Intervals.icu:n Settings → Suunto -kohdassa Upload planned workouts käyttöön ja valitse Run. Synkronoi viennin jälkeen Suunto-sovellus ja kello.", style = MaterialTheme.typography.bodySmall)
       runs.forEach { run ->
         HorizontalDivider()
@@ -53,7 +53,7 @@ fun WatchRunsCard(
         OutlinedButton(onClick = { editing = run }, enabled = !busy) { Text("Muokkaa vaiheita") }
       }
       if (runs.isEmpty()) Text("Ei tulevia juoksuja tällä jaksolla.")
-      Text("Vienti päivittää saman treenin ja poistaa tämän sovelluksen perutut tai siirretyt viennit jaksolta. Vie uudelleen, jos muutat ohjelmaa.", style = MaterialTheme.typography.bodySmall)
+      Text("Vienti päivittää saman treenin ja poistaa tämän sovelluksen perutut tai siirretyt viennit jaksolta. Automatiikan ollessa käytössä muutokset viedään taustalla.", style = MaterialTheme.typography.bodySmall)
       Button(
         onClick = onExport,
         enabled = connected && !busy && runs.all { it.runSteps?.validRunSteps() == true },

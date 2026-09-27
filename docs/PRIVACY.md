@@ -172,12 +172,17 @@ was granted with until you disconnect and reconnect.
 
 ## What the app reads from intervals.icu, and what it does not
 
-The app reads your activities and daily wellness for date ranges, and fetches streams for running
-kilometre splits. Activity fields are explicitly selected; wellness stores CTL/ATL, and streams
-are reduced on the device to split rows and then discarded.
+The app reads your activities and daily wellness for date ranges, fetches streams for running
+kilometre splits, and fetches original watch files for lap summaries. Activity fields are explicitly
+selected; wellness stores CTL/ATL. Streams are reduced on the device to split rows and original
+watch files to lap time, distance and heart-rate rows. The files, including GPS tracks, are then
+discarded; no location is stored. Relative-time HR/speed samples and lap boundaries are also retained
+for the post-run chart and removed when the Intervals connection is cleared. Lap summaries are
+included in requested workout AI analyses; the raw HR/speed sample series is used for the local chart.
 
-It **never writes anything** to intervals.icu — no activity is created, edited, uploaded or
-deleted, and no note, plan or calendar entry is posted. It does not read your profile, your athlete
+Recorded activities are not edited or deleted. The authorized workout-export feature writes this
+app's planned running workouts to the Intervals calendar; its automatic switch is described in
+[TRAINING_AUTOMATION.md](TRAINING_AUTOMATION.md). It does not read your profile, your athlete
 settings, other athletes, or anything belonging to anyone else.
 
 A personal API key is used rather than OAuth, because this app is used by one person for their own

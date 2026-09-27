@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import fi.merilainen.treenivalmentaja.data.intervals.FitBuilder
 import fi.merilainen.treenivalmentaja.data.intervals.IntervalsClient
 import fi.merilainen.treenivalmentaja.data.intervals.clearCachedIntervalsData
 import fi.merilainen.treenivalmentaja.data.local.AppDatabase
@@ -20,6 +21,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -59,6 +61,11 @@ class IntervalsRepositoryTest {
   /** How many times the streams endpoint was asked, which is the budget under test. */
   private var streamRequests = 0
 
+  /** Served for `/file` only — the original upload the laps are read from. 404 unless set. */
+  private var fileStatus = 404
+  private var fileBytes = ByteArray(0)
+  private var fileRequests = 0
+
   @Before
   fun setUp() {
     db =
@@ -74,6 +81,12 @@ class IntervalsRepositoryTest {
     server.createContext("/") { exchange: HttpExchange ->
       responseEntered?.complete(Unit)
       responseRelease?.await(5, java.util.concurrent.TimeUnit.SECONDS)
+      if (exchange.requestURI.path.endsWith("/file")) {
+        fileRequests++
+        exchange.sendResponseHeaders(fileStatus, if (fileBytes.isEmpty()) -1 else fileBytes.size.toLong())
+        exchange.responseBody.use { if (fileBytes.isNotEmpty()) it.write(fileBytes) }
+        return@createContext
+      }
       val streams = exchange.requestURI.path.endsWith("/streams")
       if (streams) streamRequests++
       val bytes = (if (streams) streamsBody else body).toByteArray()
@@ -91,6 +104,7 @@ class IntervalsRepositoryTest {
         dao = db.intervalsDao(),
         clock = { FETCHED_AT },
         generation = generation,
+        metricsDispatcher = dispatcher,
       )
   }
 
@@ -558,6 +572,148 @@ class IntervalsRepositoryTest {
       assertTrue(db.intervalsDao().splitFetchedActivityIds().isEmpty())
       assertTrue(db.intervalsDao().observeMatchedSplits().first().isEmpty())
     }
+
+  /**
+   * The reason laps are read at all: intervals.icu reduced a Guide session with a lap per stage to
+   * one interval, so the repetition times exist only in the watch's own file.
+   */
+  @Test
+  fun `a sync reads the watch's laps from the original file`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    fileStatus = 200
+    fileBytes =
+      FitBuilder()
+        .lapDefinition(0)
+        .lap(0, timerMs = 720_000, distanceCm = 215_400, avgHr = 135, maxHr = 160)
+        .lap(0, timerMs = 116_600, distanceCm = 40_000, avgHr = 150, maxHr = 160)
+        .build()
+
+    syncAndMatch()
+
+    val laps = repository.observeMatchedRunMetrics().first().getValue("session-run").laps
+    assertEquals(listOf(1, 2), laps.map { it.index })
+    assertEquals(116_600L, laps[1].durationMs)
+    assertEquals(400.0, laps[1].distanceMeters!!, 0.001)
+    assertEquals(150, laps[1].avgHeartRate)
+  }
+
+  /** No file (a manual entry) is an answer, recorded once — not a question asked forever. */
+  @Test
+  fun `an activity with no original file is not asked about twice`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    fileStatus = 404
+
+    repository.sync(FROM, TO, zone)
+    repository.sync(FROM, TO, zone)
+
+    assertEquals(1, fileRequests)
+  }
+
+  /** A service that is down has said nothing about the run, so the run is asked about again. */
+  @Test
+  fun `a failing file request costs the laps and nothing else, and is retried`() =
+    runTest(dispatcher) {
+      body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+      fileStatus = 503
+
+      val result = repository.sync(FROM, TO, zone)
+      repository.sync(FROM, TO, zone)
+
+      assertTrue(result.toString(), result is IntervalsSyncResult.Success)
+      assertEquals(2, fileRequests)
+      assertTrue(db.intervalsDao().lapFetchedActivityIds().isEmpty())
+    }
+
+  @Test
+  fun `a walk is never asked for its file`() = runTest(dispatcher) {
+    body = """[${oneRunBody("i1", "2026-08-15T06:12:03Z", type = "Walk")}]"""
+
+    repository.sync(FROM, TO, zone)
+
+    assertEquals(0, fileRequests)
+  }
+
+  @Test
+  fun `a sync asks for no more files than its budget allows`() = runTest(dispatcher) {
+    body =
+      (1..10).joinToString(prefix = "[", postfix = "]", separator = ",") {
+        oneRunBody("i$it", "2026-08-0${it % 9 + 1}T06:12:03Z")
+      }
+
+    repository.sync(FROM, TO, zone)
+
+    assertEquals(IntervalsRepository.MAX_LAP_FETCHES_PER_SYNC, fileRequests)
+  }
+
+  @Test
+  fun `laps and their fetch markers are part of what clearing the key removes`() =
+    runTest(dispatcher) {
+      body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+      fileStatus = 200
+      fileBytes = FitBuilder().lapDefinition(0).lap(0, 15_000, 4_630, 137, 140).lap(0, 45_000, 12_410, 140, 144).build()
+      syncAndMatch()
+
+      db.intervalsDao().clearCachedIntervalsData()
+
+      assertTrue(db.intervalsDao().lapFetchedActivityIds().isEmpty())
+      assertTrue(db.intervalsDao().observeMatchedLaps().first().isEmpty())
+    }
+
+  @Test fun `FIT trace reaches observed metrics and disconnect clears it`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    fileStatus = 200
+      fileBytes = FitBuilder().timedLapDefinition(0).speedDefinition(1)
+        .speed(1, 1000, 3000).speed(1, 1010, 4000).timedLap(0, 1000, 1030, 20_000).build()
+    syncAndMatch()
+    val trace = repository.observeMatchedRunMetrics().first().getValue("session-run").trace!!
+      assertEquals(listOf(150, 150), trace.heartRate.map { it.bpm })
+      assertEquals(listOf(3.0, 4.0), trace.speed.map { it.metersPerSecond })
+    assertEquals(30L, trace.laps.single().endSecond)
+    repository.sync(FROM, TO, zone)
+    assertEquals(1, fileRequests)
+    db.intervalsDao().clearCachedIntervalsData()
+    assertTrue(db.intervalsDao().traceFetchedActivityIds().isEmpty())
+    assertTrue(db.intervalsDao().observeMatchedTraces().first().isEmpty())
+  }
+
+  @Test fun `trace backfill retries failure and does not erase old laps when file disappears`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    fileStatus = 503
+    syncAndMatch()
+      db.intervalsDao().replaceLaps("i1", listOf(fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity("i1", 1, 120_000)), 1)
+      db.intervalsDao().upsertTrace(fi.merilainen.treenivalmentaja.data.local.entity.IntervalsTraceEntity("i1",
+        """{"heartRate":[{"second":0,"bpm":123}],"laps":[]}""", 1))
+      repository.sync(FROM, TO, zone)
+      assertFalse(fi.merilainen.treenivalmentaja.data.intervals.RunTraceJson.isCurrent(db.intervalsDao().tracesForActivities(listOf("i1")).single().traceJson))
+    fileStatus = 404
+    repository.sync(FROM, TO, zone)
+    repository.matchActivities(listOf(PlannedSession("session-run", Instant.parse("2026-08-15T06:12:03Z").toEpochMilli(), WorkoutType.RUNNING)), 0, Long.MAX_VALUE)
+    assertEquals(120_000L, repository.observeMatchedRunMetrics().first().getValue("session-run").laps.single().durationMs)
+      assertEquals(listOf("i1"), db.intervalsDao().traceFetchedActivityIds())
+      assertEquals(123, repository.observeMatchedRunMetrics().first().getValue("session-run").trace!!.heartRate.single().bpm)
+      assertTrue(fi.merilainen.treenivalmentaja.data.intervals.RunTraceJson.isCurrent(db.intervalsDao().tracesForActivities(listOf("i1")).single().traceJson))
+    repository.sync(FROM, TO, zone)
+      assertEquals(3, fileRequests)
+    }
+
+  @Test fun `legacy trace fetches speed once without losing lap metrics`() = runTest(dispatcher) {
+    body = oneRunBodyWrapped("i1", "2026-08-15T06:12:03Z")
+    fileStatus = 200
+    fileBytes = FitBuilder().timedLapDefinition(0).heartDefinition(1)
+      .heart(1, 1000, 120).timedLap(0, 1000, 1030, 30_000).build()
+    syncAndMatch()
+    val row = db.intervalsDao().tracesForActivities(listOf("i1")).single()
+    db.intervalsDao().upsertTrace(row.copy(traceJson = row.traceJson.replace("\"formatVersion\":2", "\"formatVersion\":1")))
+    fileBytes = FitBuilder().timedLapDefinition(0).speedDefinition(1)
+      .speed(1, 1000, 4000).timedLap(0, 1000, 1030, 30_000).build()
+    repository.sync(FROM, TO, zone)
+    repository.matchActivities(listOf(PlannedSession("session-run", Instant.parse("2026-08-15T06:12:03Z").toEpochMilli(), WorkoutType.RUNNING)), 0, Long.MAX_VALUE)
+    val metrics = repository.observeMatchedRunMetrics().first().getValue("session-run")
+    assertEquals(4.0, metrics.trace!!.speed.single().metersPerSecond!!, 0.0)
+    assertEquals(30_000L, metrics.laps.single().durationMs)
+    repository.sync(FROM, TO, zone)
+    assertEquals(2, fileRequests)
+  }
 
   private companion object {
     val FROM: LocalDate = LocalDate.of(2026, 8, 1)

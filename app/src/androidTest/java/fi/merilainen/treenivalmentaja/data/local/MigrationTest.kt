@@ -15,6 +15,81 @@ private const val TEST_DB = "migration-test"
 
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
+  @Test fun migrate18To19PreservesHistoryAndAddsEmptyTraceCache() {
+    helper.createDatabase(TEST_DB, 18).apply {
+      execSQL("INSERT INTO intervals_run_laps VALUES ('watch',1,97500,400.0,151,162)")
+      execSQL("INSERT INTO intervals_lap_fetches VALUES ('watch',1,1000)")
+      close()
+    }
+    val migrated = helper.runMigrationsAndValidate(TEST_DB, 19, true, AppDatabase.MIGRATION_17_18)
+    migrated.query("SELECT durationMs FROM intervals_run_laps WHERE activityId='watch'").use {
+      assertTrue(it.moveToFirst()); assertEquals(97500L, it.getLong(0))
+    }
+    migrated.query("SELECT COUNT(*) FROM intervals_run_traces").use {
+      assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0))
+    }
+    migrated.close()
+  }
+  @Test fun migrate16To19KeepsHistoryAndAddsAnalyses() {
+    helper.createDatabase(TEST_DB, 16).apply {
+      execSQL("INSERT INTO training_plans (id,name,schemaVersion,timeZone,startDate,createdAt,contentHash,isActive) VALUES ('keep','Keep',1,'Europe/Helsinki','2026-09-27',1,'hash',1)")
+      close()
+    }
+    val migrated = helper.runMigrationsAndValidate(TEST_DB, 19, true, AppDatabase.MIGRATION_17_18)
+    migrated.query("SELECT name FROM training_plans WHERE id='keep'").use {
+      assertTrue(it.moveToFirst()); assertEquals("Keep", it.getString(0))
+    }
+    migrated.query("SELECT COUNT(*) FROM session_analyses").use {
+      assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0))
+    }
+    migrated.close()
+  }
+  @Test fun releasedLapSchema17UpgradesWithoutLosingLaps() {
+    helper.createDatabase(TEST_DB, 17).apply {
+      execSQL("INSERT INTO intervals_run_laps VALUES ('watch',1,97500,400.0,151,162)")
+      execSQL("INSERT INTO intervals_lap_fetches VALUES ('watch',1,1000)")
+      close()
+    }
+    val migrated = helper.runMigrationsAndValidate(TEST_DB, 19, true, AppDatabase.MIGRATION_17_18)
+    migrated.query("SELECT durationMs, distanceMeters FROM intervals_run_laps WHERE activityId='watch'").use {
+      assertTrue(it.moveToFirst()); assertEquals(97500L, it.getLong(0)); assertEquals(400.0, it.getDouble(1), 0.0)
+    }
+    migrated.query("SELECT lapCount FROM intervals_lap_fetches WHERE activityId='watch'").use {
+      assertTrue(it.moveToFirst()); assertEquals(1, it.getInt(0))
+    }
+    migrated.query("SELECT COUNT(*) FROM session_analyses").use { assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0)) }
+    migrated.close()
+  }
+  @Test fun guiSchema17UpgradesWithoutLosingAnalysesOrHistory() {
+    helper.createDatabase(TEST_DB, 17).apply {
+      // Exact KSP-generated GUI schema is kept as an immutable regression fixture.
+      val json = InstrumentationRegistry.getInstrumentation().context.assets.open("legacy-gui-v17.json")
+        .bufferedReader().use { org.json.JSONObject(it.readText()) }.getJSONObject("database")
+      execSQL("DROP TABLE intervals_run_laps")
+      execSQL("DROP TABLE intervals_lap_fetches")
+      val tables = json.getJSONArray("entities")
+      for (index in 0 until tables.length()) {
+        val table = tables.getJSONObject(index)
+        if (table.getString("tableName") == "session_analyses")
+          execSQL(table.getString("createSql").replace("\${TABLE_NAME}", "session_analyses"))
+      }
+      execSQL("UPDATE room_master_table SET identity_hash = ? WHERE id = 42", arrayOf(json.getString("identityHash")))
+      execSQL("INSERT INTO training_plans (id,name,schemaVersion,timeZone,startDate,createdAt,contentHash,isActive) VALUES ('keep','Keep',1,'Europe/Helsinki','2026-09-27',1,'hash',1)")
+      execSQL("INSERT INTO workout_sessions (id,planId,type,weekNumber,scheduledDate,remindAtUtc,timeIsFixed,durationMin,description,status,appliedLighterVariant,updatedAt) VALUES ('run','keep','RUNNING',1,'2026-09-27',1000,0,30,'Keep','COMPLETED',0,1000)")
+      execSQL("INSERT INTO session_analyses VALUES ('run','COMPLETED','LOADED','Saved result','Saved prompt','test-model',1000)")
+      execSQL("INSERT INTO session_events (id,sessionId,timestampUtc,fromStatus,toStatus,source,note) VALUES ('history','run',1000,'PLANNED','COMPLETED','USER','Keep history')")
+      close()
+    }
+    val migrated = helper.runMigrationsAndValidate(TEST_DB, 19, true, AppDatabase.MIGRATION_17_18)
+    migrated.query("SELECT text FROM session_analyses WHERE sessionId='run'").use {
+      assertTrue(it.moveToFirst()); assertEquals("Saved result", it.getString(0))
+    }
+    migrated.query("SELECT note FROM session_events WHERE id='history'").use {
+      assertTrue(it.moveToFirst()); assertEquals("Keep history", it.getString(0))
+    }
+    migrated.query("SELECT COUNT(*) FROM intervals_run_laps").use { assertTrue(it.moveToFirst()); assertEquals(0, it.getInt(0)) }
+    migrated.close()
+  }
   @get:Rule
   val helper: MigrationTestHelper =
     MigrationTestHelper(

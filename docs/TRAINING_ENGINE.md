@@ -18,7 +18,7 @@ A `WorkoutSession` has exactly one of the following states. The enum is
 | `PLANNED` | Scheduled, alarm not yet fired. Initial state of every imported session. | No |
 | `NOTIFIED` | The AlarmManager reminder has fired; the user has been told but has not acted. | No |
 | `STARTED` | The user has started the session (or Oura reports an in-progress workout). | No |
-| `COMPLETED` | Done — manually confirmed or matched to an Oura workout. | **Yes** |
+| `COMPLETED` | Done — manually confirmed or conservatively detected as a Suunto run. Oura matching alone does not complete it. | **Yes**, except explicit undo of an automatic mark |
 | `SKIPPED` | Never started, and not moved to another day. | **Yes** |
 | `INTERRUPTED` | Started, then ended on purpose before the plan's movements ran out. | **Yes** |
 | `RESCHEDULED` | Moved to another day. This row is closed; a **new** session row carries the new date and points back here via `originalSessionId`. | **Yes** |
@@ -27,6 +27,9 @@ A `WorkoutSession` has exactly one of the following states. The enum is
 | `CANCELLED` | Removed from the plan entirely (plan rebuild, plan replaced, user deleted it). Never counted as missed. | **Yes** |
 
 Notes:
+- Automatic Suunto completion is a separate, optional coordinator, not a side effect of ordinary
+  activity matching. It records provenance, supports explicit undo and preserves illness/user
+  decisions. See [rules and verification](TRAINING_AUTOMATION.md#completion).
 - `SKIPPED` and `INTERRUPTED` split what used to be one status. `SKIPPED` is now reachable only
   from a session that has not been started — `STARTED` cannot transition to it. A session ended on
   purpose partway through goes to `INTERRUPTED` instead, which is what lets the AI analysis ("miten

@@ -29,6 +29,13 @@ fun TreenivalmentajaApp(
     viewModel: WorkoutViewModel = viewModel(factory = WorkoutViewModel.Factory)
 ) {
     val navController = rememberNavController()
+    val analysisSession by viewModel.pendingAnalysisSession.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(analysisSession) {
+      analysisSession?.let {
+        navController.navigate("analysis/${android.net.Uri.encode(it)}") { launchSingleTop = true }
+        viewModel.analysisNavigationHandled()
+      }
+    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val activeWorkoutVisible = currentDestination?.route?.startsWith("active/") == true
@@ -112,6 +119,9 @@ fun TreenivalmentajaApp(
             }
             composable("week") { WeekScreen(viewModel) }
             composable("settings") { SettingsScreen(viewModel) }
+            composable("analysis/{sessionId}", arguments = listOf(navArgument("sessionId") { type = NavType.StringType })) { entry ->
+              SessionAnalysisScreen(entry.arguments?.getString("sessionId").orEmpty(), viewModel)
+            }
             composable(
               route = "active/{sessionId}",
               arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),

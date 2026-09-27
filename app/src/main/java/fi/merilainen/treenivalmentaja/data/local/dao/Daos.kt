@@ -9,6 +9,8 @@ import androidx.room.Update
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraDailySummaryEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.OuraWorkoutEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsActivityEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsLapFetchEntity
+import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunLapEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsRunSplitEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsSplitFetchEntity
 import fi.merilainen.treenivalmentaja.data.local.entity.IntervalsWellnessEntity
@@ -122,6 +124,8 @@ interface WorkoutSessionDao {
  */
 @Dao
 interface SessionEventDao {
+  @Query("SELECT DISTINCT s.id FROM workout_sessions s INNER JOIN session_events e ON e.sessionId = s.id WHERE s.status = 'COMPLETED' AND e.source = 'INTERVALS_SYNC' AND NOT EXISTS (SELECT 1 FROM session_events u WHERE u.sessionId = s.id AND u.source = 'USER' AND u.timestampUtc >= e.timestampUtc)")
+  fun observeAutoCompletedIds(): Flow<List<String>>
   @Insert(onConflict = OnConflictStrategy.ABORT) suspend fun insert(event: SessionEventEntity)
 
   @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -307,4 +311,56 @@ interface IntervalsDao {
   @Query("DELETE FROM intervals_run_splits") suspend fun clearSplits()
 
   @Query("DELETE FROM intervals_split_fetches") suspend fun clearSplitFetches()
+
+  // ---------------------------------------------------------------- watch laps
+
+  /** Replaces one activity's laps and records that they were fetched — see [replaceSplits]. */
+  @Transaction
+  suspend fun replaceLaps(activityId: String, laps: List<IntervalsRunLapEntity>, fetchedAtUtc: Long) {
+    deleteLaps(activityId)
+    if (laps.isNotEmpty()) upsertLaps(laps)
+    upsertLapFetch(
+      IntervalsLapFetchEntity(activityId = activityId, lapCount = laps.size, fetchedAtUtc = fetchedAtUtc)
+    )
+  }
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertLaps(laps: List<IntervalsRunLapEntity>)
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertLapFetch(fetch: IntervalsLapFetchEntity)
+
+  @Query("DELETE FROM intervals_run_laps WHERE activityId = :activityId")
+  suspend fun deleteLaps(activityId: String)
+
+  /** Which activities have already been asked about — successfully or not. */
+  @Query("SELECT activityId FROM intervals_lap_fetches")
+  suspend fun lapFetchedActivityIds(): List<String>
+
+  /** Every lap of every activity tied to a session, for the screens and the prompts. */
+  @Query(
+    "SELECT l.* FROM intervals_run_laps l " +
+      "INNER JOIN intervals_activities a ON a.id = l.activityId " +
+      "WHERE a.matchedSessionId IS NOT NULL " +
+      "ORDER BY l.activityId, l.lapIndex"
+  )
+  fun observeMatchedLaps(): Flow<List<IntervalsRunLapEntity>>
+
+  @Query("DELETE FROM intervals_run_laps") suspend fun clearLaps()
+
+  @Query("DELETE FROM intervals_lap_fetches") suspend fun clearLapFetches()
+
+  @Insert(onConflict = OnConflictStrategy.REPLACE)
+  suspend fun upsertTrace(trace: fi.merilainen.treenivalmentaja.data.local.entity.IntervalsTraceEntity)
+
+  @Query("SELECT activityId FROM intervals_run_traces")
+  suspend fun traceFetchedActivityIds(): List<String>
+
+  @Query("SELECT * FROM intervals_run_traces WHERE activityId IN (:ids)")
+  suspend fun tracesForActivities(ids: List<String>): List<fi.merilainen.treenivalmentaja.data.local.entity.IntervalsTraceEntity>
+
+  @Query("SELECT t.* FROM intervals_run_traces t INNER JOIN intervals_activities a ON a.id=t.activityId WHERE a.matchedSessionId IS NOT NULL")
+  fun observeMatchedTraces(): Flow<List<fi.merilainen.treenivalmentaja.data.local.entity.IntervalsTraceEntity>>
+
+  @Query("DELETE FROM intervals_run_traces") suspend fun clearTraces()
 }
