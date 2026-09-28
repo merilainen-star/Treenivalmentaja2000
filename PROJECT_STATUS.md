@@ -1,5 +1,28 @@
 # Project status
 
+## Last verified build — 28 September 2026, cross-platform screenshot tolerance
+
+The test-APK workflow at `c95bed1` built and tested the app but stopped before publishing because
+all six new run-review screenshots required exact pixel identity. CI runs on Linux while their
+baselines were recorded on Windows. The uploaded CI comparisons were inspected: layout, content,
+colours and chart geometry matched; the differences were sparse font-rasterization pixels. The new
+suite now uses the same **0.5%** Roborazzi change threshold as the existing component and screen
+suites. Baseline images were not replaced.
+
+The workflow's two Gradle invocations were reproduced locally in the same order. Build, JVM tests
+and both lints succeeded in **5m 37s**; the separate screenshot verification succeeded in **2m
+32s**. Measured tests/failures/errors: **976/0/0 JVM**, including **81/0/0 screenshots**. Debug and
+personal lint: each **0 errors / 48 warnings**. Personal APK: **14,953,238 bytes = 14.953238 MB**
+(decimal MB). No failed local checks remain.
+
+Exact commands:
+
+```powershell
+.\gradlew.bat --no-daemon :app:assemblePersonal :app:testDebugUnitTest :app:lintDebug :app:lintPersonal --console=plain
+.\gradlew.bat --no-daemon :app:verifyRoborazziDebug --console=plain
+. .scratch/report-gui-verification.ps1
+```
+
 ## Last verified build — 27 September 2026, final main merge verification
 
 The Oura activity header change and the measured workout timeline work were verified after merging

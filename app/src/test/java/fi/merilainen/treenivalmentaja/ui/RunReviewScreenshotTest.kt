@@ -16,6 +16,12 @@ import org.robolectric.annotation.*
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = RobolectricDeviceQualifiers.Pixel5)
 class RunReviewScreenshotTest {
+  // The committed baselines are recorded on Windows while CI runs on Linux. Match the other
+  // screenshot suites' tolerance so sub-pixel font rasterization does not block APK publishing.
+  private val options = RoborazziOptions(
+    compareOptions = RoborazziOptions.CompareOptions(changeThreshold = 0.005f),
+  )
+
   private val steps = buildList {
     add(RunStep("Lämmittely - 12 min kevyttä juoksua", durationSec = 720))
     repeat(3) { add(RunStep("Kiihdytys ${it + 1}/3 - rento, ei sprinttiä", durationSec = 15))
@@ -43,7 +49,10 @@ class RunReviewScreenshotTest {
     val workout = Workout("run", 0, WorkoutType.RUNNING, "12:00", 45,
       "Hallittu vetoharjoitus. Juokse vedot tasaisesti ja kiihdytykset rennosti.",
       status = if (done) SessionStatus.COMPLETED else SessionStatus.PLANNED, runSteps = steps)
-    captureRoboImage("src/test/screenshots/run_review_${if (dark) "dark" else "light"}_${if (done) "after" else "before"}.png") {
+    captureRoboImage(
+      "src/test/screenshots/run_review_${if (dark) "dark" else "light"}_${if (done) "after" else "before"}.png",
+      roborazziOptions = options,
+    ) {
       MyApplicationTheme(darkTheme = dark) { Surface(Modifier.fillMaxSize()) {
         TodayScreenContent(listOf(workout),
           recovery = DailyRecovery(date = "2026-09-27", readiness = 82, sleep = 76),
@@ -59,7 +68,10 @@ class RunReviewScreenshotTest {
   @Test fun darkBefore() = capture(true, false)
   @Test fun darkAfter() = capture(true, true)
   private fun chart(dark: Boolean) = stillScreenshot {
-    captureRoboImage("src/test/screenshots/run_timeline_${if (dark) "dark" else "light"}.png") {
+    captureRoboImage(
+      "src/test/screenshots/run_timeline_${if (dark) "dark" else "light"}.png",
+      roborazziOptions = options,
+    ) {
       MyApplicationTheme(darkTheme = dark) { Surface {
         RunProfileCard(steps, title = "Juoksun vaiheet · esimerkkidata", recording = trace(), completed = true, showPrescription = false)
       } }
