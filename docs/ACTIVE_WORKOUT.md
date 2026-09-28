@@ -308,6 +308,13 @@ the end, which is exactly what §8's "Tallenna treeni" button is.
 stores the *shape* it was counted against (`rounds`, `perRound`) beside the count, because "6"
 alone cannot be read later once "Kevyempi versio" has swapped the list underneath it.
 
+Leaving the active screen does not end a started session. Its step and skipped movements are kept
+in DataStore, and **Jatka ohjattua treeniä** waits for a fresh read before rebuilding the screen.
+This wait also applies when the same `WorkoutViewModel` handled the earlier visit: its last
+`Ready` value is only an in-memory snapshot, not permission to initialize a new destination at
+step zero. The current position is mirrored into that snapshot on every step and persisted for a
+later process as before.
+
 ### 4. Two schema questions
 
 `equipment` and the round break are additive optional fields, but they touch

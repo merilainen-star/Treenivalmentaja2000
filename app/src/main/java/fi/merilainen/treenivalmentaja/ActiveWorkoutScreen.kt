@@ -91,8 +91,15 @@ fun ActiveWorkoutScreen(
   val workout = workouts.firstOrNull { it.id == sessionId }
   val guideState by viewModel.guideState.collectAsState()
   val position by viewModel.activeWorkoutPosition.collectAsState()
+  var positionRequested by remember(sessionId) { mutableStateOf(false) }
 
-  LaunchedEffect(sessionId) { viewModel.startActiveWorkout(sessionId) }
+  LaunchedEffect(sessionId) {
+    // A previous visit can have left Ready(null) in the shared ViewModel. Do not build this new
+    // navigation destination from that stale answer: startActiveWorkout first changes it back to
+    // Loading, then this visit may begin observing the result meant for this session.
+    viewModel.startActiveWorkout(sessionId)
+    positionRequested = true
+  }
 
   if (workout == null) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -104,7 +111,8 @@ fun ActiveWorkoutScreen(
   // Nothing is drawn until the stored position is known. Drawing the first movement first and
   // correcting it a moment later would tell someone mid-workout that they are starting over.
   val restored =
-    when (val state = position) {
+    when (val state = position.takeIf { positionRequested }) {
+      null,
       is ActiveWorkoutPositionState.Loading -> {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return

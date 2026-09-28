@@ -741,6 +741,33 @@ class WorkoutViewModelTest {
     }
 
   @Test
+  fun `leaving and reopening in the same app process reloads the saved position`() =
+    runTest(dispatcher) {
+      val vm = viewModel()
+      advanceUntilIdle()
+      val sessionId = "s-1"
+
+      // First opening has no stored progress, just like pressing Aloita ohjattu treeni.
+      vm.startActiveWorkout(sessionId)
+      advanceUntilIdle()
+      assertNull((vm.activeWorkoutPosition.value as ActiveWorkoutPositionState.Ready).value)
+
+      // The active screen advances and is then popped with the back arrow.
+      vm.saveActiveWorkoutPosition(sessionId, stepIndex = 5, skippedKeys = listOf("1:2"))
+      advanceUntilIdle()
+
+      // Pressing Jatka on the same ViewModel must wait for a fresh read. Previously Ready(null)
+      // from the first opening could build the new screen at step zero before this read returned.
+      vm.startActiveWorkout(sessionId)
+      assertTrue(vm.activeWorkoutPosition.value is ActiveWorkoutPositionState.Loading)
+      advanceUntilIdle()
+
+      val resumed = vm.activeWorkoutPosition.value as ActiveWorkoutPositionState.Ready
+      assertEquals(5, resumed.value?.stepIndex)
+      assertEquals(listOf("1:2"), resumed.value?.skippedKeys)
+    }
+
+  @Test
   fun `a position stored for another session is not inherited`() = runTest(dispatcher) {
     val vm = viewModel()
     advanceUntilIdle()

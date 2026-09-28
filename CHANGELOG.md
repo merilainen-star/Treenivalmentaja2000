@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 Entries below a date describe what was true when they were written; they are history and are not
 rewritten when the code moves on. For the current state, see [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
+## [Unreleased] - 2026-09-28
+
+### Fixed
+- **“Jatka ohjattua treeniä” palaa keskeytyskohtaan myös saman sovelluskäynnin aikana.** Uusi
+  harjoitusnäkymä ei enää alusta itseään edellisen avauksen vanhasta `Ready(null)`-tilasta ennen
+  kuin DataStore ehtii palauttaa tallennetun liikkeen. Jokainen avaus odottaa nyt tuoreen sijainnin,
+  ja muistissa oleva sijainti päivittyy samalla kun se tallennetaan levylle.
+
 ## [Unreleased] - 2026-09-25
 
 ### Added

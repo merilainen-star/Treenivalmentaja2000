@@ -1633,6 +1633,9 @@ class WorkoutViewModel(
   val activeWorkoutPosition: StateFlow<ActiveWorkoutPositionState> = _activeWorkoutPosition
 
   fun startActiveWorkout(sessionId: String) {
+    // This ViewModel outlives the navigation destination. A second visit must not render from the
+    // Ready value left by the first one while DataStore is still loading the persisted position.
+    _activeWorkoutPosition.value = ActiveWorkoutPositionState.Loading
     viewModelScope.launch {
       // Read the position before anything else: the screen is waiting on it.
       val stored = activeWorkoutProgressStore?.load()?.takeIf { it.sessionId == sessionId }
@@ -1647,10 +1650,13 @@ class WorkoutViewModel(
 
   /** Called on every step the screen takes, so leaving it loses nothing. */
   fun saveActiveWorkoutPosition(sessionId: String, stepIndex: Int, skippedKeys: List<String>) {
+    val position =
+      ActiveWorkoutPosition(sessionId = sessionId, stepIndex = stepIndex, skippedKeys = skippedKeys)
+    // Keep the in-memory answer current as well. DataStore survives process death; this StateFlow
+    // is what a second navigation to the workout can otherwise see before that read completes.
+    _activeWorkoutPosition.value = ActiveWorkoutPositionState.Ready(position)
     viewModelScope.launch {
-      activeWorkoutProgressStore?.save(
-        ActiveWorkoutPosition(sessionId = sessionId, stepIndex = stepIndex, skippedKeys = skippedKeys)
-      )
+      activeWorkoutProgressStore?.save(position)
     }
   }
 

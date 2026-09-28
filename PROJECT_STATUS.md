@@ -1,5 +1,31 @@
 # Project status
 
+## Last verified build — 28 September 2026, guided-workout resume
+
+Returning through **Jatka ohjattua treeniä** now waits for the persisted position before it
+constructs a new active-workout screen. The regression was specific to a second visit in the same
+app process: the shared ViewModel could still expose the first visit's `Ready(null)`, so Compose
+initialized the new destination at step zero before DataStore returned the real step. The position
+is now mirrored to the StateFlow as it is saved, every new visit resets that flow to `Loading`, and
+the screen itself refuses to consume a value until it has requested the fresh load. A regression
+test executes the full ViewModel sequence: first open, progress to step 5, leave, and reopen.
+
+Build, JVM tests, screenshot comparisons and lint succeeded in **2m 17s**. Measured
+tests/failures/errors: **977/0/0 JVM**, including **81/0/0 screenshots**. Debug lint: **0 errors /
+48 warnings**. Debug APK: **22,299,135 bytes = 22.299135 MB** (decimal MB). The targeted regression
+test also passed separately (**1/0/0**). Instrumented tests were not run: `adb devices -l` reported
+no attached device or emulator, so no device result is claimed.
+
+Exact commands:
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest --tests "fi.merilainen.treenivalmentaja.WorkoutViewModelTest.leaving and reopening in the same app process reloads the saved position" --console=plain
+.\gradlew.bat :app:assembleDebug :app:lintDebug :app:testDebugUnitTest :app:verifyRoborazziDebug --console=plain
+$sdkLine = Get-Content local.properties | Where-Object { $_ -like 'sdk.dir=*' } | Select-Object -First 1
+$sdkPath = $sdkLine.Substring(8) -replace '\\:', ':' -replace '\\\\', '\'
+& (Join-Path $sdkPath 'platform-tools\adb.exe') devices -l
+```
+
 ## Last verified build — 28 September 2026, cross-platform screenshot tolerance
 
 The test-APK workflow at `c95bed1` built and tested the app but stopped before publishing because
