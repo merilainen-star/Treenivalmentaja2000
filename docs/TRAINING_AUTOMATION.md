@@ -54,6 +54,14 @@ detail request is tried by later syncs. Oura
 recovery is refreshed when connected. Structured planned run steps enter the prompt with an
 explicit warning: kilometre splits are not measured interval laps. No lap/sprint result is invented.
 
+Completed-run prompts distinguish watch active duration (net time), Intervals.icu moving time,
+and recording duration (gross time, including pauses), emitting only available measurements.
+Kilometre split pace uses the recording timeline and can include traffic-light or other pauses;
+a slow split alone does not prove slower running or fatigue. Source-reported heart-rate zone
+times may include pauses: exceeding net duration alone is not a measurement error. The prompt
+asks the model to compare against available gross duration without inventing pause locations
+or claiming that the source's zone pause handling is known.
+
 Room v18 includes `session_analyses`, keyed by session and analysis kind, with model, time, exact
 prompt, result and typed state. Its foreign key cascades when a session is deleted, including a
 confirmed program replacement/reset. Updates retain results. KSP generates the schema; the explicit

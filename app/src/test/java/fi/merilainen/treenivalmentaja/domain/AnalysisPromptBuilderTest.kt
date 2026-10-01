@@ -870,6 +870,41 @@ class AnalysisPromptBuilderTest {
 
   // ------------------------------------------------------------------ zones and splits
 
+  @Test
+  fun `paused run explains net gross and source timing without calling excess zone time an error`() {
+    val run = runWithDetail(
+      zones = heartRateZones(listOf(145, 153, 162), listOf(2854, 1188, 52)),
+      splits = listOf(RunSplit(1, 1000, 806, avgHeartRate = 136)),
+    ).copy(
+      movingTimeSec = 3500,
+      recordingTimeSec = 4109,
+      distanceKm = 9.627,
+      avgSpeedMps = 9627.0 / 3465,
+    )
+    val prompt = builder.completed(CompletedAnalysisInput(type = WorkoutType.RUNNING, date = day, run = run))
+
+    assertTrue(prompt.contains("aktiivinen kesto (nettoaika, ilman kellon taukoja) 57:45"))
+    assertTrue(prompt.contains("Intervals.icu:n liikkeessäoloaika 58:20"))
+    assertTrue(prompt.contains("tallennuksen kokonaiskesto (bruttoaika, sisältää tauot) 1:08:29"))
+    assertTrue(prompt.contains("Älä päättele mittausvirhettä pelkästä nettoajan ylityksestä"))
+    assertTrue(prompt.contains("eikä yksin osoita juoksuvauhdin hidastumista tai väsymistä"))
+    assertTrue(prompt.contains("Taukojen tarkkoja sijainteja ja kestoja ei näistä tiedoista voi erottaa"))
+    assertTrue(prompt.contains("- 1 km: 13:26 /km, syke 136"))
+    assertTrue(prompt.contains("Z1 (–145): 47:34"))
+  }
+
+  @Test
+  fun `missing watch speed and gross time do not invent a net or gross duration`() {
+    val prompt = builder.completed(CompletedAnalysisInput(
+      type = WorkoutType.RUNNING, date = day,
+      run = runWithDetail().copy(avgSpeedMps = null),
+    ))
+
+    assertTrue(prompt.contains("Intervals.icu:n liikkeessäoloaika 45:00"))
+    assertFalse(prompt.contains("- aktiivinen kesto"))
+    assertFalse(prompt.contains("- tallennuksen kokonaiskesto"))
+  }
+
   private fun runWithDetail(
     zones: HeartRateZones? = null,
     splits: List<RunSplit> = emptyList(),

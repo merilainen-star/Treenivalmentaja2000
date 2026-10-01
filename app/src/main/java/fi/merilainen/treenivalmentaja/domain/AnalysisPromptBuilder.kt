@@ -125,7 +125,9 @@ class AnalysisPromptBuilder {
       val watch = buildList {
         r.paceText?.let { add("tahti $it") }
         r.distanceKm?.let { add(km(it)) }
-        add("kesto ${r.primaryDurationSec.formatDuration()}")
+        r.activeDurationSec?.let { add("aktiivinen kesto (nettoaika, ilman kellon taukoja) ${it.formatDuration()}") }
+        add("Intervals.icu:n liikkeessäoloaika ${r.movingTimeSec.formatDuration()}")
+        r.recordingTimeSec?.let { add("tallennuksen kokonaiskesto (bruttoaika, sisältää tauot) ${it.formatDuration()}") }
         r.avgHeartRate?.let { add("keskisyke $it") }
         r.maxHeartRate?.let { add("maksimisyke $it") }
         r.trainingLoad?.let { add("kuormitus $it") }
@@ -135,6 +137,7 @@ class AnalysisPromptBuilder {
       }
       appendLine("## Toteutunut (kello, Intervals.icu)")
       watch.forEach { appendLine("- $it") }
+      appendLine("Netto- ja bruttoaika ovat eri aikaperustoja. Kellon tauot esimerkiksi liikennevaloissa voivat selittää niiden eron. Intervals.icu laskee liikkeessäoloajan erikseen, joten sekin voi poiketa kellon nettoajasta. Eri aikaperustojen ero ei yksin tarkoita virhettä mittausdatassa.")
       appendLine()
       appendZones(r.heartRateZones)
       appendLaps(r.laps, input.runSteps)
@@ -531,6 +534,7 @@ class AnalysisPromptBuilder {
   private fun StringBuilder.appendZones(zones: HeartRateZones?) {
     if (zones == null || zones.zones.isEmpty()) return
     appendLine("## Sykealueet (aika kullakin alueella)")
+    appendLine("Sykealueajat ovat lähteen ilmoittamia, eikä niiden taukojen käsittelyä ole tässä vahvistettu. Niiden summa voi ylittää nettoajan, jos syke tallentui myös tauoilla. Älä päättele mittausvirhettä pelkästä nettoajan ylityksestä; vertaa saatavilla olevaan bruttoaikaan ja kerro epävarmuudesta vain, jos ero jää selittämättä.")
     zones.zones.forEach { zone ->
       val share = zones.percentOf(zone)?.let { " ($it %)" }.orEmpty()
       appendLine("- ${zones.label(zone)}: ${zone.seconds.formatDuration()}$share")
@@ -554,6 +558,7 @@ class AnalysisPromptBuilder {
   private fun StringBuilder.appendSplits(splits: List<RunSplit>) {
     if (splits.isEmpty()) return
     appendLine("## Kilometrijaot (sovelluksen laskemat)")
+    appendLine("Kilometriväliajat ja niistä lasketut tahdit perustuvat tallennuksen aikajanaan ja voivat sisältää kellon tauot. Hidas kilometriväliaika voi johtua pysähdyksestä esimerkiksi liikennevaloissa, eikä yksin osoita juoksuvauhdin hidastumista tai väsymistä. Älä vertaa näitä tahteja suoraan nettoajasta laskettuun keskitahtiin. Taukojen tarkkoja sijainteja ja kestoja ei näistä tiedoista voi erottaa; huomioi tämä myös rauhallisen alun ja lopun arvioinnissa.")
     splits.forEach { split ->
       val parts = buildList {
         split.paceText?.let { add("$it /km") }
